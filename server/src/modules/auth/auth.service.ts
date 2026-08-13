@@ -16,6 +16,7 @@ import { normalizeEmail, normalizeFullName } from "../../utils/text.js";
 import { authDal, type PublicUserRecord } from "./dal/auth.dal.js";
 import type {
   AuthResponse,
+  AuthUserResponse,
   SignInRequest,
   SignUpRequest,
 } from "./dto/auth.dto.js";
@@ -81,6 +82,20 @@ export class AuthService {
     }
 
     return this.createAuthResponse(user);
+  }
+
+  public async getCurrentUser(userId: string): Promise<AuthUserResponse> {
+    const user = await authDal.findPublicUserById(userId);
+
+    if (!user) {
+      throw new AppError(
+        404,
+        ERROR_CODES.USER_NOT_FOUND,
+        ERROR_MESSAGES.USER_NOT_FOUND,
+      );
+    }
+
+    return user;
   }
 
   private async createAuthResponse(

@@ -43,6 +43,13 @@ export class AuthDal {
       select: credentialUserSelect,
     });
   }
+
+  public findPublicUserById(userId: string): Promise<PublicUserRecord | null> {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: publicUserSelect,
+    });
+  }
 }
 
 export const authDal = new AuthDal();

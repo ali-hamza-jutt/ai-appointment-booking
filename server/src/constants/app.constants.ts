@@ -25,6 +25,7 @@ export const ERROR_CODES = {
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
   REQUEST_VALIDATION_FAILED: "REQUEST_VALIDATION_FAILED",
   UNSUPPORTED_AUTHENTICATION: "UNSUPPORTED_AUTHENTICATION",
+  USER_NOT_FOUND: "USER_NOT_FOUND",
   WEAK_PASSWORD: "WEAK_PASSWORD",
 } as const;
 
@@ -38,6 +39,7 @@ export const ERROR_MESSAGES = {
   RATE_LIMIT_EXCEEDED: "Too many authentication attempts. Try again later",
   REQUEST_VALIDATION_FAILED: "Request validation failed",
   UNSUPPORTED_AUTHENTICATION: "Unsupported authentication method",
+  USER_NOT_FOUND: "User account was not found",
   WEAK_PASSWORD:
     "Password must include an uppercase letter, a lowercase letter, and a number",
 } as const;

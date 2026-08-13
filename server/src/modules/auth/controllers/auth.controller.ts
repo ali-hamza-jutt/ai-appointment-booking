@@ -1,17 +1,23 @@
+import type { Request as ExpressRequest } from "express";
 import {
   Body,
   Controller,
+  Get,
   Post,
+  Request,
   Response,
   Route,
+  Security,
   SuccessResponse,
   Tags,
 } from "@tsoa/runtime";
 
+import type { AuthenticatedUser } from "../../../models/authenticated-user.js";
 import type { ApiErrorResponse } from "../../../models/api-error.js";
 import { authService } from "../auth.service.js";
 import type {
   AuthResponse,
+  AuthUserResponse,
   SignInRequest,
   SignUpRequest,
 } from "../dto/auth.dto.js";
@@ -36,5 +42,21 @@ export class AuthController extends Controller {
   @Response<ApiErrorResponse>(422, "Request validation failed")
   public signIn(@Body() request: SignInRequest): Promise<AuthResponse> {
     return authService.signIn(request);
+  }
+
+  /** Returns the current user represented by the JWT subject. */
+  @Get("me")
+  @Security("jwt")
+  @SuccessResponse("200", "Current user")
+  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
+  @Response<ApiErrorResponse>(404, "User account was not found")
+  public getCurrentUser(
+    @Request() request: ExpressRequest,
+  ): Promise<AuthUserResponse> {
+    const authenticatedRequest = request as ExpressRequest & {
+      user: AuthenticatedUser;
+    };
+
+    return authService.getCurrentUser(authenticatedRequest.user.id);
   }
 }

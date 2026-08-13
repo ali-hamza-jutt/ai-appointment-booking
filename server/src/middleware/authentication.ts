@@ -5,6 +5,7 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
 } from "../constants/app.constants.js";
+import type { AuthenticatedUser } from "../models/authenticated-user.js";
 import { AppError } from "./app-error.js";
 import {
   extractBearerToken,
@@ -15,7 +16,7 @@ export async function expressAuthentication(
   request: Request,
   securityName: string,
   scopes: string[] = [],
-): Promise<{ id: string; email: string }> {
+): Promise<AuthenticatedUser> {
   if (securityName !== AUTH_CONSTANTS.SECURITY_NAME) {
     throw new AppError(
       401,
