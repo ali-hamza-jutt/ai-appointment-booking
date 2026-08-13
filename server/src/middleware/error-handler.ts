@@ -2,6 +2,7 @@ import type { ErrorRequestHandler } from "express";
 import { ValidateError } from "@tsoa/runtime";
 
 import { env } from "../config/env.js";
+import { ERROR_CODES, ERROR_MESSAGES } from "../constants/app.constants.js";
 import { AppError } from "./app-error.js";
 
 export const errorHandler: ErrorRequestHandler = (
@@ -25,8 +26,8 @@ export const errorHandler: ErrorRequestHandler = (
 
     response.status(422).json({
       error: {
-        code: "REQUEST_VALIDATION_FAILED",
-        message: "Request validation failed",
+        code: ERROR_CODES.REQUEST_VALIDATION_FAILED,
+        message: ERROR_MESSAGES.REQUEST_VALIDATION_FAILED,
         fieldErrors,
         requestId: request.id,
       },
@@ -39,6 +40,7 @@ export const errorHandler: ErrorRequestHandler = (
       error: {
         code: error.code,
         message: error.message,
+        ...(error.fieldErrors ? { fieldErrors: error.fieldErrors } : {}),
         requestId: request.id,
       },
     });
@@ -49,13 +51,13 @@ export const errorHandler: ErrorRequestHandler = (
 
   response.status(500).json({
     error: {
-      code: "INTERNAL_SERVER_ERROR",
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
       message:
         env.NODE_ENV === "production" && error instanceof Error
-          ? "An unexpected error occurred"
+          ? ERROR_MESSAGES.INTERNAL_SERVER_ERROR
           : error instanceof Error
             ? error.message
-            : "An unexpected error occurred",
+            : ERROR_MESSAGES.INTERNAL_SERVER_ERROR,
       requestId: request.id,
     },
   });

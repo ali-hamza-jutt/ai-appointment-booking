@@ -9,7 +9,11 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.ts", "prisma/**/*.ts", "prisma.config.ts"],
+    files: [
+      "src/**/*.ts",
+      "prisma/**/*.ts",
+      "prisma.config.ts",
+    ],
     languageOptions: {
       globals: globals.node,
     },

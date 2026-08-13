@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { env } from "./config/env.js";
 import { swaggerRouter } from "./docs/swagger.js";
 import { RegisterRoutes } from "./generated/routes.js";
+import { authRateLimiter } from "./middleware/auth-rate-limit.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { requestLogger } from "./middleware/request-logger.js";
@@ -21,6 +22,7 @@ app.use(
     credentials: true,
   }),
 );
+app.use("/api/auth", authRateLimiter);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
