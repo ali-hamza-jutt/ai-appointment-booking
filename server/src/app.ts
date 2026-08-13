@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 
 import { env } from "./config/env.js";
+import { swaggerRouter } from "./docs/swagger.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { requestLogger } from "./middleware/request-logger.js";
@@ -11,6 +12,7 @@ export const app = express();
 
 app.disable("x-powered-by");
 app.use(requestLogger);
+app.use("/docs", swaggerRouter);
 app.use(helmet());
 app.use(
   cors({
