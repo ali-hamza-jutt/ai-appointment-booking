@@ -9,6 +9,7 @@ const environmentSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  DATABASE_URL: z.string().trim().min(1, "DATABASE_URL is required"),
 });
 
 const parsedEnvironment = environmentSchema.safeParse(process.env);
