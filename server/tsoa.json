@@ -15,6 +15,10 @@
         "description": "Authenticated appointment creation and retrieval"
       },
       {
+        "name": "Chat",
+        "description": "Authenticated chat sessions and message history"
+      },
+      {
         "name": "Authentication",
         "description": "Account registration and access-token issuance"
       },

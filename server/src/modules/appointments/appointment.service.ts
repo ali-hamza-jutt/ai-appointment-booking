@@ -7,22 +7,21 @@ import {
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { isUniqueConstraintError } from "../../utils/database.js";
+import {
+  decodeTimestampCursor,
+  encodeTimestampCursor,
+} from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
+import { throwRequestValidationError } from "../../utils/validation.js";
 import { appointmentDal } from "./dal/appointment.dal.js";
 import type {
   AppointmentListResponse,
-  AppointmentPageCursor,
   AppointmentRecord,
   AppointmentResponse,
   AppointmentSource,
   CreateAppointmentRequest,
   ListAppointmentsOptions,
 } from "./dto/appointment.dto.js";
-
-interface SerializedAppointmentCursor {
-  id: string;
-  scheduledAt: string;
-}
 
 export class AppointmentService {
   public async createAppointment(
@@ -70,7 +69,7 @@ export class AppointmentService {
     appointmentId: string,
   ): Promise<AppointmentResponse> {
     if (!VALIDATION_PATTERNS.UUID.test(appointmentId)) {
-      this.throwValidationError(
+      throwRequestValidationError(
         "appointmentId",
         VALIDATION_MESSAGES.APPOINTMENT_ID,
       );
@@ -99,8 +98,24 @@ export class AppointmentService {
     const limit = options.limit ?? APPOINTMENT_CONSTANTS.DEFAULT_PAGE_SIZE;
     this.validateLimit(limit);
 
-    const cursor = options.cursor
-      ? this.decodeCursor(options.cursor)
+    const decodedCursor = options.cursor
+      ? decodeTimestampCursor(options.cursor)
+      : undefined;
+
+    if (options.cursor && !decodedCursor) {
+      throw new AppError(
+        422,
+        ERROR_CODES.INVALID_PAGINATION_CURSOR,
+        ERROR_MESSAGES.INVALID_PAGINATION_CURSOR,
+        { cursor: [ERROR_MESSAGES.INVALID_PAGINATION_CURSOR] },
+      );
+    }
+
+    const cursor = decodedCursor
+      ? {
+          id: decodedCursor.id,
+          scheduledAt: decodedCursor.timestamp,
+        }
       : undefined;
     const records = await appointmentDal.listAppointments({
       userId,
@@ -115,7 +130,12 @@ export class AppointmentService {
     return {
       items: page.map((appointment) => this.toResponse(appointment)),
       ...(hasMore && lastRecord
-        ? { nextCursor: this.encodeCursor(lastRecord) }
+        ? {
+            nextCursor: encodeTimestampCursor(
+              lastRecord.id,
+              lastRecord.scheduledAt,
+            ),
+          }
         : {}),
     };
   }
@@ -125,7 +145,7 @@ export class AppointmentService {
       serviceName.length < APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH ||
       serviceName.length > APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH
     ) {
-      this.throwValidationError(
+      throwRequestValidationError(
         "serviceName",
         VALIDATION_MESSAGES.APPOINTMENT_SERVICE_NAME,
       );
@@ -138,7 +158,7 @@ export class AppointmentService {
       Number.isNaN(scheduledAt.getTime()) ||
       scheduledAt.getTime() <= Date.now()
     ) {
-      this.throwValidationError(
+      throwRequestValidationError(
         "scheduledAt",
         VALIDATION_MESSAGES.APPOINTMENT_TIME,
       );
@@ -151,7 +171,7 @@ export class AppointmentService {
       durationMinutes < APPOINTMENT_CONSTANTS.MIN_DURATION_MINUTES ||
       durationMinutes > APPOINTMENT_CONSTANTS.MAX_DURATION_MINUTES
     ) {
-      this.throwValidationError(
+      throwRequestValidationError(
         "durationMinutes",
         VALIDATION_MESSAGES.APPOINTMENT_DURATION,
       );
@@ -163,7 +183,7 @@ export class AppointmentService {
       notes !== null &&
       notes.length > APPOINTMENT_CONSTANTS.MAX_NOTES_LENGTH
     ) {
-      this.throwValidationError(
+      throwRequestValidationError(
         "notes",
         VALIDATION_MESSAGES.APPOINTMENT_NOTES,
       );
@@ -176,55 +196,8 @@ export class AppointmentService {
       limit < 1 ||
       limit > APPOINTMENT_CONSTANTS.MAX_PAGE_SIZE
     ) {
-      this.throwValidationError("limit", VALIDATION_MESSAGES.PAGINATION_LIMIT);
+      throwRequestValidationError("limit", VALIDATION_MESSAGES.PAGINATION_LIMIT);
     }
-  }
-
-  private encodeCursor(appointment: AppointmentRecord): string {
-    const cursor: SerializedAppointmentCursor = {
-      id: appointment.id,
-      scheduledAt: appointment.scheduledAt.toISOString(),
-    };
-
-    return Buffer.from(JSON.stringify(cursor)).toString("base64url");
-  }
-
-  private decodeCursor(cursor: string): AppointmentPageCursor {
-    try {
-      const value = JSON.parse(
-        Buffer.from(cursor, "base64url").toString("utf8"),
-      ) as Partial<SerializedAppointmentCursor>;
-      const scheduledAt = new Date(value.scheduledAt ?? "");
-
-      if (
-        typeof value.id !== "string" ||
-        !VALIDATION_PATTERNS.UUID.test(value.id) ||
-        Number.isNaN(scheduledAt.getTime())
-      ) {
-        throw new Error("Invalid appointment cursor values");
-      }
-
-      return {
-        id: value.id,
-        scheduledAt,
-      };
-    } catch {
-      throw new AppError(
-        422,
-        ERROR_CODES.INVALID_PAGINATION_CURSOR,
-        ERROR_MESSAGES.INVALID_PAGINATION_CURSOR,
-        { cursor: [ERROR_MESSAGES.INVALID_PAGINATION_CURSOR] },
-      );
-    }
-  }
-
-  private throwValidationError(field: string, message: string): never {
-    throw new AppError(
-      422,
-      ERROR_CODES.REQUEST_VALIDATION_FAILED,
-      ERROR_MESSAGES.REQUEST_VALIDATION_FAILED,
-      { [field]: [message] },
-    );
   }
 
   private toResponse(appointment: AppointmentRecord): AppointmentResponse {
