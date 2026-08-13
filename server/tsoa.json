@@ -11,15 +11,27 @@
     "description": "HTTP API for BookWise AI.",
     "tags": [
       {
+        "name": "Authentication",
+        "description": "Account registration and access-token issuance"
+      },
+      {
         "name": "Health",
         "description": "Server availability and status"
       }
-    ]
+    ],
+    "securityDefinitions": {
+      "jwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
   },
   "routes": {
     "routesDir": "src/generated",
     "middleware": "express",
     "basePath": "/api",
+    "authenticationModule": "src/middleware/authentication.ts",
     "esm": true,
     "noWriteIfUnchanged": true
   }
