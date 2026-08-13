@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from "express";
+import { ValidateError } from "@tsoa/runtime";
 
 import { env } from "../config/env.js";
 import { AppError } from "./app-error.js";
@@ -9,6 +10,30 @@ export const errorHandler: ErrorRequestHandler = (
   response,
   _next,
 ) => {
+  if (error instanceof ValidateError) {
+    const fieldErrors = Object.fromEntries(
+      Object.entries(error.fields).map(([field, details]) => [
+        field,
+        [details.message],
+      ]),
+    );
+
+    request.log.warn(
+      { fields: Object.keys(fieldErrors) },
+      "Request validation failed",
+    );
+
+    response.status(422).json({
+      error: {
+        code: "REQUEST_VALIDATION_FAILED",
+        message: "Request validation failed",
+        fieldErrors,
+        requestId: request.id,
+      },
+    });
+    return;
+  }
+
   if (error instanceof AppError) {
     response.status(error.statusCode).json({
       error: {

@@ -2,7 +2,7 @@ import { Router } from "express";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 
-import { openApiDocument } from "./openapi.js";
+import swaggerDocument from "../generated/swagger.json" with { type: "json" };
 
 export const swaggerRouter = Router();
 
@@ -23,7 +23,7 @@ swaggerRouter.use(
 swaggerRouter.use(swaggerUi.serve);
 swaggerRouter.get(
   "/",
-  swaggerUi.setup(openApiDocument, {
+  swaggerUi.setup(swaggerDocument, {
     customSiteTitle: "BookWise AI API Documentation",
     swaggerOptions: {
       displayRequestDuration: true,
