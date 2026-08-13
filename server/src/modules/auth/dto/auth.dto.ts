@@ -33,3 +33,19 @@ export interface SignInRequest {
   /** @minLength 1 @maxLength 128 */
   password: string;
 }
+
+export interface CreateUserData {
+  email: string;
+  fullName: string;
+  passwordHash: string;
+}
+
+export interface PublicUserRecord {
+  id: string;
+  email: string;
+  fullName: string;
+}
+
+export interface CredentialUserRecord extends PublicUserRecord {
+  passwordHash: string;
+}

@@ -11,6 +11,10 @@
     "description": "HTTP API for BookWise AI.",
     "tags": [
       {
+        "name": "Appointments",
+        "description": "Authenticated appointment creation and retrieval"
+      },
+      {
         "name": "Authentication",
         "description": "Account registration and access-token issuance"
       },

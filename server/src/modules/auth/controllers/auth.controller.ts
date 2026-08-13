@@ -12,8 +12,8 @@ import {
   Tags,
 } from "@tsoa/runtime";
 
-import type { AuthenticatedUser } from "../../../models/authenticated-user.js";
 import type { ApiErrorResponse } from "../../../models/api-error.js";
+import { getAuthenticatedUser } from "../../../utils/request.js";
 import { authService } from "../auth.service.js";
 import type {
   AuthResponse,
@@ -53,10 +53,6 @@ export class AuthController extends Controller {
   public getCurrentUser(
     @Request() request: ExpressRequest,
   ): Promise<AuthUserResponse> {
-    const authenticatedRequest = request as ExpressRequest & {
-      user: AuthenticatedUser;
-    };
-
-    return authService.getCurrentUser(authenticatedRequest.user.id);
+    return authService.getCurrentUser(getAuthenticatedUser(request).id);
   }
 }

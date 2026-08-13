@@ -13,10 +13,11 @@ import {
   verifyPassword,
 } from "../../utils/password.js";
 import { normalizeEmail, normalizeFullName } from "../../utils/text.js";
-import { authDal, type PublicUserRecord } from "./dal/auth.dal.js";
+import { authDal } from "./dal/auth.dal.js";
 import type {
   AuthResponse,
   AuthUserResponse,
+  PublicUserRecord,
   SignInRequest,
   SignUpRequest,
 } from "./dto/auth.dto.js";

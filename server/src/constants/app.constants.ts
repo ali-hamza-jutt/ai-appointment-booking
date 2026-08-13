@@ -15,11 +15,29 @@ export const AUTH_CONSTANTS = {
   RATE_LIMIT_MAX_REQUESTS: 10,
 } as const;
 
+export const APPOINTMENT_CONSTANTS = {
+  DEFAULT_DURATION_MINUTES: 30,
+  MIN_DURATION_MINUTES: 5,
+  MAX_DURATION_MINUTES: 480,
+  MIN_SERVICE_NAME_LENGTH: 2,
+  MAX_SERVICE_NAME_LENGTH: 120,
+  MAX_NOTES_LENGTH: 2_000,
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 50,
+} as const;
+
+export const VALIDATION_PATTERNS = {
+  UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+} as const;
+
 export const ERROR_CODES = {
+  APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
+  APPOINTMENT_SLOT_UNAVAILABLE: "APPOINTMENT_SLOT_UNAVAILABLE",
   EMAIL_ALREADY_EXISTS: "EMAIL_ALREADY_EXISTS",
   INSUFFICIENT_SCOPE: "INSUFFICIENT_SCOPE",
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
   INVALID_FULL_NAME: "INVALID_FULL_NAME",
+  INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
   INVALID_TOKEN: "INVALID_TOKEN",
   INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
@@ -30,10 +48,14 @@ export const ERROR_CODES = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  APPOINTMENT_NOT_FOUND: "Appointment was not found",
+  APPOINTMENT_SLOT_UNAVAILABLE:
+    "An appointment already exists at the selected time",
   EMAIL_ALREADY_EXISTS: "An account with this email already exists",
   INSUFFICIENT_SCOPE: "The access token does not have the required permissions",
   INVALID_CREDENTIALS: "Invalid email or password",
   INVALID_FULL_NAME: "Full name must contain at least 2 characters",
+  INVALID_PAGINATION_CURSOR: "Pagination cursor is invalid",
   INVALID_TOKEN: "A valid access token is required",
   INTERNAL_SERVER_ERROR: "An unexpected error occurred",
   RATE_LIMIT_EXCEEDED: "Too many authentication attempts. Try again later",
@@ -42,6 +64,16 @@ export const ERROR_MESSAGES = {
   USER_NOT_FOUND: "User account was not found",
   WEAK_PASSWORD:
     "Password must include an uppercase letter, a lowercase letter, and a number",
+} as const;
+
+export const VALIDATION_MESSAGES = {
+  APPOINTMENT_ID: "Appointment ID must be a valid UUID",
+  APPOINTMENT_SERVICE_NAME:
+    "Service name must contain between 2 and 120 characters",
+  APPOINTMENT_TIME: "Scheduled time must be a valid future date and time",
+  APPOINTMENT_DURATION: "Duration must be an integer between 5 and 480 minutes",
+  APPOINTMENT_NOTES: "Notes cannot exceed 2000 characters",
+  PAGINATION_LIMIT: "Limit must be an integer between 1 and 50",
 } as const;
 
 export const DATABASE_ERROR_CODES = {
