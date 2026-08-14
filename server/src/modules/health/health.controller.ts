@@ -8,12 +8,7 @@ import {
 } from "@tsoa/runtime";
 
 import type { ApiErrorResponse } from "../../models/api-error.js";
-
-export interface HealthResponse {
-  status: "ok";
-  service: string;
-  timestamp: string;
-}
+import type { HealthResponse } from "./dto/health.dto.js";
 
 @Route("health")
 @Tags("Health")

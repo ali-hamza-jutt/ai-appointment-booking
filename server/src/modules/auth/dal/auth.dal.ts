@@ -1,4 +1,9 @@
 import { prisma } from "../../../infrastructure/database/prisma.js";
+import type {
+  CreateUserData,
+  CredentialUserRecord,
+  PublicUserRecord,
+} from "../dto/auth.dto.js";
 
 const publicUserSelect = {
   id: true,
@@ -10,22 +15,6 @@ const credentialUserSelect = {
   ...publicUserSelect,
   passwordHash: true,
 } as const;
-
-export interface CreateUserData {
-  email: string;
-  fullName: string;
-  passwordHash: string;
-}
-
-export interface PublicUserRecord {
-  id: string;
-  email: string;
-  fullName: string;
-}
-
-export interface CredentialUserRecord extends PublicUserRecord {
-  passwordHash: string;
-}
 
 export class AuthDal {
   public createUser(data: CreateUserData): Promise<PublicUserRecord> {
@@ -41,6 +30,13 @@ export class AuthDal {
     return prisma.user.findUnique({
       where: { email },
       select: credentialUserSelect,
+    });
+  }
+
+  public findPublicUserById(userId: string): Promise<PublicUserRecord | null> {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: publicUserSelect,
     });
   }
 }

@@ -7,13 +7,99 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+
+  @@map("appointment_status")
+}
+
+enum AppointmentSource {
+  FORM
+  CHAT
+
+  @@map("appointment_source")
+}
+
+enum ChatSessionStatus {
+  ACTIVE
+  CLOSED
+
+  @@map("chat_session_status")
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+
+  @@map("chat_message_role")
+}
+
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique @db.VarChar(254)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  fullName     String   @map("full_name") @db.VarChar(80)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique @db.VarChar(254)
+  passwordHash String        @map("password_hash") @db.VarChar(255)
+  fullName     String        @map("full_name") @db.VarChar(80)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  appointments Appointment[]
+  chatSessions ChatSession[]
 
   @@map("users")
+}
+
+model Appointment {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  chatSessionId   String?           @unique(map: "appointments_chat_session_id_key") @map("chat_session_id") @db.Uuid
+  serviceName     String            @map("service_name") @db.VarChar(120)
+  scheduledAt     DateTime          @map("scheduled_at") @db.Timestamptz(3)
+  durationMinutes Int               @default(30) @map("duration_minutes") @db.SmallInt
+  status          AppointmentStatus @default(PENDING)
+  source          AppointmentSource @default(FORM)
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, scheduledAt], map: "appointments_user_id_scheduled_at_key")
+  @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")
+  @@map("appointments")
+}
+
+model ChatSession {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  title          String?           @db.VarChar(120)
+  status         ChatSessionStatus @default(ACTIVE)
+  bookingContext Json?             @map("booking_context") @db.JsonB
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       ChatMessage[]
+  appointment    Appointment?
+
+  @@index([userId, updatedAt, id], map: "chat_sessions_user_id_updated_at_id_idx")
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id               String          @id @default(uuid()) @db.Uuid
+  sessionId        String          @map("session_id") @db.Uuid
+  clientMessageId  String?         @map("client_message_id") @db.Uuid
+  replyToMessageId String?         @map("reply_to_message_id") @db.Uuid
+  role             ChatMessageRole
+  content          String          @db.Text
+  structuredData   Json?           @map("structured_data") @db.JsonB
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  session          ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, clientMessageId], map: "chat_messages_session_id_client_message_id_key")
+  @@unique([sessionId, replyToMessageId], map: "chat_messages_session_id_reply_to_message_id_key")
+  @@index([sessionId, createdAt, id], map: "chat_messages_session_id_created_at_id_idx")
+  @@map("chat_messages")
 }

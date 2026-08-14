@@ -2,7 +2,16 @@ import "dotenv/config";
 
 import { z } from "zod";
 
-import { AUTH_CONSTANTS } from "../constants/app.constants.js";
+import {
+  AI_CONSTANTS,
+  AUTH_CONSTANTS,
+} from "../constants/app.constants.js";
+
+const optionalNonEmptyString = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().trim().min(1).optional(),
+);
 
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -23,6 +32,27 @@ const environmentSchema = z.object({
     .min(60)
     .max(86_400)
     .default(AUTH_CONSTANTS.DEFAULT_ACCESS_TOKEN_TTL_SECONDS),
+  MISTRAL_API_KEY: optionalNonEmptyString,
+  MISTRAL_MODEL: z
+    .string()
+    .trim()
+    .min(1)
+    .default(AI_CONSTANTS.DEFAULT_MODEL),
+  MISTRAL_API_URL: z
+    .url()
+    .default(AI_CONSTANTS.DEFAULT_API_URL),
+  AI_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(AI_CONSTANTS.MIN_REQUEST_TIMEOUT_MS)
+    .max(AI_CONSTANTS.MAX_REQUEST_TIMEOUT_MS)
+    .default(AI_CONSTANTS.DEFAULT_REQUEST_TIMEOUT_MS),
+  AI_MAX_HISTORY_MESSAGES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(AI_CONSTANTS.MAX_HISTORY_MESSAGES)
+    .default(AI_CONSTANTS.DEFAULT_MAX_HISTORY_MESSAGES),
 });
 
 const parsedEnvironment = environmentSchema.safeParse(process.env);
