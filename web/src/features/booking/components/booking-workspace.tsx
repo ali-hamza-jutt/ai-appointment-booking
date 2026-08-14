@@ -241,12 +241,14 @@ function BookingExperience({
 
     try {
       let activeSessionId = sessionId;
+      let newlyCreatedSessionId: string | null = null;
 
       if (!activeSessionId) {
         const session = await createSessionMutation.mutateAsync({
           data: { title: turn.text.slice(0, 120) },
         });
         activeSessionId = session.id;
+        newlyCreatedSessionId = session.id;
         setSessionId(session.id);
       }
 
@@ -306,6 +308,13 @@ function BookingExperience({
           queryKey: getListMessagesQueryKey(activeSessionId),
         }),
       ]);
+
+      if (newlyCreatedSessionId) {
+        router.replace(
+          `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
+          { scroll: false },
+        );
+      }
     } catch (error) {
       updateOptimisticMessage(turn, "failed");
       setRequestError(
@@ -796,7 +805,7 @@ function BookingResumeError({
           >
             Try again
           </Button>
-          <LinkButton href="/book">Start a new booking</LinkButton>
+          <LinkButton href="/book?new=true">Start a new booking</LinkButton>
         </div>
       </div>
     </div>
