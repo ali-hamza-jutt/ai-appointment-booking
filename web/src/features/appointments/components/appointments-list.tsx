@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/icons";
 import { APPOINTMENT_UI_CONSTANTS } from "@/features/appointments/constants/appointment-ui.constants";
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
-import { useBrowserTimeZone } from "@/features/appointments/hooks/use-browser-time-zone";
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 

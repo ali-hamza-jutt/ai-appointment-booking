@@ -1,17 +1,18 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
-  useEffect,
   useRef,
   useState,
+  useEffect,
   type FormEvent,
   type ReactNode,
 } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/feedback";
+import { Button, LinkButton } from "@/components/ui/button";
+import { Alert, Skeleton } from "@/components/ui/feedback";
 import {
   CalendarIcon,
   CheckCircleIcon,
@@ -25,6 +26,8 @@ import {
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
+import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
+import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
 import type {
   BookingDraftViewModel,
   ChatMessageDeliveryStatus,
@@ -38,11 +41,19 @@ import {
 } from "@/features/booking/utils/booking-format";
 import { getListAppointmentsQueryKey } from "@/generated/api/appointments/appointments";
 import {
+  getListMessagesQueryKey,
   getListSessionsQueryKey,
+  useGetSession,
   useConfirmBooking,
   useCreateMessage,
   useCreateSession,
 } from "@/generated/api/chat/chat";
+import type {
+  AppointmentBookingContext,
+  ChatMessageResponse,
+  ChatSessionResponse,
+} from "@/generated/api/models";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
@@ -60,28 +71,114 @@ function createWelcomeMessage(firstName: string): ChatMessageViewModel {
   };
 }
 
-export function BookingWorkspace() {
+interface BookingWorkspaceProps {
+  initialSessionId?: string;
+}
+
+interface BookingExperienceProps {
+  initialMessages?: ChatMessageResponse[];
+  initialSession?: ChatSessionResponse;
+  initialTimeZone: string;
+}
+
+export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
+  const isResuming = Boolean(initialSessionId);
+  const timeZone = useBrowserTimeZone();
+  const sessionQuery = useGetSession(initialSessionId ?? "", {
+    query: { enabled: isResuming, retry: false },
+  });
+  const messagesQuery = useConversationMessages(initialSessionId ?? "", {
+    enabled: isResuming,
+    limit: CONVERSATION_UI_CONSTANTS.RESUME_MESSAGE_PAGE_SIZE,
+  });
+
+  if (!isResuming) {
+    return <BookingExperience initialTimeZone={timeZone} />;
+  }
+
+  if (sessionQuery.isPending || messagesQuery.isPending) {
+    return <BookingResumeSkeleton />;
+  }
+
+  if (sessionQuery.isError || messagesQuery.isError || !sessionQuery.data) {
+    const error = sessionQuery.error ?? messagesQuery.error;
+
+    return (
+      <BookingResumeError
+        message={getApiErrorMessage(
+          error,
+          "This booking conversation could not be resumed. It may no longer be available.",
+        )}
+        onRetry={() =>
+          void Promise.all([sessionQuery.refetch(), messagesQuery.refetch()])
+        }
+      />
+    );
+  }
+
+  const initialMessages = Array.from(
+    new Map(
+      messagesQuery.data.pages
+        .flatMap((page) => page.items)
+        .map((message) => [message.id, message]),
+    ).values(),
+  );
+
+  return (
+    <BookingExperience
+      initialMessages={initialMessages}
+      initialSession={sessionQuery.data}
+      initialTimeZone={timeZone}
+      key={`${sessionQuery.data.id}:${timeZone}`}
+    />
+  );
+}
+
+function BookingExperience({
+  initialMessages = [],
+  initialSession,
+  initialTimeZone,
+}: BookingExperienceProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
+  const persistedMessages = initialMessages
+    .filter(isBookingMessage)
+    .map(toBookingMessageViewModel);
+  const initialMissingFields = getMissingBookingFields(
+    initialSession?.bookingContext,
+  );
   const createSessionMutation = useCreateSession();
   const createMessageMutation = useCreateMessage();
   const confirmBookingMutation = useConfirmBooking();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessageViewModel[]>(() => [
-    createWelcomeMessage(firstName),
-  ]);
+  const [sessionId, setSessionId] = useState<string | null>(
+    initialSession?.id ?? null,
+  );
+  const [messages, setMessages] = useState<ChatMessageViewModel[]>(() =>
+    persistedMessages.length > 0
+      ? persistedMessages
+      : [createWelcomeMessage(firstName)],
+  );
   const [composer, setComposer] = useState("");
-  const [draft, setDraft] = useState<BookingDraftViewModel | null>(null);
-  const [timeZone, setTimeZone] = useState("UTC");
-  const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [isReadyToConfirm, setIsReadyToConfirm] = useState(false);
+  const [draft, setDraft] = useState<BookingDraftViewModel | null>(() =>
+    toBookingDraft(initialSession?.bookingContext, initialTimeZone),
+  );
+  const [timeZone, setTimeZone] = useState(initialTimeZone);
+  const [missingFields, setMissingFields] = useState<string[]>(
+    initialMissingFields,
+  );
+  const [isReadyToConfirm, setIsReadyToConfirm] = useState(
+    initialSession?.status === "ACTIVE" && initialMissingFields.length === 0,
+  );
   const [isProcessingTurn, setIsProcessingTurn] = useState(false);
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(
+    initialSession?.status === "CLOSED",
+  );
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRequestLockRef = useRef(false);
@@ -201,9 +298,14 @@ export function BookingWorkspace() {
         response.assistantMessage.structuredData?.confirmationRequired === true,
       );
       setPendingTurn(null);
-      void queryClient.invalidateQueries({
-        queryKey: getListSessionsQueryKey(),
-      });
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: getListSessionsQueryKey(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: getListMessagesQueryKey(activeSessionId),
+        }),
+      ]);
     } catch (error) {
       updateOptimisticMessage(turn, "failed");
       setRequestError(
@@ -296,6 +398,9 @@ export function BookingWorkspace() {
             queryClient.invalidateQueries({
               queryKey: getListSessionsQueryKey(),
             }),
+            queryClient.invalidateQueries({
+              queryKey: getListMessagesQueryKey(sessionId),
+            }),
           ]);
         },
       },
@@ -303,6 +408,7 @@ export function BookingWorkspace() {
   }
 
   function startAnotherBooking() {
+    router.replace(`/book?new=${crypto.randomUUID()}`);
     createSessionMutation.reset();
     createMessageMutation.reset();
     confirmBookingMutation.reset();
@@ -310,6 +416,7 @@ export function BookingWorkspace() {
     setMessages([createWelcomeMessage(firstName)]);
     setComposer("");
     setDraft(null);
+    setTimeZone(getBrowserTimeZone());
     setMissingFields([]);
     setIsReadyToConfirm(false);
     setIsProcessingTurn(false);
@@ -596,4 +703,102 @@ function DraftRow({ icon, label, value }: { icon: ReactNode; label: string; valu
 
 function formatMissingField(field: string): string {
   return field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+}
+
+function isBookingMessage(
+  message: ChatMessageResponse,
+): message is ChatMessageResponse & { role: "ASSISTANT" | "USER" } {
+  return message.role === "ASSISTANT" || message.role === "USER";
+}
+
+function toBookingMessageViewModel(
+  message: ChatMessageResponse & { role: "ASSISTANT" | "USER" },
+): ChatMessageViewModel {
+  return {
+    ...(message.clientMessageId
+      ? { clientMessageId: message.clientMessageId }
+      : {}),
+    ...(message.role === "USER" ? { deliveryStatus: "sent" as const } : {}),
+    id: message.id,
+    role: message.role === "USER" ? "user" : "assistant",
+    text: message.content,
+  };
+}
+
+function getMissingBookingFields(
+  context: AppointmentBookingContext | null | undefined,
+): string[] {
+  const missingFields: string[] = [];
+
+  if (!context?.serviceName?.trim()) missingFields.push("serviceName");
+  if (!context?.scheduledAt) missingFields.push("scheduledAt");
+
+  return missingFields;
+}
+
+function BookingResumeSkeleton() {
+  return (
+    <div
+      className="grid min-h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px]"
+      role="status"
+    >
+      <span className="sr-only">Loading booking conversation</span>
+      <section className="bg-surface px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          <div className="flex items-center gap-3 border-b border-border pb-5">
+            <Skeleton className="size-10 rounded-[10px]" />
+            <div className="flex-1">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="mt-2 h-3 w-64 max-w-full" />
+            </div>
+          </div>
+          <div className="space-y-5 py-8">
+            <Skeleton className="h-16 w-3/4 rounded-2xl" />
+            <Skeleton className="ml-auto h-14 w-2/3 rounded-2xl" />
+            <Skeleton className="h-20 w-4/5 rounded-2xl" />
+          </div>
+        </div>
+      </section>
+      <aside className="border-t border-border bg-canvas px-5 py-6 xl:border-l xl:border-t-0">
+        <Skeleton className="h-5 w-32" />
+        <div className="mt-5 rounded-xl border border-border bg-surface p-5">
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="mt-5 h-4 w-4/5" />
+          <Skeleton className="mt-5 h-4 w-2/3" />
+          <Skeleton className="mt-5 h-4 w-3/4" />
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function BookingResumeError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
+        <h2 className="text-lg font-semibold text-ink">
+          Booking conversation unavailable
+        </h2>
+        <Alert className="mt-4" tone="danger">
+          {message}
+        </Alert>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button
+            leadingIcon={<RefreshIcon className="size-4" />}
+            onClick={onRetry}
+            variant="secondary"
+          >
+            Try again
+          </Button>
+          <LinkButton href="/book">Start a new booking</LinkButton>
+        </div>
+      </div>
+    </div>
+  );
 }

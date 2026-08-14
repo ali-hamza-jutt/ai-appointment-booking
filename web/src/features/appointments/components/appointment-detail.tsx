@@ -13,8 +13,8 @@ import {
   GlobeIcon,
   RefreshIcon,
 } from "@/components/ui/icons";
-import { useBrowserTimeZone } from "@/features/appointments/hooks/use-browser-time-zone";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
+import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { useGetAppointment } from "@/generated/api/appointments/appointments";
 import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
 
