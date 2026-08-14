@@ -1,5 +1,8 @@
 import type { BadgeTone } from "@/components/ui/badge";
-import type { ChatSessionStatus } from "@/generated/api/models";
+import type {
+  ChatMessageResponse,
+  ChatSessionStatus,
+} from "@/generated/api/models";
 
 export type ConversationFilter = "ALL" | ChatSessionStatus;
 
@@ -10,6 +13,16 @@ export interface ConversationMessageViewModel {
   role: "assistant" | "system" | "user";
   text: string;
   time: string;
+}
+
+export interface ChatMessagePollingOptions {
+  enabled?: boolean;
+  initialCursor?: string;
+}
+
+export interface ChatMessagePollingState {
+  cursor?: string;
+  items: ChatMessageResponse[];
 }
 
 export interface ConversationSessionViewModel {

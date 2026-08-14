@@ -13,6 +13,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from "@/components/ui/icons";
+import { useChatMessagePolling } from "@/features/conversations/hooks/use-chat-message-polling";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
 import {
   toConversationMessageViewModel,
@@ -26,11 +27,18 @@ export function ConversationDetail({ sessionId }: { sessionId: string }) {
   const timeZone = useBrowserTimeZone();
   const sessionQuery = useGetSession(sessionId, { query: { retry: false } });
   const messagesQuery = useConversationMessages(sessionId);
+  const latestMessageCursor = messagesQuery.data?.pages.at(-1)?.nextCursor;
+  const messagePollingQuery = useChatMessagePolling(sessionId, {
+    enabled:
+      sessionQuery.data?.status === "ACTIVE" && Boolean(messagesQuery.data),
+    ...(latestMessageCursor ? { initialCursor: latestMessageCursor } : {}),
+  });
   const messages = Array.from(
     new Map(
-      (messagesQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
-        (message) => [message.id, message],
-      ),
+      [
+        ...(messagesQuery.data?.pages.flatMap((page) => page.items) ?? []),
+        ...(messagePollingQuery.data?.items ?? []),
+      ].map((message) => [message.id, message]),
     ).values(),
   ).map((message) => toConversationMessageViewModel(message, timeZone));
 
@@ -158,6 +166,21 @@ export function ConversationDetail({ sessionId }: { sessionId: string }) {
             </Alert>
           ) : null}
 
+          {messagePollingQuery.isError ? (
+            <Alert tone="warning">
+              <p>Live message updates are temporarily unavailable.</p>
+              <Button
+                className="mt-2"
+                leadingIcon={<RefreshIcon className="size-3.5" />}
+                onClick={() => void messagePollingQuery.refetch()}
+                size="sm"
+                variant="secondary"
+              >
+                Retry live updates
+              </Button>
+            </Alert>
+          ) : null}
+
           {messagesQuery.hasNextPage || messagesQuery.isError ? (
             <div className="flex justify-center pt-2">
               <Button
@@ -184,7 +207,7 @@ export function ConversationDetail({ sessionId }: { sessionId: string }) {
         {session.status === "ACTIVE" ? (
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-brand-soft px-5 py-3 sm:px-6">
             <p className="text-xs font-semibold text-brand">
-              This conversation is still active.
+              This conversation is active and updates automatically.
             </p>
             <LinkButton
               href={`/book?sessionId=${encodeURIComponent(session.id)}`}

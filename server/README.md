@@ -86,3 +86,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - The Mistral request is not retried automatically; safe client retries are supported through message idempotency.
+
+## Sample data
+
+[`prisma/sample-inserts.sql`](prisma/sample-inserts.sql) contains development-only example inserts for users, chat sessions, appointments, and chat messages. It must not be run against a production database.

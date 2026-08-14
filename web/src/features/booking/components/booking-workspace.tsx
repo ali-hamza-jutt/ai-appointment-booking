@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useEffect,
+  useMemo,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -28,6 +29,7 @@ import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
+import { useChatMessagePolling } from "@/features/conversations/hooks/use-chat-message-polling";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
 import type {
   BookingDraftViewModel,
@@ -78,6 +80,7 @@ interface BookingWorkspaceProps {
 }
 
 interface BookingExperienceProps {
+  initialMessageCursor?: string;
   initialMessages?: ChatMessageResponse[];
   initialSession?: ChatSessionResponse;
   initialTimeZone: string;
@@ -128,6 +131,7 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
 
   return (
     <BookingExperience
+      initialMessageCursor={messagesQuery.data.pages.at(-1)?.nextCursor}
       initialMessages={initialMessages}
       initialSession={sessionQuery.data}
       initialTimeZone={timeZone}
@@ -137,6 +141,7 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
 }
 
 function BookingExperience({
+  initialMessageCursor,
   initialMessages = [],
   initialSession,
   initialTimeZone,
@@ -190,6 +195,15 @@ function BookingExperience({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
+  const messagePollingQuery = useChatMessagePolling(sessionId ?? "", {
+    enabled: Boolean(sessionId) && !isConfirmed,
+    ...(initialMessageCursor ? { initialCursor: initialMessageCursor } : {}),
+  });
+  const visibleMessages = useMemo(
+    () =>
+      mergeBookingMessages(messages, messagePollingQuery.data?.items ?? []),
+    [messagePollingQuery.data?.items, messages],
+  );
 
   const isSending = isProcessingTurn;
   const isConfirming = confirmBookingMutation.isPending;
@@ -204,7 +218,7 @@ function BookingExperience({
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [isSending, messages]);
+  }, [isSending, visibleMessages]);
 
   function updateOptimisticMessage(
     turn: PendingChatTurn,
@@ -504,7 +518,7 @@ function BookingExperience({
 
         <div className="bw-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-6">
           <div className="mx-auto max-w-3xl space-y-5">
-            {messages.map((message) => {
+            {visibleMessages.map((message) => {
               const isUserMessage = message.role === "user";
               const hasFailed = message.deliveryStatus === "failed";
 
@@ -566,7 +580,7 @@ function BookingExperience({
               </Alert>
             ) : null}
 
-            {messages.length === 1 && !isConfirmed ? (
+            {visibleMessages.length === 1 && !isConfirmed ? (
               <div className="pt-1">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
                   Try an example
@@ -722,7 +736,7 @@ function BookingExperience({
               <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted">
                 Send a message and the assistant will organize the date, time, and other details here.
               </p>
-              {messages.length > 1 ? (
+              {visibleMessages.length > 1 ? (
                 <Button
                   className="mt-5"
                   disabled={isSending}
@@ -815,6 +829,35 @@ function toBookingMessageViewModel(
     role: message.role === "USER" ? "user" : "assistant",
     text: message.content,
   };
+}
+
+function mergeBookingMessages(
+  current: ChatMessageViewModel[],
+  polledMessages: ChatMessageResponse[],
+): ChatMessageViewModel[] {
+  if (polledMessages.length === 0) return current;
+
+  const mergedMessages = [...current];
+
+  for (const polledMessage of polledMessages) {
+    if (!isBookingMessage(polledMessage)) continue;
+
+    const message = toBookingMessageViewModel(polledMessage);
+    const existingIndex = mergedMessages.findIndex(
+      (existingMessage) =>
+        existingMessage.id === message.id ||
+        (message.clientMessageId !== undefined &&
+          existingMessage.clientMessageId === message.clientMessageId),
+    );
+
+    if (existingIndex >= 0) {
+      mergedMessages[existingIndex] = message;
+    } else {
+      mergedMessages.push(message);
+    }
+  }
+
+  return mergedMessages;
 }
 
 function getMissingBookingFields(
