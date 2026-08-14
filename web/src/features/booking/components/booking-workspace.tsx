@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
+import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
 import type {
@@ -33,6 +34,7 @@ import type {
   ChatMessageDeliveryStatus,
   ChatMessageViewModel,
   PendingChatTurn,
+  StructuredBookingFormValues,
 } from "@/features/booking/types/booking-ui";
 import {
   getBrowserTimeZone,
@@ -164,6 +166,10 @@ function BookingExperience({
   const [draft, setDraft] = useState<BookingDraftViewModel | null>(() =>
     toBookingDraft(initialSession?.bookingContext, initialTimeZone),
   );
+  const [bookingContext, setBookingContext] =
+    useState<AppointmentBookingContext | null>(
+      initialSession?.bookingContext ?? null,
+    );
   const [timeZone, setTimeZone] = useState(initialTimeZone);
   const [missingFields, setMissingFields] = useState<string[]>(
     initialMissingFields,
@@ -176,6 +182,7 @@ function BookingExperience({
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isStructuredFormOpen, setIsStructuredFormOpen] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(
     initialSession?.status === "CLOSED",
   );
@@ -229,8 +236,8 @@ function BookingExperience({
     });
   }
 
-  async function processTurn(turn: PendingChatTurn) {
-    if (messageRequestLockRef.current || isConfirmed) return;
+  async function processTurn(turn: PendingChatTurn): Promise<boolean> {
+    if (messageRequestLockRef.current || isConfirmed) return false;
 
     messageRequestLockRef.current = true;
     setIsProcessingTurn(true);
@@ -260,6 +267,9 @@ function BookingExperience({
           clientMessageId: turn.clientMessageId,
           content: turn.text,
           timeZone: browserTimeZone,
+          ...(turn.bookingDetails
+            ? { bookingDetails: turn.bookingDetails }
+            : {}),
         },
         sessionId: activeSessionId,
       });
@@ -292,6 +302,7 @@ function BookingExperience({
           },
         ];
       });
+      setBookingContext(response.session.bookingContext);
       setDraft(toBookingDraft(response.session.bookingContext, browserTimeZone));
       setMissingFields(
         response.assistantMessage.structuredData?.missingFields ?? [],
@@ -315,6 +326,7 @@ function BookingExperience({
           { scroll: false },
         );
       }
+      return true;
     } catch (error) {
       updateOptimisticMessage(turn, "failed");
       setRequestError(
@@ -323,6 +335,7 @@ function BookingExperience({
           "The assistant could not process your message. Check your connection and try again.",
         ),
       );
+      return false;
     } finally {
       messageRequestLockRef.current = false;
       setIsProcessingTurn(false);
@@ -350,6 +363,31 @@ function BookingExperience({
 
   function retryPendingTurn() {
     if (pendingTurn && !isSending) void processTurn(pendingTurn);
+  }
+
+  async function submitStructuredBookingDetails(
+    values: StructuredBookingFormValues,
+  ): Promise<boolean> {
+    if (isSending || isConfirmed || messageRequestLockRef.current) {
+      return false;
+    }
+
+    const turn: PendingChatTurn = pendingTurn
+      ? { ...pendingTurn, bookingDetails: values }
+      : {
+        bookingDetails: values,
+        clientMessageId: crypto.randomUUID(),
+        text: "I completed the structured booking form.",
+      };
+
+    return processTurn(turn);
+  }
+
+  function openStructuredBookingForm() {
+    if (isSending || isConfirmed) return;
+
+    setRequestError(null);
+    setIsStructuredFormOpen(true);
   }
 
   function focusComposerForChanges() {
@@ -397,9 +435,18 @@ function BookingExperience({
                 ],
           );
           setDraft(toConfirmedBookingDraft(response.appointment, timeZone));
+          setBookingContext({
+            serviceName: response.appointment.serviceName,
+            scheduledAt: response.appointment.scheduledAt,
+            durationMinutes: response.appointment.durationMinutes,
+            ...(response.appointment.notes
+              ? { notes: response.appointment.notes }
+              : {}),
+          });
           setIsReadyToConfirm(false);
           setIsConfirmed(true);
           setIsConfirmOpen(false);
+          setIsStructuredFormOpen(false);
           void Promise.all([
             queryClient.invalidateQueries({
               queryKey: getListAppointmentsQueryKey(),
@@ -425,6 +472,7 @@ function BookingExperience({
     setMessages([createWelcomeMessage(firstName)]);
     setComposer("");
     setDraft(null);
+    setBookingContext(null);
     setTimeZone(getBrowserTimeZone());
     setMissingFields([]);
     setIsReadyToConfirm(false);
@@ -433,6 +481,7 @@ function BookingExperience({
     setRequestError(null);
     setConfirmationError(null);
     setIsConfirmOpen(false);
+    setIsStructuredFormOpen(false);
     setIsConfirmed(false);
     messageRequestLockRef.current = false;
     confirmationRequestLockRef.current = false;
@@ -641,11 +690,22 @@ function BookingExperience({
                       {isReadyToConfirm ? "Confirm booking" : "More details needed"}
                     </Button>
                     <Button
+                      disabled={isSending}
+                      fullWidth
+                      leadingIcon={<EditIcon className="size-4" />}
+                      onClick={openStructuredBookingForm}
+                      variant="secondary"
+                    >
+                      {missingFields.length > 0
+                        ? "Complete details in form"
+                        : "Edit details in form"}
+                    </Button>
+                    <Button
                       disabled={isSending || hasFailedTurn}
                       fullWidth
                       leadingIcon={<EditIcon className="size-4" />}
                       onClick={focusComposerForChanges}
-                      variant="secondary"
+                      variant="ghost"
                     >
                       Change details in chat
                     </Button>
@@ -662,6 +722,17 @@ function BookingExperience({
               <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted">
                 Send a message and the assistant will organize the date, time, and other details here.
               </p>
+              {messages.length > 1 ? (
+                <Button
+                  className="mt-5"
+                  disabled={isSending}
+                  leadingIcon={<EditIcon className="size-4" />}
+                  onClick={openStructuredBookingForm}
+                  variant="secondary"
+                >
+                  Complete details in form
+                </Button>
+              ) : null}
             </div>
           )}
         </div>
@@ -694,6 +765,18 @@ function BookingExperience({
           </div>
         </div>
       </Modal>
+
+      {isStructuredFormOpen ? (
+        <StructuredBookingForm
+          bookingContext={bookingContext}
+          initialValues={pendingTurn?.bookingDetails}
+          isSubmitting={isSending}
+          onClose={() => !isSending && setIsStructuredFormOpen(false)}
+          onSubmit={submitStructuredBookingDetails}
+          submissionError={requestError}
+          timeZone={timeZone}
+        />
+      ) : null}
     </div>
   );
 }

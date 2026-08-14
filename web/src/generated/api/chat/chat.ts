@@ -337,7 +337,7 @@ export const getCreateMessageUrl = (sessionId: string,) => {
 }
 
 /**
- * Saves a user message, extracts booking details, and returns the persisted assistant reply.
+ * Saves a user message, processes conversational or structured booking details, and returns the persisted assistant reply.
  */
 export const createMessage = async (sessionId: string,
     processChatMessageRequest: ProcessChatMessageRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ChatTurnResponse> => {

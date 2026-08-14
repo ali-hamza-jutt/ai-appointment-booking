@@ -39,3 +39,4 @@ export * from './processChatMessageRequest';
 export * from './recordStringStringArray';
 export * from './signInRequest';
 export * from './signUpRequest';
+export * from './structuredBookingDetails';

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ClientMessageId } from './clientMessageId';
+import type { StructuredBookingDetails } from './structuredBookingDetails';
 
 export interface ProcessChatMessageRequest {
   clientMessageId: ClientMessageId;
@@ -19,4 +20,6 @@ export interface ProcessChatMessageRequest {
      * @maxLength 100
      */
   timeZone: string;
+  /** Form-provided values that bypass AI extraction and are validated by the server. */
+  bookingDetails?: StructuredBookingDetails;
 }
