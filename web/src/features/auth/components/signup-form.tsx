@@ -29,6 +29,8 @@ export function SignupForm() {
   const signUpMutation = useSignUp();
   const [isNavigating, startTransition] = useTransition();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isPasswordConfirmationVisible, setIsPasswordConfirmationVisible] =
+    useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -192,7 +194,17 @@ export function SignupForm() {
             setSubmitError(null);
           }}
           placeholder="Re-enter your password"
-          type="password"
+          trailingAction={
+            <PasswordToggle
+              disabled={isSubmitting}
+              fieldLabel="confirmation password"
+              isVisible={isPasswordConfirmationVisible}
+              onToggle={() =>
+                setIsPasswordConfirmationVisible((value) => !value)
+              }
+            />
+          }
+          type={isPasswordConfirmationVisible ? "text" : "password"}
           value={passwordConfirmation}
         />
 
