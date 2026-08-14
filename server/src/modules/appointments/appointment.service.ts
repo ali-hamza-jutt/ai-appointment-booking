@@ -21,6 +21,7 @@ import type {
   AppointmentSource,
   CreateAppointmentRequest,
   ListAppointmentsOptions,
+  PreparedAppointment,
 } from "./dto/appointment.dto.js";
 
 export class AppointmentService {
@@ -29,25 +30,13 @@ export class AppointmentService {
     request: CreateAppointmentRequest,
     source: AppointmentSource = "FORM",
   ): Promise<AppointmentResponse> {
-    const serviceName = normalizeWhitespace(request.serviceName);
-    const scheduledAt = request.scheduledAt;
-    const durationMinutes =
-      request.durationMinutes ?? APPOINTMENT_CONSTANTS.DEFAULT_DURATION_MINUTES;
-    const notes = request.notes?.trim() || null;
-
-    this.validateServiceName(serviceName);
-    this.validateScheduledAt(scheduledAt);
-    this.validateDuration(durationMinutes);
-    this.validateNotes(notes);
+    const preparedAppointment = this.prepareAppointment(request);
 
     try {
       const appointment = await appointmentDal.createAppointment({
         userId,
-        serviceName,
-        scheduledAt,
-        durationMinutes,
+        ...preparedAppointment,
         source,
-        notes,
       });
 
       return this.toResponse(appointment);
@@ -62,6 +51,28 @@ export class AppointmentService {
 
       throw error;
     }
+  }
+
+  public prepareAppointment(
+    request: CreateAppointmentRequest,
+  ): PreparedAppointment {
+    const serviceName = normalizeWhitespace(request.serviceName);
+    const scheduledAt = request.scheduledAt;
+    const durationMinutes =
+      request.durationMinutes ?? APPOINTMENT_CONSTANTS.DEFAULT_DURATION_MINUTES;
+    const notes = request.notes?.trim() || null;
+
+    this.validateServiceName(serviceName);
+    this.validateScheduledAt(scheduledAt);
+    this.validateDuration(durationMinutes);
+    this.validateNotes(notes);
+
+    return {
+      serviceName,
+      scheduledAt,
+      durationMinutes,
+      notes,
+    };
   }
 
   public async getAppointment(
@@ -200,7 +211,7 @@ export class AppointmentService {
     }
   }
 
-  private toResponse(appointment: AppointmentRecord): AppointmentResponse {
+  public toResponse(appointment: AppointmentRecord): AppointmentResponse {
     return {
       id: appointment.id,
       serviceName: appointment.serviceName,

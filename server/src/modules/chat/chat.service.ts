@@ -17,9 +17,13 @@ import {
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import { chatBookingDal } from "./dal/chat-booking.dal.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
+  AssistantTurnPersistenceResult,
   AppointmentBookingContext,
+  ChatBookingPersistenceResult,
+  ChatMessageCreationResult,
   ChatMessageListResponse,
   ChatMessageMetadata,
   ChatMessageRecord,
@@ -27,11 +31,16 @@ import type {
   ChatSessionListResponse,
   ChatSessionRecord,
   ChatSessionResponse,
+  ChatSessionWithMessagesRecord,
+  CompleteChatBookingRequest,
+  ConfirmChatBookingData,
+  ConfirmedChatBookingRecord,
   CreateChatMessageData,
   CreateChatMessageRequest,
   CreateChatSessionRequest,
   ListChatMessagesOptions,
   ListChatSessionsOptions,
+  SaveAssistantTurnRequest,
   StoredAppointmentBookingContext,
   StoredChatMessageMetadata,
 } from "./dto/chat.dto.js";
@@ -132,6 +141,20 @@ export class ChatService {
     sessionId: string,
     request: CreateChatMessageRequest,
   ): Promise<ChatMessageResponse> {
+    const result = await this.createUserMessageWithStatus(
+      userId,
+      sessionId,
+      request,
+    );
+
+    return result.message;
+  }
+
+  public async createUserMessageWithStatus(
+    userId: string,
+    sessionId: string,
+    request: CreateChatMessageRequest,
+  ): Promise<ChatMessageCreationResult> {
     this.validateSessionId(sessionId);
 
     if (!VALIDATION_PATTERNS.UUID.test(request.clientMessageId)) {
@@ -147,6 +170,7 @@ export class ChatService {
       userId,
       sessionId,
       clientMessageId: request.clientMessageId,
+      replyToMessageId: null,
       role: "USER",
       content,
       structuredData: null,
@@ -161,16 +185,19 @@ export class ChatService {
   ): Promise<ChatMessageResponse> {
     this.validateSessionId(sessionId);
 
-    return this.createMessage({
+    const result = await this.createMessage({
       userId,
       sessionId,
       clientMessageId: null,
+      replyToMessageId: null,
       role: "ASSISTANT",
       content: this.normalizeMessageContent(content),
       structuredData: structuredData
         ? this.serializeMessageMetadata(structuredData)
         : null,
     });
+
+    return result.message;
   }
 
   public async listMessages(
@@ -254,12 +281,194 @@ export class ChatService {
     }
   }
 
+  public async findAssistantReply(
+    userId: string,
+    sessionId: string,
+    userMessageId: string,
+  ): Promise<ChatMessageResponse | null> {
+    this.validateSessionId(sessionId);
+
+    if (!VALIDATION_PATTERNS.UUID.test(userMessageId)) {
+      throwRequestValidationError(
+        "userMessageId",
+        VALIDATION_MESSAGES.CHAT_MESSAGE_ID,
+      );
+    }
+
+    const reply = await chatDal.findAssistantReplyForUserMessage(
+      sessionId,
+      userId,
+      userMessageId,
+    );
+
+    return reply ? this.toMessageResponse(reply) : null;
+  }
+
+  public async listRecentMessages(
+    userId: string,
+    sessionId: string,
+    limit: number,
+  ): Promise<ChatMessageResponse[]> {
+    this.validateSessionId(sessionId);
+    this.validateLimit(
+      limit,
+      CHAT_CONSTANTS.MAX_MESSAGE_PAGE_SIZE,
+      VALIDATION_MESSAGES.CHAT_MESSAGE_LIMIT,
+    );
+
+    const messages = await chatDal.listRecentMessages({
+      userId,
+      sessionId,
+      take: limit,
+    });
+
+    return messages.map((message) => this.toMessageResponse(message));
+  }
+
+  public async saveAssistantTurn(
+    userId: string,
+    sessionId: string,
+    request: SaveAssistantTurnRequest,
+  ): Promise<AssistantTurnPersistenceResult> {
+    this.validateSessionId(sessionId);
+
+    if (!VALIDATION_PATTERNS.UUID.test(request.replyToMessageId)) {
+      throwRequestValidationError(
+        "replyToMessageId",
+        VALIDATION_MESSAGES.CHAT_MESSAGE_ID,
+      );
+    }
+
+    try {
+      const record = await chatDal.saveAssistantTurn({
+        userId,
+        sessionId,
+        replyToMessageId: request.replyToMessageId,
+        content: this.normalizeMessageContent(request.content),
+        ...(request.bookingContext
+          ? {
+              bookingContext: this.serializeBookingContext(
+                this.normalizeBookingContext(request.bookingContext),
+              ),
+            }
+          : {}),
+        structuredData: this.serializeMessageMetadata(request.structuredData),
+      });
+
+      return this.toAssistantTurnPersistence(record);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const [reply, session] = await Promise.all([
+          chatDal.findAssistantReplyForUserMessage(
+            sessionId,
+            userId,
+            request.replyToMessageId,
+          ),
+          chatDal.findSessionForUser(sessionId, userId),
+        ]);
+
+        if (reply && session) {
+          return {
+            session: this.toSessionResponse(session),
+            assistantMessage: this.toMessageResponse(reply),
+          };
+        }
+      }
+
+      if (isRecordNotFoundError(error)) {
+        const session = await chatDal.findSessionForUser(sessionId, userId);
+
+        if (!session) {
+          this.throwSessionNotFound();
+        }
+
+        this.throwSessionClosed();
+      }
+
+      throw error;
+    }
+  }
+
+  public async findConfirmedBooking(
+    userId: string,
+    sessionId: string,
+  ): Promise<ChatBookingPersistenceResult | null> {
+    this.validateSessionId(sessionId);
+    const record = await chatBookingDal.findConfirmedBooking(userId, sessionId);
+
+    return record ? this.toChatBookingPersistence(record) : null;
+  }
+
+  public async completeBooking(
+    userId: string,
+    sessionId: string,
+    request: CompleteChatBookingRequest,
+  ): Promise<ChatBookingPersistenceResult> {
+    this.validateSessionId(sessionId);
+
+    const data: ConfirmChatBookingData = {
+      userId,
+      sessionId,
+      appointmentId: request.appointmentId,
+      serviceName: request.serviceName,
+      scheduledAt: request.scheduledAt,
+      durationMinutes: request.durationMinutes,
+      notes: request.notes,
+      assistantContent: this.normalizeMessageContent(request.assistantContent),
+      assistantStructuredData: this.serializeMessageMetadata(
+        request.assistantStructuredData,
+      ),
+    };
+
+    try {
+      const record = await chatBookingDal.confirmBooking(data);
+      return this.toChatBookingPersistence(record);
+    } catch (error) {
+      if (
+        isUniqueConstraintError(error) ||
+        isRecordNotFoundError(error)
+      ) {
+        const confirmedBooking = await chatBookingDal.findConfirmedBooking(
+          userId,
+          sessionId,
+        );
+
+        if (confirmedBooking) {
+          return this.toChatBookingPersistence(confirmedBooking);
+        }
+      }
+
+      if (isUniqueConstraintError(error)) {
+        throw new AppError(
+          409,
+          ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE,
+          ERROR_MESSAGES.APPOINTMENT_SLOT_UNAVAILABLE,
+        );
+      }
+
+      if (isRecordNotFoundError(error)) {
+        const session = await chatDal.findSessionForUser(sessionId, userId);
+
+        if (!session) {
+          this.throwSessionNotFound();
+        }
+
+        this.throwSessionClosed();
+      }
+
+      throw error;
+    }
+  }
+
   private async createMessage(
     data: CreateChatMessageData,
-  ): Promise<ChatMessageResponse> {
+  ): Promise<ChatMessageCreationResult> {
     try {
       const message = await chatDal.createMessage(data);
-      return this.toMessageResponse(message);
+      return {
+        message: this.toMessageResponse(message),
+        created: true,
+      };
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         if (data.clientMessageId) {
@@ -274,7 +483,10 @@ export class ChatService {
             existingMessage.role === data.role &&
             existingMessage.content === data.content
           ) {
-            return this.toMessageResponse(existingMessage);
+            return {
+              message: this.toMessageResponse(existingMessage),
+              created: false,
+            };
           }
         }
 
@@ -286,7 +498,35 @@ export class ChatService {
       }
 
       if (isRecordNotFoundError(error)) {
-        this.throwSessionNotFound();
+        if (data.clientMessageId) {
+          const existingMessage = await chatDal.findMessageByClientIdForUser(
+            data.sessionId,
+            data.userId,
+            data.clientMessageId,
+          );
+
+          if (
+            existingMessage &&
+            existingMessage.role === data.role &&
+            existingMessage.content === data.content
+          ) {
+            return {
+              message: this.toMessageResponse(existingMessage),
+              created: false,
+            };
+          }
+        }
+
+        const session = await chatDal.findSessionForUser(
+          data.sessionId,
+          data.userId,
+        );
+
+        if (!session) {
+          this.throwSessionNotFound();
+        }
+
+        this.throwSessionClosed();
       }
 
       throw error;
@@ -506,6 +746,45 @@ export class ChatService {
     );
   }
 
+  private throwSessionClosed(): never {
+    throw new AppError(
+      409,
+      ERROR_CODES.CHAT_SESSION_CLOSED,
+      ERROR_MESSAGES.CHAT_SESSION_CLOSED,
+    );
+  }
+
+  private toAssistantTurnPersistence(
+    record: ChatSessionWithMessagesRecord,
+  ): AssistantTurnPersistenceResult {
+    const assistantMessage = record.messages[0];
+
+    if (!assistantMessage) {
+      throw new Error("Saved assistant message was not returned");
+    }
+
+    return {
+      session: this.toSessionResponse(record),
+      assistantMessage: this.toMessageResponse(assistantMessage),
+    };
+  }
+
+  private toChatBookingPersistence(
+    record: ConfirmedChatBookingRecord,
+  ): ChatBookingPersistenceResult {
+    const assistantMessage = record.messages[0];
+
+    if (!record.appointment || !assistantMessage) {
+      throw new Error("Completed chat booking was not returned");
+    }
+
+    return {
+      session: this.toSessionResponse(record),
+      assistantMessage: this.toMessageResponse(assistantMessage),
+      appointment: record.appointment,
+    };
+  }
+
   private toSessionResponse(session: ChatSessionRecord): ChatSessionResponse {
     return {
       id: session.id,
@@ -522,6 +801,7 @@ export class ChatService {
       id: message.id,
       sessionId: message.sessionId,
       clientMessageId: message.clientMessageId,
+      replyToMessageId: message.replyToMessageId,
       role: message.role,
       content: message.content,
       structuredData: this.deserializeMessageMetadata(message.structuredData),

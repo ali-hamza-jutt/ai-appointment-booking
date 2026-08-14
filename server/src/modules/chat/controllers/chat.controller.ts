@@ -16,15 +16,17 @@ import {
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
 import { getAuthenticatedUser } from "../../../utils/request.js";
+import { chatOrchestrationService } from "../chat-orchestration.service.js";
 import { chatService } from "../chat.service.js";
 import type {
   ChatMessageListResponse,
-  ChatMessageResponse,
   ChatSessionListResponse,
   ChatSessionResponse,
   ChatSessionStatus,
-  CreateChatMessageRequest,
+  ChatTurnResponse,
+  ConfirmChatBookingResponse,
   CreateChatSessionRequest,
+  ProcessChatMessageRequest,
 } from "../dto/chat.dto.js";
 
 @Route("chat")
@@ -80,23 +82,44 @@ export class ChatController extends Controller {
     return chatService.getSession(getAuthenticatedUser(request).id, sessionId);
   }
 
-  /** Saves a user message using a client-generated idempotency ID. */
+  /** Saves a user message, extracts booking details, and returns the persisted assistant reply. */
   @Post("sessions/{sessionId}/messages")
-  @SuccessResponse("201", "Chat message created")
+  @SuccessResponse("201", "Chat turn processed")
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "Chat session was not found")
-  @Response<ApiErrorResponse>(409, "Client message ID already exists")
+  @Response<ApiErrorResponse>(409, "Chat session is closed or the client message ID conflicts")
   @Response<ApiErrorResponse>(422, "Request validation failed")
+  @Response<ApiErrorResponse>(502, "The AI provider response was invalid")
+  @Response<ApiErrorResponse>(503, "The AI integration is unavailable")
+  @Response<ApiErrorResponse>(504, "The AI provider request timed out")
   public async createMessage(
     @Request() request: ExpressRequest,
     @Path() sessionId: string,
-    @Body() body: CreateChatMessageRequest,
-  ): Promise<ChatMessageResponse> {
+    @Body() body: ProcessChatMessageRequest,
+  ): Promise<ChatTurnResponse> {
     this.setStatus(201);
-    return chatService.createUserMessage(
+    return chatOrchestrationService.processMessage(
       getAuthenticatedUser(request).id,
       sessionId,
       body,
+    );
+  }
+
+  /** Confirms the collected booking details and atomically creates the appointment. */
+  @Post("sessions/{sessionId}/confirm")
+  @SuccessResponse("201", "Chat appointment created")
+  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
+  @Response<ApiErrorResponse>(404, "Chat session was not found")
+  @Response<ApiErrorResponse>(409, "Booking details are incomplete, the session is closed, or the slot is unavailable")
+  @Response<ApiErrorResponse>(422, "Stored booking details are invalid")
+  public async confirmBooking(
+    @Request() request: ExpressRequest,
+    @Path() sessionId: string,
+  ): Promise<ConfirmChatBookingResponse> {
+    this.setStatus(201);
+    return chatOrchestrationService.confirmBooking(
+      getAuthenticatedUser(request).id,
+      sessionId,
     );
   }
 

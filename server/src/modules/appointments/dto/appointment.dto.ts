@@ -35,6 +35,13 @@ export interface AppointmentResponse {
   updatedAt: Date;
 }
 
+export interface PreparedAppointment {
+  serviceName: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  notes: string | null;
+}
+
 export interface AppointmentListResponse {
   items: AppointmentResponse[];
   nextCursor?: string;

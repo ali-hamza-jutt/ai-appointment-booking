@@ -12,6 +12,7 @@ modules/<module>/
 
 - Controllers translate HTTP input/output and delegate to services.
 - Services contain business rules and remain independent of Express.
+- Orchestration services compose multiple business services without accessing Prisma directly.
 - DAL classes are the only module files that access Prisma.
 - All module request, response, service, DAL, and database-record contracts belong in the module DTO folder.
 - Controller, service, and DAL files do not declare module interfaces; DAL files keep only Prisma selects and query implementations.

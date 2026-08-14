@@ -54,6 +54,7 @@ model User {
 model Appointment {
   id              String            @id @default(uuid()) @db.Uuid
   userId          String            @map("user_id") @db.Uuid
+  chatSessionId   String?           @unique(map: "appointments_chat_session_id_key") @map("chat_session_id") @db.Uuid
   serviceName     String            @map("service_name") @db.VarChar(120)
   scheduledAt     DateTime          @map("scheduled_at") @db.Timestamptz(3)
   durationMinutes Int               @default(30) @map("duration_minutes") @db.SmallInt
@@ -63,6 +64,7 @@ model Appointment {
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, scheduledAt], map: "appointments_user_id_scheduled_at_key")
   @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")
@@ -79,22 +81,25 @@ model ChatSession {
   updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages       ChatMessage[]
+  appointment    Appointment?
 
   @@index([userId, updatedAt, id], map: "chat_sessions_user_id_updated_at_id_idx")
   @@map("chat_sessions")
 }
 
 model ChatMessage {
-  id              String          @id @default(uuid()) @db.Uuid
-  sessionId       String          @map("session_id") @db.Uuid
-  clientMessageId String?         @map("client_message_id") @db.Uuid
-  role            ChatMessageRole
-  content         String          @db.Text
-  structuredData  Json?           @map("structured_data") @db.JsonB
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  session         ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id               String          @id @default(uuid()) @db.Uuid
+  sessionId        String          @map("session_id") @db.Uuid
+  clientMessageId  String?         @map("client_message_id") @db.Uuid
+  replyToMessageId String?         @map("reply_to_message_id") @db.Uuid
+  role             ChatMessageRole
+  content          String          @db.Text
+  structuredData   Json?           @map("structured_data") @db.JsonB
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  session          ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, clientMessageId], map: "chat_messages_session_id_client_message_id_key")
+  @@unique([sessionId, replyToMessageId], map: "chat_messages_session_id_reply_to_message_id_key")
   @@index([sessionId, createdAt, id], map: "chat_messages_session_id_created_at_id_idx")
   @@map("chat_messages")
 }

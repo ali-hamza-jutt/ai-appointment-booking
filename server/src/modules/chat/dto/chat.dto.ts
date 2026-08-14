@@ -1,3 +1,8 @@
+import type {
+  AppointmentRecord,
+  AppointmentResponse,
+} from "../../appointments/dto/appointment.dto.js";
+
 export type ChatSessionStatus = "ACTIVE" | "CLOSED";
 
 export type ChatMessageRole = "USER" | "ASSISTANT" | "SYSTEM";
@@ -61,6 +66,11 @@ export interface CreateChatMessageRequest {
   content: string;
 }
 
+export interface ProcessChatMessageRequest extends CreateChatMessageRequest {
+  /** IANA time zone used to interpret relative dates such as tomorrow. @maxLength 100 */
+  timeZone: string;
+}
+
 export interface ChatSessionResponse {
   id: string;
   title: string | null;
@@ -79,10 +89,23 @@ export interface ChatMessageResponse {
   id: string;
   sessionId: string;
   clientMessageId: string | null;
+  replyToMessageId: string | null;
   role: ChatMessageRole;
   content: string;
   structuredData: ChatMessageMetadata | null;
   createdAt: Date;
+}
+
+export interface ChatTurnResponse {
+  session: ChatSessionResponse;
+  userMessage: ChatMessageResponse;
+  assistantMessage: ChatMessageResponse;
+}
+
+export interface ConfirmChatBookingResponse {
+  session: ChatSessionResponse;
+  assistantMessage: ChatMessageResponse;
+  appointment: AppointmentResponse;
 }
 
 export interface ChatMessageListResponse {
@@ -115,6 +138,7 @@ export interface ChatMessageRecord {
   id: string;
   sessionId: string;
   clientMessageId: string | null;
+  replyToMessageId: string | null;
   role: ChatMessageRole;
   content: string;
   structuredData: unknown;
@@ -143,9 +167,79 @@ export interface CreateChatMessageData {
   userId: string;
   sessionId: string;
   clientMessageId: string | null;
+  replyToMessageId: string | null;
   role: ChatMessageRole;
   content: string;
   structuredData: StoredChatMessageMetadata | null;
+}
+
+export interface ChatMessageCreationResult {
+  message: ChatMessageResponse;
+  created: boolean;
+}
+
+export interface ListRecentChatMessagesData {
+  userId: string;
+  sessionId: string;
+  take: number;
+}
+
+export interface SaveAssistantTurnRequest {
+  replyToMessageId: string;
+  content: string;
+  bookingContext?: AppointmentBookingContext;
+  structuredData: ChatMessageMetadata;
+}
+
+export interface SaveAssistantTurnData {
+  userId: string;
+  sessionId: string;
+  replyToMessageId: string;
+  content: string;
+  bookingContext?: StoredAppointmentBookingContext;
+  structuredData: StoredChatMessageMetadata;
+}
+
+export interface ChatSessionWithMessagesRecord extends ChatSessionRecord {
+  messages: ChatMessageRecord[];
+}
+
+export interface AssistantTurnPersistenceResult {
+  session: ChatSessionResponse;
+  assistantMessage: ChatMessageResponse;
+}
+
+export interface ConfirmChatBookingData {
+  userId: string;
+  sessionId: string;
+  appointmentId: string;
+  serviceName: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  notes: string | null;
+  assistantContent: string;
+  assistantStructuredData: StoredChatMessageMetadata;
+}
+
+export interface CompleteChatBookingRequest {
+  appointmentId: string;
+  serviceName: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  notes: string | null;
+  assistantContent: string;
+  assistantStructuredData: ChatMessageMetadata;
+}
+
+export interface ConfirmedChatBookingRecord extends ChatSessionRecord {
+  appointment: AppointmentRecord | null;
+  messages: ChatMessageRecord[];
+}
+
+export interface ChatBookingPersistenceResult {
+  session: ChatSessionResponse;
+  assistantMessage: ChatMessageResponse;
+  appointment: AppointmentRecord;
 }
 
 export interface ChatMessagePageCursor {

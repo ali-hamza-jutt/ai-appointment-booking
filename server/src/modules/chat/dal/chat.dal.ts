@@ -5,14 +5,17 @@ import { prisma } from "../../../infrastructure/database/prisma.js";
 import type {
   ChatMessageRecord,
   ChatSessionRecord,
+  ChatSessionWithMessagesRecord,
   CreateChatMessageData,
   CreateChatSessionData,
   ListChatMessagesData,
+  ListRecentChatMessagesData,
   ListChatSessionsData,
+  SaveAssistantTurnData,
   UpdateBookingContextData,
 } from "../dto/chat.dto.js";
 
-const chatSessionSelect = {
+export const chatSessionSelect = {
   id: true,
   title: true,
   status: true,
@@ -21,10 +24,11 @@ const chatSessionSelect = {
   updatedAt: true,
 } as const;
 
-const chatMessageSelect = {
+export const chatMessageSelect = {
   id: true,
   sessionId: true,
   clientMessageId: true,
+  replyToMessageId: true,
   role: true,
   content: true,
   structuredData: true,
@@ -94,6 +98,7 @@ export class ChatDal {
       where: {
         id: data.sessionId,
         userId: data.userId,
+        status: "ACTIVE",
       },
       data: {
         updatedAt: new Date(),
@@ -101,6 +106,7 @@ export class ChatDal {
           create: {
             id: messageId,
             clientMessageId: data.clientMessageId,
+            replyToMessageId: data.replyToMessageId,
             role: data.role,
             content: data.content,
             ...(data.structuredData
@@ -173,6 +179,79 @@ export class ChatDal {
         session: { userId },
       },
       select: chatMessageSelect,
+    });
+  }
+
+  public findAssistantReplyForUserMessage(
+    sessionId: string,
+    userId: string,
+    replyToMessageId: string,
+  ): Promise<ChatMessageRecord | null> {
+    return prisma.chatMessage.findFirst({
+      where: {
+        sessionId,
+        replyToMessageId,
+        role: "ASSISTANT",
+        session: { userId },
+      },
+      select: chatMessageSelect,
+    });
+  }
+
+  public async listRecentMessages(
+    data: ListRecentChatMessagesData,
+  ): Promise<ChatMessageRecord[]> {
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        sessionId: data.sessionId,
+        session: { userId: data.userId },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: data.take,
+      select: chatMessageSelect,
+    });
+
+    return messages.reverse();
+  }
+
+  public saveAssistantTurn(
+    data: SaveAssistantTurnData,
+  ): Promise<ChatSessionWithMessagesRecord> {
+    const assistantMessageId = randomUUID();
+
+    return prisma.chatSession.update({
+      where: {
+        id: data.sessionId,
+        userId: data.userId,
+        status: "ACTIVE",
+      },
+      data: {
+        updatedAt: new Date(),
+        ...(data.bookingContext
+          ? {
+              bookingContext:
+                data.bookingContext as unknown as Prisma.InputJsonObject,
+            }
+          : {}),
+        messages: {
+          create: {
+            id: assistantMessageId,
+            clientMessageId: null,
+            replyToMessageId: data.replyToMessageId,
+            role: "ASSISTANT",
+            content: data.content,
+            structuredData:
+              data.structuredData as unknown as Prisma.InputJsonObject,
+          },
+        },
+      },
+      select: {
+        ...chatSessionSelect,
+        messages: {
+          where: { id: assistantMessageId },
+          select: chatMessageSelect,
+        },
+      },
     });
   }
 

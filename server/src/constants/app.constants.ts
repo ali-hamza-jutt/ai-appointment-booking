@@ -34,16 +34,69 @@ export const CHAT_CONSTANTS = {
   MAX_SESSION_TITLE_LENGTH: 120,
   MIN_MESSAGE_LENGTH: 1,
   MAX_MESSAGE_LENGTH: 4_000,
+  RESPONSE_LOCALE: "en-US",
+  ASSISTANT_MESSAGES: {
+    UNKNOWN_INTENT:
+      "I can help you book an appointment. Tell me the service, date, and time you would prefer.",
+    CONFIRMATION_SUFFIX: "Please confirm to create this appointment.",
+    BOOKING_SUCCESS_PREFIX: "Your appointment has been booked",
+  },
+} as const;
+
+export const AI_CONSTANTS = {
+  PROVIDER: "mistral",
+  CHAT_COMPLETIONS_PATH: "/chat/completions",
+  DEFAULT_MODEL: "mistral-small-latest",
+  DEFAULT_API_URL: "https://api.mistral.ai/v1",
+  DEFAULT_REQUEST_TIMEOUT_MS: 15_000,
+  MIN_REQUEST_TIMEOUT_MS: 1_000,
+  MAX_REQUEST_TIMEOUT_MS: 60_000,
+  DEFAULT_MAX_HISTORY_MESSAGES: 12,
+  MAX_HISTORY_MESSAGES: 50,
+  HISTORY_QUERY_LIMIT: 51,
+  MAX_OUTPUT_TOKENS: 600,
+  TEMPERATURE: 0,
+  INTENTS: ["BOOK_APPOINTMENT", "UNKNOWN"] as const,
+  CONVERSATION_ROLES: ["user", "assistant"] as const,
+  BOOKING_FIELDS: [
+    "serviceName",
+    "scheduledAt",
+    "durationMinutes",
+    "notes",
+  ] as const,
+  REQUIRED_BOOKING_FIELDS: ["serviceName", "scheduledAt"] as const,
+  PROVIDER_ERROR_CODES: [
+    "TIMEOUT",
+    "NETWORK_ERROR",
+    "HTTP_ERROR",
+    "INVALID_RESPONSE",
+  ] as const,
+  MAX_TIME_ZONE_LENGTH: 100,
+  MAX_CLARIFICATION_QUESTION_LENGTH: 300,
+  CLARIFICATION_QUESTIONS: {
+    serviceName: "What service would you like to book?",
+    scheduledAt: "What date and time would you prefer for the appointment?",
+    serviceNameAndScheduledAt:
+      "What service would you like to book, and what date and time would you prefer?",
+  },
 } as const;
 
 export const VALIDATION_PATTERNS = {
+  ISO_8601_DATE_TIME_WITH_TIME_ZONE:
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/,
   UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 } as const;
 
 export const ERROR_CODES = {
+  AI_INVALID_RESPONSE: "AI_INVALID_RESPONSE",
+  AI_NOT_CONFIGURED: "AI_NOT_CONFIGURED",
+  AI_PROVIDER_UNAVAILABLE: "AI_PROVIDER_UNAVAILABLE",
+  AI_REQUEST_TIMEOUT: "AI_REQUEST_TIMEOUT",
   APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
   APPOINTMENT_SLOT_UNAVAILABLE: "APPOINTMENT_SLOT_UNAVAILABLE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
+  CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
+  CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
   CHAT_SESSION_NOT_FOUND: "CHAT_SESSION_NOT_FOUND",
   EMAIL_ALREADY_EXISTS: "EMAIL_ALREADY_EXISTS",
   INSUFFICIENT_SCOPE: "INSUFFICIENT_SCOPE",
@@ -60,11 +113,18 @@ export const ERROR_CODES = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  AI_INVALID_RESPONSE: "The AI provider returned an invalid response",
+  AI_NOT_CONFIGURED: "The AI integration is not configured",
+  AI_PROVIDER_UNAVAILABLE: "The AI provider is temporarily unavailable",
+  AI_REQUEST_TIMEOUT: "The AI provider did not respond in time",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_SLOT_UNAVAILABLE:
     "An appointment already exists at the selected time",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
+  CHAT_BOOKING_CONTEXT_INCOMPLETE:
+    "The booking details must include a valid service, date, and time",
+  CHAT_SESSION_CLOSED: "This chat session is already closed",
   CHAT_SESSION_NOT_FOUND: "Chat session was not found",
   EMAIL_ALREADY_EXISTS: "An account with this email already exists",
   INSUFFICIENT_SCOPE: "The access token does not have the required permissions",
@@ -82,6 +142,11 @@ export const ERROR_MESSAGES = {
 } as const;
 
 export const VALIDATION_MESSAGES = {
+  AI_APPOINTMENT_CONTEXT: "Appointment context is invalid",
+  AI_CONVERSATION_HISTORY: "Conversation history is invalid",
+  AI_CURRENT_DATE_TIME: "Current date and time must be valid",
+  AI_TIME_ZONE: "Time zone must be a valid IANA time zone",
+  AI_USER_MESSAGE: "Message must contain between 1 and 4000 characters",
   APPOINTMENT_ID: "Appointment ID must be a valid UUID",
   APPOINTMENT_SERVICE_NAME:
     "Service name must contain between 2 and 120 characters",

@@ -5,7 +5,7 @@ import type {
   ListAppointmentsData,
 } from "../dto/appointment.dto.js";
 
-const appointmentSelect = {
+export const appointmentSelect = {
   id: true,
   serviceName: true,
   scheduledAt: true,
