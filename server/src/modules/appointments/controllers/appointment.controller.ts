@@ -46,7 +46,7 @@ export class AppointmentController extends Controller {
   }
 
   /**
-   * Lists appointments chronologically using cursor pagination.
+   * Lists the user's most recently created appointments using cursor pagination.
    * @isInt limit Limit must be a whole number
    * @minimum limit 1
    * @maximum limit 50

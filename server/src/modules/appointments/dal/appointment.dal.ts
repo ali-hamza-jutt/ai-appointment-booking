@@ -50,16 +50,16 @@ export class AppointmentDal {
         ...(data.cursor
           ? {
               OR: [
-                { scheduledAt: { gt: data.cursor.scheduledAt } },
+                { createdAt: { lt: data.cursor.createdAt } },
                 {
-                  scheduledAt: data.cursor.scheduledAt,
-                  id: { gt: data.cursor.id },
+                  createdAt: data.cursor.createdAt,
+                  id: { lt: data.cursor.id },
                 },
               ],
             }
           : {}),
       },
-      orderBy: [{ scheduledAt: "asc" }, { id: "asc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: data.take,
       select: appointmentSelect,
     });

@@ -67,6 +67,8 @@ model Appointment {
   chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, scheduledAt], map: "appointments_user_id_scheduled_at_key")
+  @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")
+  @@index([userId, status, createdAt, id], map: "appointments_user_id_status_created_at_id_idx")
   @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")
   @@map("appointments")
 }

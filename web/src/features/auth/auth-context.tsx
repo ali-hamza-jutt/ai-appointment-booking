@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const accessTokenRef = useRef<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
 
@@ -35,13 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const synchronizeToken = () => {
       const nextToken = getAccessToken();
 
-      setAccessTokenState((currentToken) => {
-        if (currentToken !== nextToken) {
-          queryClient.removeQueries({ queryKey: getGetCurrentUserQueryKey() });
-        }
+      if (accessTokenRef.current !== nextToken) {
+        queryClient.removeQueries();
+        accessTokenRef.current = nextToken;
+      }
 
-        return nextToken;
-      });
+      setAccessTokenState(nextToken);
       setIsInitialized(true);
     };
 
@@ -66,6 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeAuthentication = useCallback<AuthContextValue["completeAuthentication"]>(
     (response, persistence) => {
+      queryClient.removeQueries();
+      accessTokenRef.current = response.accessToken;
       setAccessToken(response.accessToken, persistence);
       setAccessTokenState(response.accessToken);
       queryClient.setQueryData(getGetCurrentUserQueryKey(), response.user);
@@ -74,9 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(() => {
+    queryClient.removeQueries();
+    accessTokenRef.current = null;
     clearAccessToken();
     setAccessTokenState(null);
-    queryClient.removeQueries({ queryKey: getGetCurrentUserQueryKey() });
   }, [queryClient]);
 
   const retryAuthentication = useCallback(() => {

@@ -335,9 +335,10 @@ function BookingExperience({
       ]);
 
       if (newlyCreatedSessionId) {
-        router.replace(
+        window.history.replaceState(
+          null,
+          "",
           `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
-          { scroll: false },
         );
       }
       return true;

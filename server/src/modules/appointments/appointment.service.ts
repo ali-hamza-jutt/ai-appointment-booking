@@ -124,8 +124,8 @@ export class AppointmentService {
 
     const cursor = decodedCursor
       ? {
+          createdAt: decodedCursor.timestamp,
           id: decodedCursor.id,
-          scheduledAt: decodedCursor.timestamp,
         }
       : undefined;
     const records = await appointmentDal.listAppointments({
@@ -144,7 +144,7 @@ export class AppointmentService {
         ? {
             nextCursor: encodeTimestampCursor(
               lastRecord.id,
-              lastRecord.scheduledAt,
+              lastRecord.createdAt,
             ),
           }
         : {}),

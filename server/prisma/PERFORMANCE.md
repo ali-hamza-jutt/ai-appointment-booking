@@ -16,6 +16,8 @@ Core fields that are filtered or sorted remain normal relational columns. JSONB 
 | `users_email_key` | Enforces normalized email uniqueness and supports sign-in lookup. |
 | `appointments_user_id_scheduled_at_key` | Prevents the same user from booking the exact timestamp twice and supports chronological user queries. |
 | `appointments_chat_session_id_key` | Makes chat confirmation idempotent by allowing at most one appointment per chat session. |
+| `appointments_user_id_created_at_id_idx` | Supports stable newest-first appointment pagination across all statuses. |
+| `appointments_user_id_status_created_at_id_idx` | Supports stable newest-first appointment pagination within a status filter. |
 | `appointments_user_id_status_scheduled_at_idx` | Supports appointment lists filtered by user and status, ordered by scheduled time. |
 | `chat_sessions_user_id_updated_at_id_idx` | Supports stable cursor pagination of a user's recently active sessions. |
 | `chat_messages_session_id_client_message_id_key` | Makes retried client message submissions idempotent within a session. Multiple server-generated messages can keep this value null. |

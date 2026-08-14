@@ -40,7 +40,9 @@ export function BookingEntry({
     {
       query: {
         enabled: shouldCheckActiveSessions,
+        refetchOnMount: "always",
         retry: false,
+        staleTime: 0,
       },
     },
   );
@@ -71,7 +73,10 @@ export function BookingEntry({
     return <BookingWorkspace key={newBookingKey || "new"} />;
   }
 
-  if (activeSessionsQuery.isPending) {
+  if (
+    activeSessionsQuery.isPending ||
+    !activeSessionsQuery.isFetchedAfterMount
+  ) {
     return <BookingEntrySkeleton />;
   }
 
