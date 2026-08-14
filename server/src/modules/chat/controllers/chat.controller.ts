@@ -89,6 +89,7 @@ export class ChatController extends Controller {
   @Response<ApiErrorResponse>(404, "Chat session was not found")
   @Response<ApiErrorResponse>(409, "Chat session is closed or the client message ID conflicts")
   @Response<ApiErrorResponse>(422, "Request validation failed")
+  @Response<ApiErrorResponse>(429, "Too many requests")
   @Response<ApiErrorResponse>(502, "The AI provider response was invalid")
   @Response<ApiErrorResponse>(503, "The AI integration is unavailable")
   @Response<ApiErrorResponse>(504, "The AI provider request timed out")
@@ -112,6 +113,7 @@ export class ChatController extends Controller {
   @Response<ApiErrorResponse>(404, "Chat session was not found")
   @Response<ApiErrorResponse>(409, "Booking details are incomplete, the session is closed, or the slot is unavailable")
   @Response<ApiErrorResponse>(422, "Stored booking details are invalid")
+  @Response<ApiErrorResponse>(429, "Too many requests")
   public async confirmBooking(
     @Request() request: ExpressRequest,
     @Path() sessionId: string,

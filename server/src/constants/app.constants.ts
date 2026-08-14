@@ -27,6 +27,8 @@ export const APPOINTMENT_CONSTANTS = {
 } as const;
 
 export const CHAT_CONSTANTS = {
+  RATE_LIMIT_WINDOW_MS: 60 * 1_000,
+  RATE_LIMIT_MAX_REQUESTS: 20,
   DEFAULT_SESSION_PAGE_SIZE: 20,
   MAX_SESSION_PAGE_SIZE: 50,
   DEFAULT_MESSAGE_PAGE_SIZE: 50,
@@ -133,7 +135,7 @@ export const ERROR_MESSAGES = {
   INVALID_PAGINATION_CURSOR: "Pagination cursor is invalid",
   INVALID_TOKEN: "A valid access token is required",
   INTERNAL_SERVER_ERROR: "An unexpected error occurred",
-  RATE_LIMIT_EXCEEDED: "Too many authentication attempts. Try again later",
+  RATE_LIMIT_EXCEEDED: "Too many requests. Try again later",
   REQUEST_VALIDATION_FAILED: "Request validation failed",
   UNSUPPORTED_AUTHENTICATION: "Unsupported authentication method",
   USER_NOT_FOUND: "User account was not found",
