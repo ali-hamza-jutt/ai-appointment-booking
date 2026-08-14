@@ -44,7 +44,7 @@ export function ConversationsList() {
             Return to active booking chats or review completed conversations.
           </p>
         </div>
-        <LinkButton href="/book" leadingIcon={<PlusIcon className="size-4" />}>
+        <LinkButton href="/book?new=true" leadingIcon={<PlusIcon className="size-4" />}>
           New conversation
         </LinkButton>
       </div>

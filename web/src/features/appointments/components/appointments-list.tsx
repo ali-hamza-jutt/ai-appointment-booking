@@ -39,7 +39,7 @@ export function AppointmentsList() {
           <h2 className="text-xl font-bold tracking-tight text-ink">Your appointments</h2>
           <p className="mt-1 text-sm text-muted">View booking details and upcoming plans.</p>
         </div>
-        <LinkButton href="/book" leadingIcon={<PlusIcon className="size-4" />}>
+        <LinkButton href="/book?new=true" leadingIcon={<PlusIcon className="size-4" />}>
           Book an appointment
         </LinkButton>
       </div>

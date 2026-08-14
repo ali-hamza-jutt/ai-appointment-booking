@@ -101,7 +101,7 @@ export function ProfileOverview() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <LinkButton
-              href="/book"
+              href="/book?new=true"
               leadingIcon={<PlusIcon className="size-4" />}
               variant="secondary"
             >

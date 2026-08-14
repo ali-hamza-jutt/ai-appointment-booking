@@ -8,7 +8,11 @@ import {
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
-import { normalizeIanaTimeZone } from "../../utils/time-zone.js";
+import {
+  getLocalDateTimeValues,
+  localDateTimeToUtc,
+  normalizeIanaTimeZone,
+} from "../../utils/time-zone.js";
 import type {
   AiAppointmentContext,
   AiBookingField,
@@ -73,7 +77,12 @@ export class AiService {
         maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
         temperature: AI_CONSTANTS.TEMPERATURE,
       });
-      const result = this.parseExtraction(completion.content, currentDateTime);
+      const result = this.parseExtraction(
+        completion.content,
+        currentDateTime,
+        timeZone,
+        appointmentContext,
+      );
 
       logger.info(
         {
@@ -232,6 +241,8 @@ export class AiService {
   private parseExtraction(
     content: string,
     currentDateTime: Date,
+    timeZone: string,
+    previousContext?: AiAppointmentContext,
   ): AppointmentExtractionResult {
     let json: unknown;
 
@@ -262,11 +273,23 @@ export class AiService {
       appointmentContext.serviceName = output.serviceName;
     }
 
-    if (output.scheduledAt) {
-      const scheduledAt = new Date(output.scheduledAt);
+    const previousLocalDateTime = previousContext?.scheduledAt
+      ? getLocalDateTimeValues(previousContext.scheduledAt, timeZone)
+      : null;
+    const scheduledDate =
+      output.scheduledDate ?? previousLocalDateTime?.date;
+    const scheduledTime =
+      output.scheduledTime ?? previousLocalDateTime?.time;
+
+    if (scheduledDate && scheduledTime) {
+      const scheduledAt = localDateTimeToUtc(
+        scheduledDate,
+        scheduledTime,
+        timeZone,
+      );
 
       if (
-        !Number.isNaN(scheduledAt.getTime()) &&
+        scheduledAt &&
         scheduledAt.getTime() > currentDateTime.getTime()
       ) {
         appointmentContext.scheduledAt = scheduledAt;

@@ -241,12 +241,14 @@ function BookingExperience({
 
     try {
       let activeSessionId = sessionId;
+      let newlyCreatedSessionId: string | null = null;
 
       if (!activeSessionId) {
         const session = await createSessionMutation.mutateAsync({
           data: { title: turn.text.slice(0, 120) },
         });
         activeSessionId = session.id;
+        newlyCreatedSessionId = session.id;
         setSessionId(session.id);
       }
 
@@ -306,6 +308,13 @@ function BookingExperience({
           queryKey: getListMessagesQueryKey(activeSessionId),
         }),
       ]);
+
+      if (newlyCreatedSessionId) {
+        router.replace(
+          `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
+          { scroll: false },
+        );
+      }
     } catch (error) {
       updateOptimisticMessage(turn, "failed");
       setRequestError(
@@ -534,7 +543,7 @@ function BookingExperience({
 
         <div className="border-t border-border bg-surface px-4 py-4 sm:px-6">
           <form className="mx-auto max-w-3xl" onSubmit={handleSubmit}>
-            <div className="flex items-end gap-2 rounded-xl border border-border bg-surface p-2 focus-within:border-brand focus-within:ring-2 focus-within:ring-focus">
+            <div className="flex items-end gap-2 rounded-xl border border-border bg-surface p-2 focus-within:border-brand">
               <textarea
                 aria-label="Describe your appointment"
                 className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-subtle disabled:cursor-not-allowed"
@@ -796,7 +805,7 @@ function BookingResumeError({
           >
             Try again
           </Button>
-          <LinkButton href="/book">Start a new booking</LinkButton>
+          <LinkButton href="/book?new=true">Start a new booking</LinkButton>
         </div>
       </div>
     </div>

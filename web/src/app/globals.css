@@ -101,6 +101,15 @@ button:not(:disabled),
   outline-offset: 2px;
 }
 
+input:not([type="checkbox"]):not([type="radio"]):focus,
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none;
+}
+
 ::placeholder {
   color: var(--bw-subtle);
 }
