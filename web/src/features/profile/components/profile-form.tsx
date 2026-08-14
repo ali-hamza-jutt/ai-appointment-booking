@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/form-controls";
 import { CheckIcon } from "@/components/ui/icons";
+import { useAuth } from "@/features/auth/auth-context";
+import { getUserInitials } from "@/features/auth/utils/user-display";
 
 const timezones = [
   "Asia/Karachi",
@@ -19,8 +21,9 @@ const timezones = [
 ];
 
 export function ProfileForm() {
-  const [fullName, setFullName] = useState("Jordan Rivera");
-  const [email, setEmail] = useState("jordan@example.com");
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState(user?.fullName ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [timezone, setTimezone] = useState("Asia/Karachi");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -52,11 +55,11 @@ export function ProfileForm() {
       <form className="overflow-hidden rounded-xl border border-border bg-surface shadow-card" onSubmit={handleSubmit}>
         <div className="flex items-center gap-4 border-b border-border p-5 sm:p-6">
           <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-base font-bold text-brand">
-            JR
+            {getUserInitials(user?.fullName ?? "") || "BW"}
           </span>
           <div>
-            <p className="text-sm font-semibold text-ink">Jordan Rivera</p>
-            <p className="mt-0.5 text-xs text-muted">BookWise AI member</p>
+            <p className="text-sm font-semibold text-ink">{user?.fullName}</p>
+            <p className="mt-0.5 text-xs text-muted">{user?.email}</p>
           </div>
         </div>
 

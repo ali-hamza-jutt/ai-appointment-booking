@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { BookWiseLogo } from "@/components/brand/bookwise-logo";
@@ -16,6 +16,8 @@ import {
   PlusIcon,
   UserIcon,
 } from "@/components/ui/icons";
+import { useAuth } from "@/features/auth/auth-context";
+import { getUserInitials } from "@/features/auth/utils/user-display";
 import { cn } from "@/lib/utils/cn";
 
 interface AppShellProps {
@@ -40,6 +42,16 @@ function getPageTitle(pathname: string) {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut, user } = useAuth();
+  const fullName = user?.fullName ?? "BookWise user";
+  const email = user?.email ?? "";
+
+  function handleSignOut() {
+    signOut();
+    onNavigate?.();
+    router.replace("/login");
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -85,21 +97,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="border-t border-border p-3">
         <div className="mb-1 flex items-center gap-3 rounded-[9px] px-3 py-2.5">
           <span className="flex size-9 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-brand">
-            JR
+            {getUserInitials(fullName) || "BW"}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-ink">Jordan Rivera</span>
-            <span className="block truncate text-xs text-muted">jordan@example.com</span>
+            <span className="block truncate text-sm font-semibold text-ink">{fullName}</span>
+            <span className="block truncate text-xs text-muted">{email}</span>
           </span>
         </div>
-        <Link
+        <button
           className="flex min-h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
-          href="/login"
-          onClick={onNavigate}
+          onClick={handleSignOut}
+          type="button"
         >
           <LogoutIcon className="size-[18px]" />
           Sign out
-        </Link>
+        </button>
       </div>
     </div>
   );

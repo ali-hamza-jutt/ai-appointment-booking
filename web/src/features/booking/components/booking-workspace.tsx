@@ -15,18 +15,11 @@ import {
   SparklesIcon,
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
+import { useAuth } from "@/features/auth/auth-context";
 import type {
   BookingDraftViewModel,
   ChatMessageViewModel,
 } from "@/features/booking/types/booking-ui";
-
-const initialMessages: ChatMessageViewModel[] = [
-  {
-    id: "welcome",
-    role: "assistant",
-    text: "Hi Jordan! Tell me what you would like to schedule, and I’ll help turn it into an appointment.",
-  },
-];
 
 const suggestions = [
   "Book a consultation next Tuesday at 10 AM",
@@ -44,7 +37,15 @@ const previewDraft: BookingDraftViewModel = {
 };
 
 export function BookingWorkspace() {
-  const [messages, setMessages] = useState(initialMessages);
+  const { user } = useAuth();
+  const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
+  const [messages, setMessages] = useState<ChatMessageViewModel[]>(() => [
+    {
+      id: "welcome",
+      role: "assistant",
+      text: `Hi ${firstName}! Tell me what you would like to schedule, and I’ll help turn it into an appointment.`,
+    },
+  ]);
   const [composer, setComposer] = useState("");
   const [draft, setDraft] = useState<BookingDraftViewModel | null>(null);
   const [isSending, setIsSending] = useState(false);

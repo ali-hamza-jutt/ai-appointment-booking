@@ -19,3 +19,24 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
+
+export function getApiFieldError(
+  error: unknown,
+  fieldName: string,
+): string | undefined {
+  if (!isApiError(error) || !error.fieldErrors) return undefined;
+
+  const fieldEntry = Object.entries(error.fieldErrors).find(
+    ([key]) => key === fieldName || key.endsWith(`.${fieldName}`),
+  );
+
+  return fieldEntry?.[1]?.[0];
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  return isApiError(error) ? error.message : fallback;
+}
