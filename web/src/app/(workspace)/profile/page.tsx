@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-import { ProfileForm } from "@/features/profile/components/profile-form";
+import { ProfileOverview } from "@/features/profile/components/profile-overview";
 
 export const metadata: Metadata = { title: "Profile" };
 
 export default function ProfilePage() {
-  return <ProfileForm />;
+  return <ProfileOverview />;
 }

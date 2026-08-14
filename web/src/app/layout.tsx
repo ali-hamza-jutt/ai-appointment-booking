@@ -24,7 +24,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${inter.variable} h-full`}
     >
-      <body className="min-h-full bg-canvas font-sans text-ink">
+      <body
+        className="min-h-full bg-canvas font-sans text-ink"
+        suppressHydrationWarning
+      >
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
