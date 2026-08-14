@@ -157,10 +157,15 @@ export const appointmentExtractionOutputSchema = z
       .min(APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH)
       .max(APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH)
       .nullable(),
-    scheduledAt: z
+    scheduledDate: z
       .string()
       .trim()
-      .regex(VALIDATION_PATTERNS.ISO_8601_DATE_TIME_WITH_TIME_ZONE)
+      .regex(VALIDATION_PATTERNS.LOCAL_DATE)
+      .nullable(),
+    scheduledTime: z
+      .string()
+      .trim()
+      .regex(VALIDATION_PATTERNS.LOCAL_TIME)
       .nullable(),
     durationMinutes: z
       .number()
