@@ -1,26 +1,168 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bw-canvas: #f8fafc;
+  --bw-surface: #ffffff;
+  --bw-surface-subtle: #f1f5f9;
+  --bw-surface-muted: #eef2f6;
+  --bw-ink: #0f172a;
+  --bw-ink-soft: #334155;
+  --bw-muted: #64748b;
+  --bw-subtle: #94a3b8;
+  --bw-border: #e2e8f0;
+  --bw-border-strong: #cbd5e1;
+  --bw-brand: #0f766e;
+  --bw-brand-hover: #115e59;
+  --bw-brand-soft: #ccfbf1;
+  --bw-brand-disabled: #5ea8a2;
+  --bw-success: #15803d;
+  --bw-success-strong: #166534;
+  --bw-success-soft: #f0fdf4;
+  --bw-success-border: #bbf7d0;
+  --bw-warning: #b45309;
+  --bw-warning-strong: #92400e;
+  --bw-warning-soft: #fffbeb;
+  --bw-warning-border: #fde68a;
+  --bw-danger: #b91c1c;
+  --bw-danger-strong: #991b1b;
+  --bw-danger-soft: #fef2f2;
+  --bw-danger-border: #fecaca;
+  --bw-overlay: rgb(15 23 42 / 50%);
+  --bw-focus: #0f766e;
+  --bw-shadow-card: 0 1px 2px rgb(15 23 42 / 4%);
+  --bw-shadow-menu: 0 16px 40px rgb(15 23 42 / 18%);
+  --bw-shadow-modal: 0 24px 60px rgb(15 23 42 / 28%);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--bw-canvas);
+  --color-surface: var(--bw-surface);
+  --color-surface-subtle: var(--bw-surface-subtle);
+  --color-surface-muted: var(--bw-surface-muted);
+  --color-ink: var(--bw-ink);
+  --color-ink-soft: var(--bw-ink-soft);
+  --color-muted: var(--bw-muted);
+  --color-subtle: var(--bw-subtle);
+  --color-border: var(--bw-border);
+  --color-border-strong: var(--bw-border-strong);
+  --color-brand: var(--bw-brand);
+  --color-brand-hover: var(--bw-brand-hover);
+  --color-brand-soft: var(--bw-brand-soft);
+  --color-brand-disabled: var(--bw-brand-disabled);
+  --color-success: var(--bw-success);
+  --color-success-strong: var(--bw-success-strong);
+  --color-success-soft: var(--bw-success-soft);
+  --color-success-border: var(--bw-success-border);
+  --color-warning: var(--bw-warning);
+  --color-warning-strong: var(--bw-warning-strong);
+  --color-warning-soft: var(--bw-warning-soft);
+  --color-warning-border: var(--bw-warning-border);
+  --color-danger: var(--bw-danger);
+  --color-danger-strong: var(--bw-danger-strong);
+  --color-danger-soft: var(--bw-danger-soft);
+  --color-danger-border: var(--bw-danger-border);
+  --color-overlay: var(--bw-overlay);
+  --font-sans: var(--font-inter);
+  --shadow-card: var(--bw-shadow-card);
+  --shadow-menu: var(--bw-shadow-menu);
+  --shadow-modal: var(--bw-shadow-modal);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  background: var(--bw-canvas);
+  color: var(--bw-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--bw-focus);
+  outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--bw-subtle);
+}
+
+@keyframes bw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bw-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes bw-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.animate-bw-spin {
+  animation: bw-spin 700ms linear infinite;
+}
+
+.animate-bw-pulse {
+  animation: bw-pulse 1.2s ease-in-out infinite;
+}
+
+.bw-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bw-surface-muted) 25%,
+    var(--bw-border) 37%,
+    var(--bw-surface-muted) 63%
+  );
+  background-size: 800px 100%;
+  animation: bw-shimmer 1.4s linear infinite;
+}
+
+.bw-scrollbar {
+  scrollbar-color: var(--bw-border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
