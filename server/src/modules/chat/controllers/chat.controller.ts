@@ -82,7 +82,7 @@ export class ChatController extends Controller {
     return chatService.getSession(getAuthenticatedUser(request).id, sessionId);
   }
 
-  /** Saves a user message, extracts booking details, and returns the persisted assistant reply. */
+  /** Saves a user message, processes conversational or structured booking details, and returns the persisted assistant reply. */
   @Post("sessions/{sessionId}/messages")
   @SuccessResponse("201", "Chat turn processed")
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")

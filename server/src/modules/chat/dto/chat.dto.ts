@@ -66,9 +66,33 @@ export interface CreateChatMessageRequest {
   content: string;
 }
 
+export interface StructuredBookingDetails {
+  /** @minLength 2 @maxLength 120 */
+  serviceName: string;
+
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ Must use YYYY-MM-DD */
+  scheduledDate: string;
+
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ Must use HH:mm in 24-hour time */
+  scheduledTime: string;
+
+  /**
+   * @isInt Duration must be a whole number
+   * @minimum 5
+   * @maximum 480
+   */
+  durationMinutes?: number;
+
+  /** @maxLength 2000 */
+  notes?: string;
+}
+
 export interface ProcessChatMessageRequest extends CreateChatMessageRequest {
   /** IANA time zone used to interpret relative dates such as tomorrow. @maxLength 100 */
   timeZone: string;
+
+  /** Form-provided values that bypass AI extraction and are validated by the server. */
+  bookingDetails?: StructuredBookingDetails;
 }
 
 export interface ChatSessionResponse {

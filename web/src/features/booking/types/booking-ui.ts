@@ -19,6 +19,15 @@ export interface BookingDraftViewModel {
 }
 
 export interface PendingChatTurn {
+  bookingDetails?: StructuredBookingFormValues;
   clientMessageId: string;
   text: string;
+}
+
+export interface StructuredBookingFormValues {
+  durationMinutes: number;
+  notes?: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  serviceName: string;
 }

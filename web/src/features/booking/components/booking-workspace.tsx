@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useEffect,
+  useMemo,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -26,13 +27,16 @@ import {
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
+import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
+import { useChatMessagePolling } from "@/features/conversations/hooks/use-chat-message-polling";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
 import type {
   BookingDraftViewModel,
   ChatMessageDeliveryStatus,
   ChatMessageViewModel,
   PendingChatTurn,
+  StructuredBookingFormValues,
 } from "@/features/booking/types/booking-ui";
 import {
   getBrowserTimeZone,
@@ -76,6 +80,7 @@ interface BookingWorkspaceProps {
 }
 
 interface BookingExperienceProps {
+  initialMessageCursor?: string;
   initialMessages?: ChatMessageResponse[];
   initialSession?: ChatSessionResponse;
   initialTimeZone: string;
@@ -126,6 +131,7 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
 
   return (
     <BookingExperience
+      initialMessageCursor={messagesQuery.data.pages.at(-1)?.nextCursor}
       initialMessages={initialMessages}
       initialSession={sessionQuery.data}
       initialTimeZone={timeZone}
@@ -135,6 +141,7 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
 }
 
 function BookingExperience({
+  initialMessageCursor,
   initialMessages = [],
   initialSession,
   initialTimeZone,
@@ -164,6 +171,10 @@ function BookingExperience({
   const [draft, setDraft] = useState<BookingDraftViewModel | null>(() =>
     toBookingDraft(initialSession?.bookingContext, initialTimeZone),
   );
+  const [bookingContext, setBookingContext] =
+    useState<AppointmentBookingContext | null>(
+      initialSession?.bookingContext ?? null,
+    );
   const [timeZone, setTimeZone] = useState(initialTimeZone);
   const [missingFields, setMissingFields] = useState<string[]>(
     initialMissingFields,
@@ -176,6 +187,7 @@ function BookingExperience({
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isStructuredFormOpen, setIsStructuredFormOpen] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(
     initialSession?.status === "CLOSED",
   );
@@ -183,6 +195,15 @@ function BookingExperience({
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
+  const messagePollingQuery = useChatMessagePolling(sessionId ?? "", {
+    enabled: Boolean(sessionId) && !isConfirmed,
+    ...(initialMessageCursor ? { initialCursor: initialMessageCursor } : {}),
+  });
+  const visibleMessages = useMemo(
+    () =>
+      mergeBookingMessages(messages, messagePollingQuery.data?.items ?? []),
+    [messagePollingQuery.data?.items, messages],
+  );
 
   const isSending = isProcessingTurn;
   const isConfirming = confirmBookingMutation.isPending;
@@ -197,7 +218,7 @@ function BookingExperience({
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [isSending, messages]);
+  }, [isSending, visibleMessages]);
 
   function updateOptimisticMessage(
     turn: PendingChatTurn,
@@ -229,8 +250,8 @@ function BookingExperience({
     });
   }
 
-  async function processTurn(turn: PendingChatTurn) {
-    if (messageRequestLockRef.current || isConfirmed) return;
+  async function processTurn(turn: PendingChatTurn): Promise<boolean> {
+    if (messageRequestLockRef.current || isConfirmed) return false;
 
     messageRequestLockRef.current = true;
     setIsProcessingTurn(true);
@@ -260,6 +281,9 @@ function BookingExperience({
           clientMessageId: turn.clientMessageId,
           content: turn.text,
           timeZone: browserTimeZone,
+          ...(turn.bookingDetails
+            ? { bookingDetails: turn.bookingDetails }
+            : {}),
         },
         sessionId: activeSessionId,
       });
@@ -292,6 +316,7 @@ function BookingExperience({
           },
         ];
       });
+      setBookingContext(response.session.bookingContext);
       setDraft(toBookingDraft(response.session.bookingContext, browserTimeZone));
       setMissingFields(
         response.assistantMessage.structuredData?.missingFields ?? [],
@@ -315,6 +340,7 @@ function BookingExperience({
           { scroll: false },
         );
       }
+      return true;
     } catch (error) {
       updateOptimisticMessage(turn, "failed");
       setRequestError(
@@ -323,6 +349,7 @@ function BookingExperience({
           "The assistant could not process your message. Check your connection and try again.",
         ),
       );
+      return false;
     } finally {
       messageRequestLockRef.current = false;
       setIsProcessingTurn(false);
@@ -350,6 +377,31 @@ function BookingExperience({
 
   function retryPendingTurn() {
     if (pendingTurn && !isSending) void processTurn(pendingTurn);
+  }
+
+  async function submitStructuredBookingDetails(
+    values: StructuredBookingFormValues,
+  ): Promise<boolean> {
+    if (isSending || isConfirmed || messageRequestLockRef.current) {
+      return false;
+    }
+
+    const turn: PendingChatTurn = pendingTurn
+      ? { ...pendingTurn, bookingDetails: values }
+      : {
+        bookingDetails: values,
+        clientMessageId: crypto.randomUUID(),
+        text: "I completed the structured booking form.",
+      };
+
+    return processTurn(turn);
+  }
+
+  function openStructuredBookingForm() {
+    if (isSending || isConfirmed) return;
+
+    setRequestError(null);
+    setIsStructuredFormOpen(true);
   }
 
   function focusComposerForChanges() {
@@ -397,9 +449,18 @@ function BookingExperience({
                 ],
           );
           setDraft(toConfirmedBookingDraft(response.appointment, timeZone));
+          setBookingContext({
+            serviceName: response.appointment.serviceName,
+            scheduledAt: response.appointment.scheduledAt,
+            durationMinutes: response.appointment.durationMinutes,
+            ...(response.appointment.notes
+              ? { notes: response.appointment.notes }
+              : {}),
+          });
           setIsReadyToConfirm(false);
           setIsConfirmed(true);
           setIsConfirmOpen(false);
+          setIsStructuredFormOpen(false);
           void Promise.all([
             queryClient.invalidateQueries({
               queryKey: getListAppointmentsQueryKey(),
@@ -425,6 +486,7 @@ function BookingExperience({
     setMessages([createWelcomeMessage(firstName)]);
     setComposer("");
     setDraft(null);
+    setBookingContext(null);
     setTimeZone(getBrowserTimeZone());
     setMissingFields([]);
     setIsReadyToConfirm(false);
@@ -433,6 +495,7 @@ function BookingExperience({
     setRequestError(null);
     setConfirmationError(null);
     setIsConfirmOpen(false);
+    setIsStructuredFormOpen(false);
     setIsConfirmed(false);
     messageRequestLockRef.current = false;
     confirmationRequestLockRef.current = false;
@@ -455,7 +518,7 @@ function BookingExperience({
 
         <div className="bw-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-6">
           <div className="mx-auto max-w-3xl space-y-5">
-            {messages.map((message) => {
+            {visibleMessages.map((message) => {
               const isUserMessage = message.role === "user";
               const hasFailed = message.deliveryStatus === "failed";
 
@@ -517,7 +580,7 @@ function BookingExperience({
               </Alert>
             ) : null}
 
-            {messages.length === 1 && !isConfirmed ? (
+            {visibleMessages.length === 1 && !isConfirmed ? (
               <div className="pt-1">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
                   Try an example
@@ -641,11 +704,22 @@ function BookingExperience({
                       {isReadyToConfirm ? "Confirm booking" : "More details needed"}
                     </Button>
                     <Button
+                      disabled={isSending}
+                      fullWidth
+                      leadingIcon={<EditIcon className="size-4" />}
+                      onClick={openStructuredBookingForm}
+                      variant="secondary"
+                    >
+                      {missingFields.length > 0
+                        ? "Complete details in form"
+                        : "Edit details in form"}
+                    </Button>
+                    <Button
                       disabled={isSending || hasFailedTurn}
                       fullWidth
                       leadingIcon={<EditIcon className="size-4" />}
                       onClick={focusComposerForChanges}
-                      variant="secondary"
+                      variant="ghost"
                     >
                       Change details in chat
                     </Button>
@@ -662,6 +736,17 @@ function BookingExperience({
               <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted">
                 Send a message and the assistant will organize the date, time, and other details here.
               </p>
+              {visibleMessages.length > 1 ? (
+                <Button
+                  className="mt-5"
+                  disabled={isSending}
+                  leadingIcon={<EditIcon className="size-4" />}
+                  onClick={openStructuredBookingForm}
+                  variant="secondary"
+                >
+                  Complete details in form
+                </Button>
+              ) : null}
             </div>
           )}
         </div>
@@ -694,6 +779,18 @@ function BookingExperience({
           </div>
         </div>
       </Modal>
+
+      {isStructuredFormOpen ? (
+        <StructuredBookingForm
+          bookingContext={bookingContext}
+          initialValues={pendingTurn?.bookingDetails}
+          isSubmitting={isSending}
+          onClose={() => !isSending && setIsStructuredFormOpen(false)}
+          onSubmit={submitStructuredBookingDetails}
+          submissionError={requestError}
+          timeZone={timeZone}
+        />
+      ) : null}
     </div>
   );
 }
@@ -732,6 +829,35 @@ function toBookingMessageViewModel(
     role: message.role === "USER" ? "user" : "assistant",
     text: message.content,
   };
+}
+
+function mergeBookingMessages(
+  current: ChatMessageViewModel[],
+  polledMessages: ChatMessageResponse[],
+): ChatMessageViewModel[] {
+  if (polledMessages.length === 0) return current;
+
+  const mergedMessages = [...current];
+
+  for (const polledMessage of polledMessages) {
+    if (!isBookingMessage(polledMessage)) continue;
+
+    const message = toBookingMessageViewModel(polledMessage);
+    const existingIndex = mergedMessages.findIndex(
+      (existingMessage) =>
+        existingMessage.id === message.id ||
+        (message.clientMessageId !== undefined &&
+          existingMessage.clientMessageId === message.clientMessageId),
+    );
+
+    if (existingIndex >= 0) {
+      mergedMessages[existingIndex] = message;
+    } else {
+      mergedMessages.push(message);
+    }
+  }
+
+  return mergedMessages;
 }
 
 function getMissingBookingFields(

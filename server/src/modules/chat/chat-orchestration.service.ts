@@ -14,7 +14,10 @@ import {
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
-import { normalizeIanaTimeZone } from "../../utils/time-zone.js";
+import {
+  localDateTimeToUtc,
+  normalizeIanaTimeZone,
+} from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { appointmentService } from "../appointments/appointment.service.js";
 import type {
@@ -24,6 +27,7 @@ import type {
   ChatTurnResponse,
   ConfirmChatBookingResponse,
   ProcessChatMessageRequest,
+  StructuredBookingDetails,
 } from "./dto/chat.dto.js";
 import type {
   ChatOrchestrationAiPort,
@@ -74,6 +78,16 @@ export class ChatOrchestrationService {
           assistantMessage: existingReply,
         };
       }
+    }
+
+    if (request.bookingDetails) {
+      return this.processStructuredBookingDetails(
+        userId,
+        sessionId,
+        userMessage,
+        request.bookingDetails,
+        timeZone,
+      );
     }
 
     const [session, recentMessages] = await Promise.all([
@@ -131,6 +145,80 @@ export class ChatOrchestrationService {
           ? { bookingContext }
           : {}),
         structuredData: metadata,
+      },
+    );
+
+    return {
+      session: persistedTurn.session,
+      userMessage,
+      assistantMessage: persistedTurn.assistantMessage,
+    };
+  }
+
+  private async processStructuredBookingDetails(
+    userId: string,
+    sessionId: string,
+    userMessage: ChatMessageResponse,
+    details: StructuredBookingDetails,
+    timeZone: string,
+  ): Promise<ChatTurnResponse> {
+    const session = await this.chat.getSession(userId, sessionId);
+
+    if (session.status === "CLOSED") {
+      throw new AppError(
+        409,
+        ERROR_CODES.CHAT_SESSION_CLOSED,
+        ERROR_MESSAGES.CHAT_SESSION_CLOSED,
+      );
+    }
+
+    const scheduledAt = localDateTimeToUtc(
+      details.scheduledDate,
+      details.scheduledTime,
+      timeZone,
+    );
+
+    if (!scheduledAt) {
+      throwRequestValidationError(
+        "bookingDetails.scheduledDate",
+        VALIDATION_MESSAGES.BOOKING_CONTEXT_TIME,
+      );
+    }
+
+    const preparedAppointment = this.appointments.prepareAppointment({
+      serviceName: details.serviceName,
+      scheduledAt,
+      ...(details.durationMinutes !== undefined
+        ? { durationMinutes: details.durationMinutes }
+        : {}),
+      ...(details.notes !== undefined ? { notes: details.notes } : {}),
+    });
+    const bookingContext: AppointmentBookingContext = {
+      serviceName: preparedAppointment.serviceName,
+      scheduledAt: preparedAppointment.scheduledAt,
+      durationMinutes: preparedAppointment.durationMinutes,
+      ...(preparedAppointment.notes
+        ? { notes: preparedAppointment.notes }
+        : {}),
+    };
+    const persistedTurn = await this.chat.saveAssistantTurn(
+      userId,
+      sessionId,
+      {
+        replyToMessageId: userMessage.id,
+        content: this.buildAssistantResponse(
+          "BOOK_APPOINTMENT",
+          bookingContext,
+          undefined,
+          timeZone,
+        ),
+        bookingContext,
+        structuredData: {
+          intent: "BOOK_APPOINTMENT",
+          bookingContext,
+          missingFields: [],
+          confirmationRequired: true,
+        },
       },
     );
 

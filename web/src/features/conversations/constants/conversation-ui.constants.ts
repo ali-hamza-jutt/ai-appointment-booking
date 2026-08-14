@@ -7,6 +7,8 @@ export const CONVERSATION_UI_CONSTANTS = {
     { label: "Closed", value: "CLOSED" },
   ] satisfies ReadonlyArray<{ label: string; value: ConversationFilter }>,
   MESSAGE_PAGE_SIZE: 50,
+  MESSAGE_POLL_INTERVAL_MS: 3_000,
+  MESSAGE_POLL_PAGE_SIZE: 100,
   RESUME_MESSAGE_PAGE_SIZE: 100,
   SESSION_PAGE_SIZE: 20,
 } as const;
