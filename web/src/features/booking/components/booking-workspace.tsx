@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +18,8 @@ import {
   ClockIcon,
   EditIcon,
   GlobeIcon,
+  PlusIcon,
+  RefreshIcon,
   SendIcon,
   SparklesIcon,
 } from "@/components/ui/icons";
@@ -18,8 +27,24 @@ import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import type {
   BookingDraftViewModel,
+  ChatMessageDeliveryStatus,
   ChatMessageViewModel,
+  PendingChatTurn,
 } from "@/features/booking/types/booking-ui";
+import {
+  getBrowserTimeZone,
+  toBookingDraft,
+  toConfirmedBookingDraft,
+} from "@/features/booking/utils/booking-format";
+import { getListAppointmentsQueryKey } from "@/generated/api/appointments/appointments";
+import {
+  getListSessionsQueryKey,
+  useConfirmBooking,
+  useCreateMessage,
+  useCreateSession,
+} from "@/generated/api/chat/chat";
+import { getApiErrorMessage } from "@/lib/api/api-error";
+import { cn } from "@/lib/utils/cn";
 
 const suggestions = [
   "Book a consultation next Tuesday at 10 AM",
@@ -27,64 +52,184 @@ const suggestions = [
   "I need a planning session next week",
 ];
 
-const previewDraft: BookingDraftViewModel = {
-  date: "Tuesday, August 18, 2026",
-  duration: "30 minutes",
-  notes: "Discuss project goals and next steps.",
-  time: "10:00 AM",
-  timezone: "Asia/Karachi",
-  title: "Project consultation",
-};
+function createWelcomeMessage(firstName: string): ChatMessageViewModel {
+  return {
+    id: "welcome",
+    role: "assistant",
+    text: `Hi ${firstName}! Tell me what you would like to schedule, and I’ll help turn it into an appointment.`,
+  };
+}
 
 export function BookingWorkspace() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
+  const createSessionMutation = useCreateSession();
+  const createMessageMutation = useCreateMessage();
+  const confirmBookingMutation = useConfirmBooking();
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageViewModel[]>(() => [
-    {
-      id: "welcome",
-      role: "assistant",
-      text: `Hi ${firstName}! Tell me what you would like to schedule, and I’ll help turn it into an appointment.`,
-    },
+    createWelcomeMessage(firstName),
   ]);
   const [composer, setComposer] = useState("");
   const [draft, setDraft] = useState<BookingDraftViewModel | null>(null);
-  const [isSending, setIsSending] = useState(false);
+  const [timeZone, setTimeZone] = useState("UTC");
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [isReadyToConfirm, setIsReadyToConfirm] = useState(false);
+  const [isProcessingTurn, setIsProcessingTurn] = useState(false);
+  const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const responseTimerRef = useRef<number | undefined>(undefined);
-  const confirmationTimerRef = useRef<number | undefined>(undefined);
+  const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const messageRequestLockRef = useRef(false);
+  const confirmationRequestLockRef = useRef(false);
+
+  const isSending = isProcessingTurn;
+  const isConfirming = confirmBookingMutation.isPending;
+  const hasFailedTurn = Boolean(pendingTurn) && !isSending;
+  const isComposerDisabled = isSending || hasFailedTurn || isConfirmed;
+  const canConfirm =
+    Boolean(sessionId) &&
+    Boolean(draft) &&
+    isReadyToConfirm &&
+    !isSending &&
+    !isConfirmed;
 
   useEffect(() => {
-    return () => {
-      window.clearTimeout(responseTimerRef.current);
-      window.clearTimeout(confirmationTimerRef.current);
-    };
-  }, []);
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [isSending, messages]);
+
+  function updateOptimisticMessage(
+    turn: PendingChatTurn,
+    deliveryStatus: ChatMessageDeliveryStatus,
+  ) {
+    setMessages((current) => {
+      const existingMessage = current.find(
+        (message) => message.clientMessageId === turn.clientMessageId,
+      );
+
+      if (existingMessage) {
+        return current.map((message) =>
+          message.clientMessageId === turn.clientMessageId
+            ? { ...message, deliveryStatus }
+            : message,
+        );
+      }
+
+      return [
+        ...current,
+        {
+          clientMessageId: turn.clientMessageId,
+          deliveryStatus,
+          id: `pending-${turn.clientMessageId}`,
+          role: "user",
+          text: turn.text,
+        },
+      ];
+    });
+  }
+
+  async function processTurn(turn: PendingChatTurn) {
+    if (messageRequestLockRef.current || isConfirmed) return;
+
+    messageRequestLockRef.current = true;
+    setIsProcessingTurn(true);
+    setPendingTurn(turn);
+    setRequestError(null);
+    setIsReadyToConfirm(false);
+    updateOptimisticMessage(turn, "sending");
+
+    try {
+      let activeSessionId = sessionId;
+
+      if (!activeSessionId) {
+        const session = await createSessionMutation.mutateAsync({
+          data: { title: turn.text.slice(0, 120) },
+        });
+        activeSessionId = session.id;
+        setSessionId(session.id);
+      }
+
+      const browserTimeZone = getBrowserTimeZone();
+      setTimeZone(browserTimeZone);
+
+      const response = await createMessageMutation.mutateAsync({
+        data: {
+          clientMessageId: turn.clientMessageId,
+          content: turn.text,
+          timeZone: browserTimeZone,
+        },
+        sessionId: activeSessionId,
+      });
+
+      setMessages((current) => {
+        const deliveredMessages = current.map((message) =>
+          message.clientMessageId === turn.clientMessageId
+            ? {
+                ...message,
+                deliveryStatus: "sent" as const,
+                text: response.userMessage.content,
+              }
+            : message,
+        );
+
+        if (
+          deliveredMessages.some(
+            (message) => message.id === response.assistantMessage.id,
+          )
+        ) {
+          return deliveredMessages;
+        }
+
+        return [
+          ...deliveredMessages,
+          {
+            id: response.assistantMessage.id,
+            role: "assistant" as const,
+            text: response.assistantMessage.content,
+          },
+        ];
+      });
+      setDraft(toBookingDraft(response.session.bookingContext, browserTimeZone));
+      setMissingFields(
+        response.assistantMessage.structuredData?.missingFields ?? [],
+      );
+      setIsReadyToConfirm(
+        response.assistantMessage.structuredData?.confirmationRequired === true,
+      );
+      setPendingTurn(null);
+      void queryClient.invalidateQueries({
+        queryKey: getListSessionsQueryKey(),
+      });
+    } catch (error) {
+      updateOptimisticMessage(turn, "failed");
+      setRequestError(
+        getApiErrorMessage(
+          error,
+          "The assistant could not process your message. Check your connection and try again.",
+        ),
+      );
+    } finally {
+      messageRequestLockRef.current = false;
+      setIsProcessingTurn(false);
+    }
+  }
 
   function sendMessage(text: string) {
     const trimmedMessage = text.trim();
-    if (!trimmedMessage || isSending) return;
+    if (!trimmedMessage || isComposerDisabled || messageRequestLockRef.current) {
+      return;
+    }
 
-    setMessages((current) => [
-      ...current,
-      { id: crypto.randomUUID(), role: "user", text: trimmedMessage },
-    ]);
+    const turn: PendingChatTurn = {
+      clientMessageId: crypto.randomUUID(),
+      text: trimmedMessage,
+    };
     setComposer("");
-    setIsSending(true);
-
-    responseTimerRef.current = window.setTimeout(() => {
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          text: "I found the details below. Review them before you confirm the booking.",
-        },
-      ]);
-      setDraft(previewDraft);
-      setIsSending(false);
-    }, 700);
+    void processTurn(turn);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -92,15 +237,89 @@ export function BookingWorkspace() {
     sendMessage(composer);
   }
 
-  function confirmBooking() {
-    if (isConfirming) return;
-    setIsConfirming(true);
+  function retryPendingTurn() {
+    if (pendingTurn && !isSending) void processTurn(pendingTurn);
+  }
 
-    confirmationTimerRef.current = window.setTimeout(() => {
-      setIsConfirming(false);
-      setIsConfirmOpen(false);
-      setIsConfirmed(true);
-    }, 700);
+  function focusComposerForChanges() {
+    setComposer("I want to change ");
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  function confirmBooking() {
+    if (
+      !sessionId ||
+      !canConfirm ||
+      isConfirming ||
+      confirmationRequestLockRef.current
+    ) {
+      return;
+    }
+
+    confirmationRequestLockRef.current = true;
+    setConfirmationError(null);
+    confirmBookingMutation.mutate(
+      { sessionId },
+      {
+        onError: (error) => {
+          setConfirmationError(
+            getApiErrorMessage(
+              error,
+              "The appointment could not be confirmed. Please try again.",
+            ),
+          );
+        },
+        onSettled: () => {
+          confirmationRequestLockRef.current = false;
+        },
+        onSuccess: (response) => {
+          setMessages((current) =>
+            current.some((message) => message.id === response.assistantMessage.id)
+              ? current
+              : [
+                  ...current,
+                  {
+                    id: response.assistantMessage.id,
+                    role: "assistant",
+                    text: response.assistantMessage.content,
+                  },
+                ],
+          );
+          setDraft(toConfirmedBookingDraft(response.appointment, timeZone));
+          setIsReadyToConfirm(false);
+          setIsConfirmed(true);
+          setIsConfirmOpen(false);
+          void Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: getListAppointmentsQueryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: getListSessionsQueryKey(),
+            }),
+          ]);
+        },
+      },
+    );
+  }
+
+  function startAnotherBooking() {
+    createSessionMutation.reset();
+    createMessageMutation.reset();
+    confirmBookingMutation.reset();
+    setSessionId(null);
+    setMessages([createWelcomeMessage(firstName)]);
+    setComposer("");
+    setDraft(null);
+    setMissingFields([]);
+    setIsReadyToConfirm(false);
+    setIsProcessingTurn(false);
+    setPendingTurn(null);
+    setRequestError(null);
+    setConfirmationError(null);
+    setIsConfirmOpen(false);
+    setIsConfirmed(false);
+    messageRequestLockRef.current = false;
+    confirmationRequestLockRef.current = false;
   }
 
   return (
@@ -120,22 +339,37 @@ export function BookingWorkspace() {
 
         <div className="bw-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-6">
           <div className="mx-auto max-w-3xl space-y-5">
-            {messages.map((message) => (
-              <div
-                className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
-                key={message.id}
-              >
+            {messages.map((message) => {
+              const isUserMessage = message.role === "user";
+              const hasFailed = message.deliveryStatus === "failed";
+
+              return (
                 <div
-                  className={
-                    message.role === "user"
-                      ? "max-w-[82%] rounded-2xl rounded-br-[5px] bg-brand px-4 py-3 text-sm leading-6 text-surface"
-                      : "max-w-[82%] rounded-2xl rounded-bl-[5px] border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-ink-soft"
-                  }
+                  className={isUserMessage ? "flex justify-end" : "flex justify-start"}
+                  key={message.id}
                 >
-                  {message.text}
+                  <div className="max-w-[82%]">
+                    <div
+                      className={cn(
+                        "px-4 py-3 text-sm leading-6",
+                        isUserMessage
+                          ? "rounded-2xl rounded-br-[5px] bg-brand text-surface"
+                          : "rounded-2xl rounded-bl-[5px] border border-border bg-surface-subtle text-ink-soft",
+                        hasFailed &&
+                          "border border-danger-border bg-danger-soft text-danger-strong",
+                      )}
+                    >
+                      {message.text}
+                    </div>
+                    {message.deliveryStatus === "sending" ? (
+                      <p className="mt-1 text-right text-[10px] text-subtle">Sending…</p>
+                    ) : hasFailed ? (
+                      <p className="mt-1 text-right text-[10px] font-medium text-danger">Not processed</p>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {isSending ? (
               <div className="flex justify-start" role="status">
@@ -148,7 +382,26 @@ export function BookingWorkspace() {
               </div>
             ) : null}
 
-            {messages.length === 1 ? (
+            {requestError ? (
+              <Alert tone="danger">
+                <p>{requestError}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    leadingIcon={<RefreshIcon className="size-3.5" />}
+                    onClick={retryPendingTurn}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Retry message
+                  </Button>
+                  <Button onClick={startAnotherBooking} size="sm" variant="ghost">
+                    Start over
+                  </Button>
+                </div>
+              </Alert>
+            ) : null}
+
+            {messages.length === 1 && !isConfirmed ? (
               <div className="pt-1">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
                   Try an example
@@ -157,7 +410,7 @@ export function BookingWorkspace() {
                   {suggestions.map((suggestion) => (
                     <button
                       className="rounded-full border border-border bg-surface px-3 py-2 text-left text-xs text-ink-soft transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isSending}
+                      disabled={isComposerDisabled}
                       key={suggestion}
                       onClick={() => sendMessage(suggestion)}
                       type="button"
@@ -168,6 +421,7 @@ export function BookingWorkspace() {
                 </div>
               </div>
             ) : null}
+            <div ref={messageEndRef} />
           </div>
         </div>
 
@@ -177,7 +431,8 @@ export function BookingWorkspace() {
               <textarea
                 aria-label="Describe your appointment"
                 className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-subtle disabled:cursor-not-allowed"
-                disabled={isSending}
+                disabled={isComposerDisabled}
+                maxLength={4000}
                 onChange={(event) => setComposer(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
@@ -185,14 +440,21 @@ export function BookingWorkspace() {
                     sendMessage(composer);
                   }
                 }}
-                placeholder="Example: Book a 30-minute consultation next Tuesday at 10 AM"
+                placeholder={
+                  isConfirmed
+                    ? "This appointment has been booked"
+                    : hasFailedTurn
+                      ? "Retry or start over before sending another message"
+                      : "Example: Book a 30-minute consultation next Tuesday at 10 AM"
+                }
+                ref={composerRef}
                 rows={1}
                 value={composer}
               />
               <Button
                 aria-label="Send message"
                 className="size-10 shrink-0 px-0"
-                disabled={!composer.trim()}
+                disabled={!composer.trim() || isComposerDisabled}
                 isLoading={isSending}
                 type="submit"
               >
@@ -213,7 +475,11 @@ export function BookingWorkspace() {
               <h2 className="text-sm font-semibold text-ink">Booking details</h2>
               <p className="mt-0.5 text-xs text-muted">Review before you confirm.</p>
             </div>
-            {draft ? <Badge tone="warning">Draft</Badge> : null}
+            {draft ? (
+              <Badge tone={isConfirmed ? "success" : "warning"}>
+                {isConfirmed ? "Booked" : "Draft"}
+              </Badge>
+            ) : null}
           </div>
 
           {isConfirmed ? (
@@ -225,6 +491,11 @@ export function BookingWorkspace() {
           {draft ? (
             <div className="rounded-xl border border-border bg-surface shadow-card">
               <div className="space-y-5 p-5">
+                {missingFields.length > 0 && !isConfirmed ? (
+                  <Alert tone="info">
+                    Still needed: {missingFields.map(formatMissingField).join(", ")}.
+                  </Alert>
+                ) : null}
                 <DraftRow icon={<CalendarIcon className="size-[18px]" />} label="Appointment" value={draft.title} />
                 <DraftRow icon={<CalendarIcon className="size-[18px]" />} label="Date" value={draft.date} />
                 <DraftRow icon={<ClockIcon className="size-[18px]" />} label="Time" value={`${draft.time} · ${draft.duration}`} />
@@ -235,16 +506,35 @@ export function BookingWorkspace() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 border-t border-border p-4 sm:flex-row xl:flex-col">
-                <Button
-                  fullWidth
-                  leadingIcon={<CheckCircleIcon className="size-4" />}
-                  onClick={() => setIsConfirmOpen(true)}
-                >
-                  Confirm booking
-                </Button>
-                <Button fullWidth leadingIcon={<EditIcon className="size-4" />} variant="secondary">
-                  Edit details
-                </Button>
+                {isConfirmed ? (
+                  <Button
+                    fullWidth
+                    leadingIcon={<PlusIcon className="size-4" />}
+                    onClick={startAnotherBooking}
+                  >
+                    Book another appointment
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      disabled={!canConfirm}
+                      fullWidth
+                      leadingIcon={<CheckCircleIcon className="size-4" />}
+                      onClick={() => setIsConfirmOpen(true)}
+                    >
+                      {isReadyToConfirm ? "Confirm booking" : "More details needed"}
+                    </Button>
+                    <Button
+                      disabled={isSending || hasFailedTurn}
+                      fullWidth
+                      leadingIcon={<EditIcon className="size-4" />}
+                      onClick={focusComposerForChanges}
+                      variant="secondary"
+                    >
+                      Change details in chat
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -268,13 +558,18 @@ export function BookingWorkspace() {
         title="Confirm appointment"
       >
         <div className="space-y-4 p-5 sm:p-6">
+          {confirmationError ? <Alert tone="danger">{confirmationError}</Alert> : null}
           <div className="rounded-[10px] bg-surface-subtle p-4 text-sm text-ink-soft">
             <p className="font-semibold text-ink">{draft?.title}</p>
             <p className="mt-1">{draft?.date} at {draft?.time}</p>
             <p className="mt-1 text-xs text-muted">{draft?.timezone}</p>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button disabled={isConfirming} onClick={() => setIsConfirmOpen(false)} variant="secondary">
+            <Button
+              disabled={isConfirming}
+              onClick={() => setIsConfirmOpen(false)}
+              variant="secondary"
+            >
               Go back
             </Button>
             <Button isLoading={isConfirming} onClick={confirmBooking}>
@@ -297,4 +592,8 @@ function DraftRow({ icon, label, value }: { icon: ReactNode; label: string; valu
       </div>
     </div>
   );
+}
+
+function formatMissingField(field: string): string {
+  return field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 }

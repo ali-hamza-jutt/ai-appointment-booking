@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { BookWiseLogo } from "@/components/brand/bookwise-logo";
-import { LinkButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   CalendarIcon,
   ChatIcon,
@@ -53,6 +53,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     router.replace("/login");
   }
 
+  function handleNewBooking() {
+    onNavigate?.();
+    router.push(`/book?new=${crypto.randomUUID()}`);
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center border-b border-border px-5">
@@ -60,14 +65,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="px-4 pb-4 pt-5">
-        <LinkButton
+        <Button
           fullWidth
-          href="/book"
           leadingIcon={<PlusIcon className="size-4" />}
-          onClick={onNavigate}
+          onClick={handleNewBooking}
         >
           New booking
-        </LinkButton>
+        </Button>
       </div>
 
       <nav aria-label="Primary navigation" className="flex-1 space-y-1 px-3">

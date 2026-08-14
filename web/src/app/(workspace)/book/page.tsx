@@ -4,6 +4,12 @@ import { BookingWorkspace } from "@/features/booking/components/booking-workspac
 
 export const metadata: Metadata = { title: "Book an appointment" };
 
-export default function BookPage() {
-  return <BookingWorkspace />;
+export default async function BookPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { new: bookingKey = "default" } = await searchParams;
+
+  return <BookingWorkspace key={bookingKey} />;
 }
