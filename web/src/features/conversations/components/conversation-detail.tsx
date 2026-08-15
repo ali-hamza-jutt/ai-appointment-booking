@@ -57,7 +57,7 @@ export function ConversationDetail({ sessionId }: { sessionId: string }) {
       <ConversationDetailError
         message={getApiErrorMessage(
           error,
-          "This conversation could not be loaded. It may no longer be available.",
+          "This conversation could not be loaded. Please try again.",
         )}
         onRetry={() =>
           void Promise.all([sessionQuery.refetch(), messagesQuery.refetch()])

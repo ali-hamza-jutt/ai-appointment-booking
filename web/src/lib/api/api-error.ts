@@ -1,11 +1,8 @@
-export interface ApiErrorBody {
-  error?: {
-    code?: string;
-    message?: string;
-    fieldErrors?: Record<string, string[]>;
-    requestId?: string;
-  };
-}
+import {
+  API_ERROR_MESSAGES,
+  API_FIELD_ERROR_MESSAGES,
+  DEFAULT_API_FIELD_ERROR_MESSAGE,
+} from "./api-error.constants";
 
 export class ApiError extends Error {
   public constructor(
@@ -27,6 +24,7 @@ export function isApiError(error: unknown): error is ApiError {
 export function getApiFieldError(
   error: unknown,
   fieldName: string,
+  fallback = DEFAULT_API_FIELD_ERROR_MESSAGE,
 ): string | undefined {
   if (!isApiError(error) || !error.fieldErrors) return undefined;
 
@@ -34,9 +32,13 @@ export function getApiFieldError(
     ([key]) => key === fieldName || key.endsWith(`.${fieldName}`),
   );
 
-  return fieldEntry?.[1]?.[0];
+  if (!fieldEntry) return undefined;
+
+  return API_FIELD_ERROR_MESSAGES[error.code]?.[fieldName] ?? fallback;
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
-  return isApiError(error) ? error.message : fallback;
+  if (!isApiError(error)) return fallback;
+
+  return API_ERROR_MESSAGES[error.code] ?? fallback;
 }

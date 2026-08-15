@@ -53,13 +53,21 @@ export function LoginForm() {
       {
         onError: (error) => {
           setErrors({
-            email: getApiFieldError(error, "email"),
-            password: getApiFieldError(error, "password"),
+            email: getApiFieldError(
+              error,
+              "email",
+              "Enter a valid email address.",
+            ),
+            password: getApiFieldError(
+              error,
+              "password",
+              "Check your password and try again.",
+            ),
           });
           setSubmitError(
             getApiErrorMessage(
               error,
-              "We could not sign you in. Check your connection and try again.",
+              "We could not sign you in. Please try again later.",
             ),
           );
         },

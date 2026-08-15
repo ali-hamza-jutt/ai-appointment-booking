@@ -3,7 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { AlertIcon, RefreshIcon } from "@/components/ui/icons";
 
-export default function WorkspaceError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function WorkspaceError({
+  retry,
+}: {
+  error: Error & { digest?: string };
+  retry: () => void;
+}) {
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-10">
       <div className="max-w-sm text-center">
@@ -12,7 +17,7 @@ export default function WorkspaceError({ reset }: { error: Error & { digest?: st
         </span>
         <h2 className="mt-4 text-lg font-bold text-ink">This page could not be loaded</h2>
         <p className="mt-2 text-sm leading-6 text-muted">Try the request again. Your previous changes have not been submitted.</p>
-        <Button className="mt-5" leadingIcon={<RefreshIcon className="size-4" />} onClick={reset}>
+        <Button className="mt-5" leadingIcon={<RefreshIcon className="size-4" />} onClick={retry}>
           Try again
         </Button>
       </div>

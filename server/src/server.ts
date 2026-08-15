@@ -11,6 +11,11 @@ import {
 let httpServer: Server | undefined;
 let isShuttingDown = false;
 
+type ShutdownReason =
+  | NodeJS.Signals
+  | "HTTP_SERVER_ERROR"
+  | "UNHANDLED_REJECTION";
+
 async function startServer(): Promise<void> {
   try {
     await connectDatabase();
@@ -27,7 +32,7 @@ async function startServer(): Promise<void> {
 
     httpServer.on("error", (error) => {
       logger.fatal({ err: error }, "BookWise HTTP server error");
-      void shutdown("SIGTERM");
+      void shutdown("HTTP_SERVER_ERROR", 1);
     });
   } catch (error) {
     logger.fatal({ err: error }, "Failed to start BookWise server");
@@ -55,13 +60,17 @@ async function closeHttpServer(): Promise<void> {
   });
 }
 
-async function shutdown(signal: NodeJS.Signals): Promise<void> {
+async function shutdown(reason: ShutdownReason, exitCode = 0): Promise<void> {
+  const currentExitCode =
+    typeof process.exitCode === "number" ? process.exitCode : 0;
+  process.exitCode = Math.max(currentExitCode, exitCode);
+
   if (isShuttingDown) {
     return;
   }
 
   isShuttingDown = true;
-  logger.info({ signal }, "Graceful shutdown started");
+  logger.info({ reason }, "Graceful shutdown started");
 
   const forceShutdownTimer = setTimeout(() => {
     logger.fatal("Graceful shutdown timed out");
@@ -90,7 +99,8 @@ process.on("SIGTERM", () => {
 });
 
 process.on("unhandledRejection", (reason) => {
-  logger.error({ err: reason }, "Unhandled promise rejection");
+  logger.fatal({ err: reason }, "Unhandled promise rejection");
+  void shutdown("UNHANDLED_REJECTION", 1);
 });
 
 process.on("uncaughtException", (error) => {

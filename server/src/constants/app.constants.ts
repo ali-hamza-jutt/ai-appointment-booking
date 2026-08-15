@@ -104,11 +104,14 @@ export const ERROR_CODES = {
   INSUFFICIENT_SCOPE: "INSUFFICIENT_SCOPE",
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
   INVALID_FULL_NAME: "INVALID_FULL_NAME",
+  INVALID_JSON_BODY: "INVALID_JSON_BODY",
   INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
   INVALID_TOKEN: "INVALID_TOKEN",
   INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+  REQUEST_BODY_TOO_LARGE: "REQUEST_BODY_TOO_LARGE",
   REQUEST_VALIDATION_FAILED: "REQUEST_VALIDATION_FAILED",
+  ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND",
   UNSUPPORTED_AUTHENTICATION: "UNSUPPORTED_AUTHENTICATION",
   USER_NOT_FOUND: "USER_NOT_FOUND",
   WEAK_PASSWORD: "WEAK_PASSWORD",
@@ -132,11 +135,15 @@ export const ERROR_MESSAGES = {
   INSUFFICIENT_SCOPE: "The access token does not have the required permissions",
   INVALID_CREDENTIALS: "Invalid email or password",
   INVALID_FULL_NAME: "Full name must contain at least 2 characters",
+  INVALID_JSON_BODY: "Request body must contain valid JSON",
   INVALID_PAGINATION_CURSOR: "Pagination cursor is invalid",
   INVALID_TOKEN: "A valid access token is required",
-  INTERNAL_SERVER_ERROR: "An unexpected error occurred",
+  INTERNAL_SERVER_ERROR: "Something went wrong. Please try again.",
   RATE_LIMIT_EXCEEDED: "Too many requests. Try again later",
-  REQUEST_VALIDATION_FAILED: "Request validation failed",
+  REQUEST_BODY_TOO_LARGE: "Request body is too large",
+  REQUEST_VALIDATION_FAILED:
+    "Check the provided information and try again",
+  ROUTE_NOT_FOUND: "The requested API endpoint was not found",
   UNSUPPORTED_AUTHENTICATION: "Unsupported authentication method",
   USER_NOT_FOUND: "User account was not found",
   WEAK_PASSWORD:
@@ -165,6 +172,7 @@ export const VALIDATION_MESSAGES = {
   CHAT_SESSION_LIMIT: "Session limit must be an integer between 1 and 50",
   CHAT_SESSION_TITLE: "Chat session title cannot exceed 120 characters",
   PAGINATION_LIMIT: "Limit must be an integer between 1 and 50",
+  REQUEST_FIELD: "Check this value and try again",
 } as const;
 
 export const DATABASE_ERROR_CODES = {

@@ -54,7 +54,7 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
                 ? "The appointment identifier in this link is not valid."
               : getApiErrorMessage(
                   appointmentQuery.error,
-                  "Check your connection and try again.",
+                  "This appointment could not be loaded. Please try again.",
                 )}
           </p>
           {!cannotRetry ? (

@@ -84,7 +84,7 @@ export function ConversationsList() {
           <ConversationListError
             message={getApiErrorMessage(
               sessionsQuery.error,
-              "Conversations could not be loaded. Check your connection and try again.",
+              "Conversations could not be loaded. Please try again.",
             )}
             onRetry={() => void sessionsQuery.refetch()}
           />

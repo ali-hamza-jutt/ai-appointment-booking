@@ -86,7 +86,7 @@ export function BookingEntry({
         isStartingNew={selectedChoice === "new"}
         message={getApiErrorMessage(
           activeSessionsQuery.error,
-          "BookWise could not check for active conversations. Check your connection and try again.",
+          "BookWise could not check for active conversations. Please try again.",
         )}
         onRetry={() => void activeSessionsQuery.refetch()}
         onStartNew={() => chooseBooking("new")}
