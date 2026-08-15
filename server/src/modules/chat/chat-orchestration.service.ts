@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { aiService } from "../../integrations/ai/ai.service.js";
 import type {
   AiAppointmentContext,
+  AiAppointmentIntent,
+  AiBookingField,
   AiConversationMessage,
 } from "../../integrations/ai/dto/ai.dto.js";
 import {
@@ -130,15 +132,24 @@ export class ChatOrchestrationService {
       extraction.intent,
       bookingContext,
       extraction.clarificationQuestion,
+      extraction.assistantReply,
       timeZone,
     );
+    const isBookingIntent = extraction.intent === "BOOK_APPOINTMENT";
+    const currentMissingFields = this.getMissingBookingFields(
+      session.bookingContext,
+    );
     const metadata: ChatMessageMetadata = {
-      intent: extraction.intent,
-      ...(extraction.intent === "BOOK_APPOINTMENT"
+      intent: this.toChatMessageIntent(extraction.intent),
+      ...(isBookingIntent
         ? { bookingContext }
         : {}),
-      missingFields: extraction.missingFields,
-      confirmationRequired: extraction.confirmationRequired,
+      missingFields: isBookingIntent
+        ? extraction.missingFields
+        : currentMissingFields,
+      confirmationRequired: isBookingIntent
+        ? extraction.confirmationRequired
+        : session.status === "ACTIVE" && currentMissingFields.length === 0,
     };
     const persistedTurn = await this.chat.saveAssistantTurn(
       userId,
@@ -146,7 +157,7 @@ export class ChatOrchestrationService {
       {
         replyToMessageId: userMessage.id,
         content: assistantContent,
-        ...(extraction.intent === "BOOK_APPOINTMENT"
+        ...(isBookingIntent
           ? { bookingContext }
           : {}),
         structuredData: metadata,
@@ -216,6 +227,7 @@ export class ChatOrchestrationService {
         content: this.buildAssistantResponse(
           "BOOK_APPOINTMENT",
           bookingContext,
+          undefined,
           undefined,
           timeZone,
         ),
@@ -363,12 +375,25 @@ export class ChatOrchestrationService {
   }
 
   private buildAssistantResponse(
-    intent: "BOOK_APPOINTMENT" | "UNKNOWN",
+    intent: AiAppointmentIntent,
     context: AppointmentBookingContext,
     clarificationQuestion: string | undefined,
+    assistantReply: string | undefined,
     timeZone: string,
   ): string {
-    if (intent === "UNKNOWN") {
+    if (intent !== "BOOK_APPOINTMENT") {
+      if (intent === "GREETING") {
+        return assistantReply ?? CHAT_CONSTANTS.ASSISTANT_MESSAGES.GREETING;
+      }
+
+      if (intent === "BOOKING_HELP") {
+        return assistantReply ?? CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_HELP;
+      }
+
+      if (intent === "MANAGE_APPOINTMENT") {
+        return CHAT_CONSTANTS.ASSISTANT_MESSAGES.MANAGE_APPOINTMENT;
+      }
+
       return CHAT_CONSTANTS.ASSISTANT_MESSAGES.UNKNOWN_INTENT;
     }
 
@@ -396,6 +421,28 @@ export class ChatOrchestrationService {
       context.durationMinutes ?? APPOINTMENT_CONSTANTS.DEFAULT_DURATION_MINUTES;
 
     return `I have ${context.serviceName} for ${formattedTime} (${duration} minutes). ${CHAT_CONSTANTS.ASSISTANT_MESSAGES.CONFIRMATION_SUFFIX}`;
+  }
+
+  private toChatMessageIntent(
+    intent: AiAppointmentIntent,
+  ): "BOOK_APPOINTMENT" | "UNKNOWN" {
+    return intent === "BOOK_APPOINTMENT" ? "BOOK_APPOINTMENT" : "UNKNOWN";
+  }
+
+  private getMissingBookingFields(
+    context: AppointmentBookingContext | null,
+  ): AiBookingField[] {
+    const missingFields: AiBookingField[] = [];
+
+    if (!context?.serviceName?.trim()) {
+      missingFields.push("serviceName");
+    }
+
+    if (!context?.scheduledAt || context.scheduledAt.getTime() <= Date.now()) {
+      missingFields.push("scheduledAt");
+    }
+
+    return missingFields;
   }
 
   private buildBookingSuccessResponse(

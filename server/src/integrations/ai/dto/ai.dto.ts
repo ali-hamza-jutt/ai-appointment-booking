@@ -14,6 +14,8 @@ export type AiConversationRole =
 
 export type AiBookingField = (typeof AI_CONSTANTS.BOOKING_FIELDS)[number];
 
+export type AiBookingIssue = "PAST_TIME" | "INVALID_TIME";
+
 export type AiProviderName = typeof AI_CONSTANTS.PROVIDER;
 
 export type AiProviderErrorCode =
@@ -52,6 +54,8 @@ export interface AppointmentExtractionResult {
   missingFields: AiBookingField[];
   confirmationRequired: boolean;
   clarificationQuestion?: string;
+  assistantReply?: string;
+  bookingIssue?: AiBookingIssue;
   confidence: number;
 }
 
@@ -184,6 +188,13 @@ export const appointmentExtractionOutputSchema = z
       .min(1)
       .max(AI_CONSTANTS.MAX_CLARIFICATION_QUESTION_LENGTH)
       .nullable(),
+    assistantReply: z
+      .string()
+      .trim()
+      .min(1)
+      .max(AI_CONSTANTS.MAX_ASSISTANT_REPLY_LENGTH)
+      .nullable()
+      .optional(),
     confidence: z.number().min(0).max(1),
   })
   .strict();
