@@ -69,7 +69,7 @@ export const getCreateSessionUrl = () => {
 }
 
 /**
- * Creates a chat session for the authenticated user.
+ * Returns the active chat or abandons it and creates a replacement when requested.
  */
 export const createSession = async (createChatSessionRequest: CreateChatSessionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ChatSessionResponse> => {
 

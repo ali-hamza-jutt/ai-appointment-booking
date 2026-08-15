@@ -7,6 +7,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useTransition,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -121,6 +122,10 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
     );
   }
 
+  if (sessionQuery.data.status === "ABANDONED") {
+    return <AbandonedBookingNotice />;
+  }
+
   const initialMessages = Array.from(
     new Map(
       messagesQuery.data.pages
@@ -147,6 +152,7 @@ function BookingExperience({
   initialTimeZone,
 }: BookingExperienceProps) {
   const router = useRouter();
+  const [isStartingNew, startNewTransition] = useTransition();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
@@ -479,27 +485,11 @@ function BookingExperience({
   }
 
   function startAnotherBooking() {
-    router.replace(`/book?new=${crypto.randomUUID()}`);
-    createSessionMutation.reset();
-    createMessageMutation.reset();
-    confirmBookingMutation.reset();
-    setSessionId(null);
-    setMessages([createWelcomeMessage(firstName)]);
-    setComposer("");
-    setDraft(null);
-    setBookingContext(null);
-    setTimeZone(getBrowserTimeZone());
-    setMissingFields([]);
-    setIsReadyToConfirm(false);
-    setIsProcessingTurn(false);
-    setPendingTurn(null);
-    setRequestError(null);
-    setConfirmationError(null);
-    setIsConfirmOpen(false);
-    setIsStructuredFormOpen(false);
-    setIsConfirmed(false);
-    messageRequestLockRef.current = false;
-    confirmationRequestLockRef.current = false;
+    if (isStartingNew) return;
+
+    startNewTransition(() => {
+      router.replace(`/book?new=${crypto.randomUUID()}`);
+    });
   }
 
   return (
@@ -574,7 +564,12 @@ function BookingExperience({
                   >
                     Retry message
                   </Button>
-                  <Button onClick={startAnotherBooking} size="sm" variant="ghost">
+                  <Button
+                    isLoading={isStartingNew}
+                    onClick={startAnotherBooking}
+                    size="sm"
+                    variant="ghost"
+                  >
                     Start over
                   </Button>
                 </div>
@@ -689,6 +684,7 @@ function BookingExperience({
                 {isConfirmed ? (
                   <Button
                     fullWidth
+                    isLoading={isStartingNew}
                     leadingIcon={<PlusIcon className="size-4" />}
                     onClick={startAnotherBooking}
                   >
@@ -904,6 +900,24 @@ function BookingResumeSkeleton() {
           <Skeleton className="mt-5 h-4 w-3/4" />
         </div>
       </aside>
+    </div>
+  );
+}
+
+function AbandonedBookingNotice() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
+        <h2 className="text-lg font-semibold text-ink">
+          Booking conversation abandoned
+        </h2>
+        <Alert className="mt-4" tone="warning">
+          This conversation is read-only and cannot be resumed.
+        </Alert>
+        <LinkButton className="mt-5" href="/book?new=true">
+          Start a new booking
+        </LinkButton>
+      </div>
     </div>
   );
 }

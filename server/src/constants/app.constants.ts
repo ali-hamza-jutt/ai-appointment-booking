@@ -75,6 +75,8 @@ export const AI_CONSTANTS = {
   ] as const,
   MAX_TIME_ZONE_LENGTH: 100,
   MAX_CLARIFICATION_QUESTION_LENGTH: 300,
+  EXPLICIT_SERVICE_CHANGE_PATTERN:
+    /^(?:please\s+)?(?:change|update)\s+(?:the\s+)?service(?:\s+name)?\s+to\s+(.+?)[.!?]*$/i,
   CLARIFICATION_QUESTIONS: {
     serviceName: "What service would you like to book?",
     scheduledAt: "What date and time would you prefer for the appointment?",
@@ -99,6 +101,7 @@ export const ERROR_CODES = {
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
   CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
+  CHAT_SESSION_NOT_ACTIVE: "CHAT_SESSION_NOT_ACTIVE",
   CHAT_SESSION_NOT_FOUND: "CHAT_SESSION_NOT_FOUND",
   EMAIL_ALREADY_EXISTS: "EMAIL_ALREADY_EXISTS",
   INSUFFICIENT_SCOPE: "INSUFFICIENT_SCOPE",
@@ -130,6 +133,7 @@ export const ERROR_MESSAGES = {
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "The booking details must include a valid service, date, and time",
   CHAT_SESSION_CLOSED: "This chat session is already closed",
+  CHAT_SESSION_NOT_ACTIVE: "This chat session is no longer active",
   CHAT_SESSION_NOT_FOUND: "Chat session was not found",
   EMAIL_ALREADY_EXISTS: "An account with this email already exists",
   INSUFFICIENT_SCOPE: "The access token does not have the required permissions",

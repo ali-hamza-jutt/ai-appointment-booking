@@ -26,6 +26,7 @@ enum AppointmentSource {
 enum ChatSessionStatus {
   ACTIVE
   CLOSED
+  ABANDONED
 
   @@map("chat_session_status")
 }

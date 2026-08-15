@@ -11,4 +11,6 @@ export interface CreateChatSessionRequest {
   /** @maxLength 120 */
   title?: string;
   bookingContext?: AppointmentBookingContext;
+  /** Abandons the current active chat before creating this session. */
+  replaceActive?: boolean;
 }

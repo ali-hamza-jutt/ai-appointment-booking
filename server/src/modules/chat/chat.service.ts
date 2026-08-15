@@ -64,13 +64,28 @@ export class ChatService {
       );
     }
 
-    const session = await chatDal.createSession({
-      userId,
-      title,
-      bookingContext: bookingContext
-        ? this.serializeBookingContext(bookingContext)
-        : null,
-    });
+    let session: ChatSessionRecord;
+
+    try {
+      session = await chatDal.createSession({
+        userId,
+        title,
+        bookingContext: bookingContext
+          ? this.serializeBookingContext(bookingContext)
+          : null,
+        replaceActive: request.replaceActive ?? false,
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const activeSession = await chatDal.findActiveSessionForUser(userId);
+
+        if (activeSession) {
+          return this.toSessionResponse(activeSession);
+        }
+      }
+
+      throw error;
+    }
 
     return this.toSessionResponse(session);
   }
@@ -382,7 +397,7 @@ export class ChatService {
           this.throwSessionNotFound();
         }
 
-        this.throwSessionClosed();
+        this.throwSessionNotActive();
       }
 
       throw error;
@@ -453,7 +468,7 @@ export class ChatService {
           this.throwSessionNotFound();
         }
 
-        this.throwSessionClosed();
+        this.throwSessionNotActive();
       }
 
       throw error;
@@ -526,7 +541,7 @@ export class ChatService {
           this.throwSessionNotFound();
         }
 
-        this.throwSessionClosed();
+        this.throwSessionNotActive();
       }
 
       throw error;
@@ -746,11 +761,11 @@ export class ChatService {
     );
   }
 
-  private throwSessionClosed(): never {
+  private throwSessionNotActive(): never {
     throw new AppError(
       409,
-      ERROR_CODES.CHAT_SESSION_CLOSED,
-      ERROR_MESSAGES.CHAT_SESSION_CLOSED,
+      ERROR_CODES.CHAT_SESSION_NOT_ACTIVE,
+      ERROR_MESSAGES.CHAT_SESSION_NOT_ACTIVE,
     );
   }
 

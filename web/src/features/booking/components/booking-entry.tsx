@@ -1,20 +1,18 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button, LinkButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/feedback";
-import {
-  ChatIcon,
-  ConversationsIcon,
-  PlusIcon,
-  RefreshIcon,
-} from "@/components/ui/icons";
-import { Modal } from "@/components/ui/modal";
+import { PlusIcon, RefreshIcon } from "@/components/ui/icons";
 import { BookingWorkspace } from "@/features/booking/components/booking-workspace";
-import { useListSessions } from "@/generated/api/chat/chat";
+import {
+  getListSessionsQueryKey,
+  useCreateSession,
+  useListSessions,
+} from "@/generated/api/chat/chat";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
 interface BookingEntryProps {
@@ -23,20 +21,19 @@ interface BookingEntryProps {
   shouldStartNew: boolean;
 }
 
-type BookingChoice = "new" | "previous";
-
 export function BookingEntry({
   initialSessionId,
   newBookingKey,
   shouldStartNew,
 }: BookingEntryProps) {
   const router = useRouter();
-  const [selectedChoice, setSelectedChoice] =
-    useState<BookingChoice | null>(null);
-  const [isNavigating, startTransition] = useTransition();
+  const queryClient = useQueryClient();
+  const createSessionMutation = useCreateSession();
+  const requestedNewBookingRef = useRef<string | null>(null);
+  const replacementKey = newBookingKey ?? "new-booking";
   const shouldCheckActiveSessions = !initialSessionId && !shouldStartNew;
   const activeSessionsQuery = useListSessions(
-    { limit: 2, status: "ACTIVE" },
+    { limit: 1, status: "ACTIVE" },
     {
       query: {
         enabled: shouldCheckActiveSessions,
@@ -47,18 +44,33 @@ export function BookingEntry({
     },
   );
 
-  function chooseBooking(choice: BookingChoice, sessionId?: string) {
-    if (selectedChoice || (choice === "previous" && !sessionId)) return;
+  const startNewBooking = useCallback(
+    (requestKey: string) => {
+      if (requestedNewBookingRef.current === requestKey) return;
 
-    setSelectedChoice(choice);
-    startTransition(() => {
-      router.replace(
-        choice === "previous"
-          ? `/book?sessionId=${encodeURIComponent(sessionId!)}`
-          : `/book?new=${crypto.randomUUID()}`,
+      requestedNewBookingRef.current = requestKey;
+      createSessionMutation.mutate(
+        { data: { replaceActive: true } },
+        {
+          onSuccess: (session) => {
+            void queryClient.invalidateQueries({
+              queryKey: getListSessionsQueryKey(),
+            });
+            router.replace(
+              `/book?sessionId=${encodeURIComponent(session.id)}`,
+            );
+          },
+        },
       );
-    });
-  }
+    },
+    [createSessionMutation, queryClient, router],
+  );
+
+  useEffect(() => {
+    if (shouldStartNew && !initialSessionId) {
+      startNewBooking(replacementKey);
+    }
+  }, [initialSessionId, replacementKey, shouldStartNew, startNewBooking]);
 
   if (initialSessionId) {
     return (
@@ -70,26 +82,48 @@ export function BookingEntry({
   }
 
   if (shouldStartNew) {
-    return <BookingWorkspace key={newBookingKey || "new"} />;
+    if (createSessionMutation.isError) {
+      return (
+        <BookingEntryError
+          message={getApiErrorMessage(
+            createSessionMutation.error,
+            "A new booking could not be started. Please try again.",
+          )}
+          onRetry={() => {
+            requestedNewBookingRef.current = null;
+            createSessionMutation.reset();
+            startNewBooking(replacementKey);
+          }}
+          onSecondary={() => router.replace("/book")}
+          secondaryLabel="Return to current booking"
+          title="New booking could not be started"
+        />
+      );
+    }
+
+    return <BookingEntrySkeleton label="Starting a new booking" />;
   }
 
   if (
     activeSessionsQuery.isPending ||
     !activeSessionsQuery.isFetchedAfterMount
   ) {
-    return <BookingEntrySkeleton />;
+    return <BookingEntrySkeleton label="Opening your booking" />;
   }
 
   if (activeSessionsQuery.isError) {
     return (
       <BookingEntryError
-        isStartingNew={selectedChoice === "new"}
         message={getApiErrorMessage(
           activeSessionsQuery.error,
           "BookWise could not check for active conversations. Please try again.",
         )}
         onRetry={() => void activeSessionsQuery.refetch()}
-        onStartNew={() => chooseBooking("new")}
+        onSecondary={() =>
+          router.replace(`/book?new=${crypto.randomUUID()}`)
+        }
+        secondaryLabel="Start new booking"
+        title="Booking could not be opened"
       />
     );
   }
@@ -101,91 +135,21 @@ export function BookingEntry({
     return <BookingWorkspace key="no-active-session" />;
   }
 
-  const sessionTitle =
-    latestActiveSession.title?.trim() ||
-    latestActiveSession.bookingContext?.serviceName?.trim() ||
-    "Booking conversation";
-  const isChoosing = selectedChoice !== null || isNavigating;
-
   return (
-    <>
-      <BookingWorkspace key="booking-choice-background" />
-      <Modal
-        description="You already have an active booking conversation."
-        isDismissible={false}
-        isOpen
-        onClose={() => undefined}
-        title="Continue where you left off?"
-      >
-        <div className="space-y-4 p-5 sm:p-6">
-          <div className="flex items-start gap-3 rounded-[10px] border border-border bg-surface-subtle p-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-              <ChatIcon className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-                  {sessionTitle}
-                </p>
-                <Badge tone="brand">Active</Badge>
-              </div>
-              <p className="mt-1 text-xs leading-5 text-muted">
-                Resume your most recently active conversation with its saved
-                messages and booking details.
-              </p>
-            </div>
-          </div>
-
-          {activeSessions.length > 1 ? (
-            <Alert tone="info">
-              Continue previous opens only your latest active chat. To resume a
-              specific active chat, select it from conversation history.
-            </Alert>
-          ) : null}
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              disabled={isChoosing}
-              isLoading={selectedChoice === "previous"}
-              leadingIcon={<ChatIcon className="size-4" />}
-              onClick={() =>
-                chooseBooking("previous", latestActiveSession.id)
-              }
-            >
-              Continue previous
-            </Button>
-            <Button
-              disabled={isChoosing}
-              isLoading={selectedChoice === "new"}
-              leadingIcon={<PlusIcon className="size-4" />}
-              onClick={() => chooseBooking("new")}
-              variant="secondary"
-            >
-              Start new chat
-            </Button>
-          </div>
-
-          <LinkButton
-            fullWidth
-            href="/conversations"
-            leadingIcon={<ConversationsIcon className="size-4" />}
-            variant="ghost"
-          >
-            Open conversation history
-          </LinkButton>
-        </div>
-      </Modal>
-    </>
+    <BookingWorkspace
+      initialSessionId={latestActiveSession.id}
+      key={latestActiveSession.id}
+    />
   );
 }
 
-function BookingEntrySkeleton() {
+function BookingEntrySkeleton({ label }: { label: string }) {
   return (
     <div
       className="grid min-h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px]"
       role="status"
     >
-      <span className="sr-only">Checking active conversations</span>
+      <span className="sr-only">{label}</span>
       <section className="bg-surface px-4 py-6 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center gap-3 border-b border-border pb-5">
@@ -207,22 +171,22 @@ function BookingEntrySkeleton() {
 }
 
 function BookingEntryError({
-  isStartingNew,
   message,
   onRetry,
-  onStartNew,
+  onSecondary,
+  secondaryLabel,
+  title,
 }: {
-  isStartingNew: boolean;
   message: string;
   onRetry: () => void;
-  onStartNew: () => void;
+  onSecondary: () => void;
+  secondaryLabel: string;
+  title: string;
 }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
-        <h2 className="text-lg font-semibold text-ink">
-          Active conversations could not be checked
-        </h2>
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
         <Alert className="mt-4" tone="danger">
           {message}
         </Alert>
@@ -235,11 +199,14 @@ function BookingEntryError({
             Try again
           </Button>
           <Button
-            isLoading={isStartingNew}
-            leadingIcon={<PlusIcon className="size-4" />}
-            onClick={onStartNew}
+            leadingIcon={
+              secondaryLabel === "Start new booking" ? (
+                <PlusIcon className="size-4" />
+              ) : undefined
+            }
+            onClick={onSecondary}
           >
-            Start new chat anyway
+            {secondaryLabel}
           </Button>
         </div>
       </div>

@@ -41,7 +41,7 @@ export function ConversationsList() {
             Conversation history
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Return to active booking chats or review completed conversations.
+            Continue your active booking or review previous conversations.
           </p>
         </div>
         <LinkButton href="/book?new=true" leadingIcon={<PlusIcon className="size-4" />}>

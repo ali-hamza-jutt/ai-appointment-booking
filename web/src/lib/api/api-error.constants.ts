@@ -15,6 +15,7 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CHAT_MESSAGE_ALREADY_EXISTS:
     "This message was already submitted. Refresh the conversation and try again.",
   CHAT_SESSION_CLOSED: "This conversation is already closed.",
+  CHAT_SESSION_NOT_ACTIVE: "This conversation is no longer active.",
   CHAT_SESSION_NOT_FOUND: "This conversation could not be found.",
   EMAIL_ALREADY_EXISTS: "An account with this email already exists.",
   INSUFFICIENT_SCOPE: "You do not have permission to perform this action.",

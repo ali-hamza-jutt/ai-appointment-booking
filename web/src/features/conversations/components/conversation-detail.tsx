@@ -9,6 +9,7 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckCircleIcon,
+  CloseIcon,
   RefreshIcon,
   SparklesIcon,
   UserIcon,
@@ -216,6 +217,11 @@ export function ConversationDetail({ sessionId }: { sessionId: string }) {
             >
               Resume booking
             </LinkButton>
+          </footer>
+        ) : session.status === "ABANDONED" ? (
+          <footer className="flex items-center gap-2 border-t border-border bg-warning-soft px-5 py-3 text-xs font-semibold text-warning-strong sm:px-6">
+            <CloseIcon className="size-4" />
+            This conversation was abandoned and is read-only.
           </footer>
         ) : (
           <footer className="flex items-center gap-2 border-t border-border bg-success-soft px-5 py-3 text-xs font-semibold text-success-strong sm:px-6">
