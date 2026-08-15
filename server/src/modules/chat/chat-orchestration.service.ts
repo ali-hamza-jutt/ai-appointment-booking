@@ -114,7 +114,11 @@ export class ChatOrchestrationService {
         userMessage.id,
       ),
       ...(session.bookingContext
-        ? { appointmentContext: session.bookingContext }
+        ? {
+            appointmentContext: this.toAiAppointmentContext(
+              session.bookingContext,
+            ),
+          }
         : {}),
       timeZone,
     });
@@ -338,6 +342,19 @@ export class ChatOrchestrationService {
       ...(context.serviceName ? { serviceName: context.serviceName } : {}),
       ...(context.scheduledAt ? { scheduledAt: context.scheduledAt } : {}),
       timeZone,
+      ...(context.durationMinutes !== undefined
+        ? { durationMinutes: context.durationMinutes }
+        : {}),
+      ...(context.notes ? { notes: context.notes } : {}),
+    };
+  }
+
+  private toAiAppointmentContext(
+    context: AppointmentBookingContext,
+  ): AiAppointmentContext {
+    return {
+      ...(context.serviceName ? { serviceName: context.serviceName } : {}),
+      ...(context.scheduledAt ? { scheduledAt: context.scheduledAt } : {}),
       ...(context.durationMinutes !== undefined
         ? { durationMinutes: context.durationMinutes }
         : {}),
