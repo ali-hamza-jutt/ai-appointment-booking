@@ -16,13 +16,11 @@ import { APPOINTMENT_UI_CONSTANTS } from "@/features/appointments/constants/appo
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
-import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
 export function AppointmentsList() {
   const [activeFilter, setActiveFilter] = useState<AppointmentFilter>("ALL");
-  const timeZone = useBrowserTimeZone();
   const appointmentsQuery = useAppointments(activeFilter);
   const appointments = Array.from(
     new Map(
@@ -30,7 +28,7 @@ export function AppointmentsList() {
         (appointment) => [appointment.id, appointment],
       ),
     ).values(),
-  ).map((appointment) => toAppointmentViewModel(appointment, timeZone));
+  ).map((appointment) => toAppointmentViewModel(appointment));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">

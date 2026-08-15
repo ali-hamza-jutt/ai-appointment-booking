@@ -65,10 +65,14 @@ function formatSessionPreview(
   session: ChatSessionResponse,
   timeZone: string,
 ): string {
-  const { scheduledAt, serviceName } = session.bookingContext ?? {};
+  const {
+    scheduledAt,
+    serviceName,
+    timeZone: bookingTimeZone,
+  } = session.bookingContext ?? {};
 
   if (scheduledAt) {
-    const dateLabel = formatDateTime(new Date(scheduledAt), timeZone, {
+    const dateLabel = formatDateTime(new Date(scheduledAt), bookingTimeZone ?? timeZone, {
       dateStyle: "medium",
       timeStyle: "short",
     });

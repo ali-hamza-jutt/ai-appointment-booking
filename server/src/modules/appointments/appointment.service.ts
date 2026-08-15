@@ -6,12 +6,19 @@ import {
   VALIDATION_PATTERNS,
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
-import { isUniqueConstraintError } from "../../utils/database.js";
+import {
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+} from "../../utils/database.js";
 import {
   decodeTimestampCursor,
   encodeTimestampCursor,
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
+import {
+  localDateTimeToUtc,
+  normalizeIanaTimeZone,
+} from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { AppointmentSlotConflictError } from "./appointment-slot-conflict.error.js";
 import { appointmentDal } from "./dal/appointment.dal.js";
@@ -23,6 +30,7 @@ import type {
   CreateAppointmentRequest,
   ListAppointmentsOptions,
   PreparedAppointment,
+  RescheduleAppointmentRequest,
 } from "./dto/appointment.dto.js";
 
 export class AppointmentService {
@@ -62,33 +70,135 @@ export class AppointmentService {
   ): PreparedAppointment {
     const serviceName = normalizeWhitespace(request.serviceName);
     const scheduledAt = request.scheduledAt;
+    const timeZone = normalizeIanaTimeZone(request.timeZone);
     const durationMinutes =
       request.durationMinutes ?? APPOINTMENT_CONSTANTS.DEFAULT_DURATION_MINUTES;
     const notes = request.notes?.trim() || null;
 
     this.validateServiceName(serviceName);
     this.validateScheduledAt(scheduledAt);
+    this.validateTimeZone(timeZone);
     this.validateDuration(durationMinutes);
     this.validateNotes(notes);
 
     return {
       serviceName,
       scheduledAt,
+      timeZone,
       durationMinutes,
       notes,
     };
+  }
+
+  public async cancelAppointment(
+    userId: string,
+    appointmentId: string,
+  ): Promise<AppointmentResponse> {
+    this.validateAppointmentId(appointmentId);
+
+    try {
+      const appointment = await appointmentDal.cancelAppointment({
+        appointmentId,
+        userId,
+      });
+
+      return this.toResponse(appointment);
+    } catch (error) {
+      if (!isRecordNotFoundError(error)) throw error;
+
+      const currentAppointment = await appointmentDal.findAppointmentForUser(
+        appointmentId,
+        userId,
+      );
+
+      if (!currentAppointment) this.throwAppointmentNotFound();
+
+      if (currentAppointment.status === "CANCELLED") {
+        return this.toResponse(currentAppointment);
+      }
+
+      throw new AppError(
+        409,
+        ERROR_CODES.APPOINTMENT_CANCELLATION_NOT_ALLOWED,
+        ERROR_MESSAGES.APPOINTMENT_CANCELLATION_NOT_ALLOWED,
+      );
+    }
+  }
+
+  public async rescheduleAppointment(
+    userId: string,
+    appointmentId: string,
+    request: RescheduleAppointmentRequest,
+  ): Promise<AppointmentResponse> {
+    this.validateAppointmentId(appointmentId);
+
+    const currentAppointment = await appointmentDal.findAppointmentForUser(
+      appointmentId,
+      userId,
+    );
+
+    if (!currentAppointment) this.throwAppointmentNotFound();
+
+    if (
+      currentAppointment.status === "CANCELLED" ||
+      currentAppointment.status === "COMPLETED"
+    ) {
+      this.throwRescheduleNotAllowed();
+    }
+
+    const scheduledAt = localDateTimeToUtc(
+      request.scheduledDate,
+      request.scheduledTime,
+      currentAppointment.timeZone,
+    );
+
+    if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
+      throwRequestValidationError(
+        "scheduledDate",
+        VALIDATION_MESSAGES.APPOINTMENT_RESCHEDULE_TIME,
+      );
+    }
+
+    try {
+      const appointment = await appointmentDal.rescheduleAppointment({
+        appointmentId,
+        userId,
+        scheduledAt,
+        durationMinutes: currentAppointment.durationMinutes,
+      });
+
+      return this.toResponse(appointment);
+    } catch (error) {
+      if (
+        error instanceof AppointmentSlotConflictError ||
+        isUniqueConstraintError(error)
+      ) {
+        throw new AppError(
+          409,
+          ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE,
+          ERROR_MESSAGES.APPOINTMENT_SLOT_UNAVAILABLE,
+        );
+      }
+
+      if (isRecordNotFoundError(error)) {
+        const latestAppointment = await appointmentDal.findAppointmentForUser(
+          appointmentId,
+          userId,
+        );
+
+        if (!latestAppointment) this.throwAppointmentNotFound();
+        this.throwRescheduleNotAllowed();
+      }
+
+      throw error;
+    }
   }
 
   public async getAppointment(
     userId: string,
     appointmentId: string,
   ): Promise<AppointmentResponse> {
-    if (!VALIDATION_PATTERNS.UUID.test(appointmentId)) {
-      throwRequestValidationError(
-        "appointmentId",
-        VALIDATION_MESSAGES.APPOINTMENT_ID,
-      );
-    }
+    this.validateAppointmentId(appointmentId);
 
     const appointment = await appointmentDal.findAppointmentForUser(
       appointmentId,
@@ -96,11 +206,7 @@ export class AppointmentService {
     );
 
     if (!appointment) {
-      throw new AppError(
-        404,
-        ERROR_CODES.APPOINTMENT_NOT_FOUND,
-        ERROR_MESSAGES.APPOINTMENT_NOT_FOUND,
-      );
+      this.throwAppointmentNotFound();
     }
 
     return this.toResponse(appointment);
@@ -167,6 +273,40 @@ export class AppointmentService {
     }
   }
 
+  private validateAppointmentId(appointmentId: string): void {
+    if (!VALIDATION_PATTERNS.UUID.test(appointmentId)) {
+      throwRequestValidationError(
+        "appointmentId",
+        VALIDATION_MESSAGES.APPOINTMENT_ID,
+      );
+    }
+  }
+
+  private validateTimeZone(timeZone: string | null): asserts timeZone is string {
+    if (!timeZone) {
+      throwRequestValidationError(
+        "timeZone",
+        VALIDATION_MESSAGES.APPOINTMENT_TIME_ZONE,
+      );
+    }
+  }
+
+  private throwAppointmentNotFound(): never {
+    throw new AppError(
+      404,
+      ERROR_CODES.APPOINTMENT_NOT_FOUND,
+      ERROR_MESSAGES.APPOINTMENT_NOT_FOUND,
+    );
+  }
+
+  private throwRescheduleNotAllowed(): never {
+    throw new AppError(
+      409,
+      ERROR_CODES.APPOINTMENT_RESCHEDULE_NOT_ALLOWED,
+      ERROR_MESSAGES.APPOINTMENT_RESCHEDULE_NOT_ALLOWED,
+    );
+  }
+
   private validateScheduledAt(scheduledAt: Date): void {
     if (
       !(scheduledAt instanceof Date) ||
@@ -220,6 +360,7 @@ export class AppointmentService {
       id: appointment.id,
       serviceName: appointment.serviceName,
       scheduledAt: appointment.scheduledAt,
+      timeZone: appointment.timeZone,
       durationMinutes: appointment.durationMinutes,
       status: appointment.status,
       source: appointment.source,

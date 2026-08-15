@@ -17,11 +17,11 @@ const statusPresentation: Record<
 
 export function toAppointmentViewModel(
   appointment: AppointmentResponse,
-  timeZone: string,
 ): AppointmentViewModel {
   const scheduledAt = new Date(appointment.scheduledAt);
   const createdAt = new Date(appointment.createdAt);
   const status = statusPresentation[appointment.status];
+  const timeZone = appointment.timeZone;
 
   return {
     createdAtLabel: formatDateTime(createdAt, timeZone, {

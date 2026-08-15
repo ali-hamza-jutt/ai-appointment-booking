@@ -37,6 +37,7 @@ export * from './listMessagesParams';
 export * from './listSessionsParams';
 export * from './processChatMessageRequest';
 export * from './recordStringStringArray';
+export * from './rescheduleAppointmentRequest';
 export * from './signInRequest';
 export * from './signUpRequest';
 export * from './structuredBookingDetails';

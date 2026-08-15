@@ -12,6 +12,7 @@ export interface AppointmentResponse {
   id: string;
   serviceName: string;
   scheduledAt: string;
+  timeZone: string;
   durationMinutes: number;
   status: AppointmentStatus;
   source: AppointmentSource;

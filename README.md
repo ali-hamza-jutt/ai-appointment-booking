@@ -20,6 +20,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - Deterministic IANA-time-zone conversion with UTC storage.
 - Explicit review and confirmation before an appointment is created.
 - Duration-aware conflict detection that rejects overlapping appointments while allowing directly adjacent bookings.
+- Appointment cancellation and conflict-safe rescheduling in the original booking timezone.
 - Appointment and conversation lists with cursor pagination.
 - Three-second cursor-based polling for active conversation messages.
 - One active booking conversation per user, with automatic resume and explicit abandonment when a new booking starts.
@@ -97,6 +98,7 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 12. The user reviews the final details and confirms the booking.
 13. During confirmation, the backend locks that user's appointment schedule and rejects any overlapping time range.
 14. If the slot is available, one atomic database write closes the chat, creates the appointment, and stores the success message.
+15. From appointment details, the user can cancel the booking or reschedule its date and time. Cancellation releases the reserved interval; rescheduling keeps the original duration and timezone.
 
 ## Repository structure
 
@@ -223,6 +225,8 @@ All domain routes except signup, sign-in, and health require `Authorization: Bea
 | `POST` | `/api/appointments` | Create a form-sourced appointment |
 | `GET` | `/api/appointments` | List owned appointments with cursor pagination |
 | `GET` | `/api/appointments/{appointmentId}` | Retrieve one owned appointment |
+| `PATCH` | `/api/appointments/{appointmentId}/cancel` | Cancel an appointment and release its reserved interval |
+| `PATCH` | `/api/appointments/{appointmentId}/reschedule` | Change an appointment's local date and time in its stored timezone |
 | `POST` | `/api/chat/sessions` | Return the active conversation or abandon and replace it when `replaceActive` is true |
 | `GET` | `/api/chat/sessions` | List owned conversations |
 | `GET` | `/api/chat/sessions/{sessionId}` | Retrieve one owned conversation |
@@ -251,7 +255,7 @@ The PostgreSQL DDL is represented by committed SQL migrations under `server/pris
 | Table | Responsibility |
 | --- | --- |
 | `users` | Authentication identity and profile fields |
-| `appointments` | Scheduling data, source, status, and optional chat relation |
+| `appointments` | Scheduling data, creation timezone, lifecycle status, source, and optional chat relation |
 | `chat_sessions` | Conversation ownership, lifecycle, and JSONB booking context |
 | `chat_messages` | Ordered user, assistant, and system messages with metadata |
 
@@ -260,7 +264,8 @@ Important database decisions include:
 - UUID primary keys are generated automatically.
 - Email uniqueness supports registration and sign-in lookup.
 - Foreign keys enforce ownership relationships and cascade appropriate deletions.
-- Duration-aware checks inside serialized per-user transactions prevent overlapping appointment writes; exact-start uniqueness remains a database fallback.
+- Duration-aware checks inside serialized per-user transactions prevent overlapping create and reschedule writes; active exact-start uniqueness remains a database fallback.
+- Cancelled appointments are excluded from conflicts and release their previous time range.
 - A PostgreSQL partial unique index permits only one `ACTIVE` chat session per user.
 - Client-message and reply constraints make retries idempotent.
 - Composite indexes support owned appointment, session, and message pagination.
@@ -304,7 +309,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Polling requests begin from the latest cursor instead of downloading full message history.
 - AI history is bounded and database queries retrieve only required fields.
 - Starting a new booking abandons the current active chat and creates its replacement in one transaction.
-- Form creation and chat confirmation use the same transaction-safe appointment overlap rule.
+- Form creation, chat confirmation, cancellation, and rescheduling serialize schedule changes per user.
 - Booking confirmation closes the session, creates the appointment, and stores the success message atomically.
 - Graceful shutdown closes the HTTP listener and PostgreSQL connection.
 
@@ -323,21 +328,25 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 | In-memory rate limiting | Appropriate for one prototype server instance | Multiple instances require a shared store such as Redis |
 | Structured form bypasses AI | Provides a reliable fallback for incomplete or failed conversations | Two input paths must converge on the same domain validation |
 | Single active booking chat | Automatically restores the current draft and prevents competing booking contexts | Starting a new booking permanently abandons the previous active chat |
+| Stored appointment timezone | Rescheduling interprets date and time exactly as the original booking did | Existing appointments created before this field use UTC, and users cannot choose a different timezone during rescheduling |
+| Idempotent message processing with client IDs | Network retries do not create duplicate user messages or assistant responses | The frontend must generate and reuse stable UUIDs, and uniqueness indexes add write overhead |
+| Bounded AI conversation history | Reduces AI cost, response time, token usage, and exposure of old conversation data | Very old context may be unavailable to the model |
+| Database enums and foreign keys | Protects lifecycle values and relational integrity at the database level | Enum changes require migrations, and cascade deletion can permanently remove related records |
+| TanStack Query in-memory caching | Reduces repeated requests and improves navigation responsiveness | Requires careful invalidation, can temporarily display stale data, and disappears after a page reload |
 
 ## Assumptions
 
 - Each account represents one appointment owner; provider/resource scheduling is outside this prototype.
-- The browser supplies a valid IANA time zone and the user reviews displayed details before confirmation.
+- The browser supplies a valid IANA time zone that is stored with the appointment and reused for display and rescheduling.
 - A chat session produces at most one appointment.
 - Each user has at most one active chat; abandoned chats are retained as read-only history and cannot be resumed.
 - Duration defaults to 30 minutes when it is not supplied.
 - Optional notes do not block booking confirmation.
 - Overlapping appointment time ranges for one user are conflicts; directly adjacent appointments remain valid.
-- PostgreSQL and the Mistral API are reachable from the deployed backend.
 
 ## Known limitations
 
-- There is no provider availability, calendar synchronization, cancellation, rescheduling, or reminder workflow.
+- There is no provider availability, calendar synchronization, or reminder workflow.
 - The data model does not include optional multi-tenancy through a `business_id`.
 - Polling is near-real-time rather than a WebSocket connection.
 - JWT access tokens are not refreshed, revoked, or stored in HttpOnly cookies.
@@ -374,12 +383,14 @@ Recommended manual verification:
 4. Select **New booking** and verify the previous chat becomes read-only and `ABANDONED` while the replacement is the only active chat.
 5. Start an incomplete chat request and complete it through the structured form.
 6. Create a conversational booking and correct its service or time before confirmation.
-7. Confirm that the stored appointment displays in the browser time zone.
+7. Confirm that the stored appointment displays in the timezone captured when it was created.
 8. Retry a failed message and confirm it is not duplicated.
 9. Open the same active conversation in another tab and verify polling receives new messages.
 10. Confirm the appointment, then review appointment and conversation history.
 11. Create a 30-minute appointment, verify an overlapping booking returns a conflict, and verify a booking starting exactly at its end time succeeds.
-12. Verify one user cannot access another user's resource IDs.
+12. Reschedule an appointment, verify conflicting times are rejected, and confirm its previous interval becomes available.
+13. Cancel an appointment and confirm its interval becomes available while the cancelled record remains in history.
+14. Verify one user cannot access another user's resource IDs.
 
 ## Deployment
 

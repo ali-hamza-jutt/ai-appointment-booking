@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Path,
   Post,
   Query,
@@ -22,6 +23,7 @@ import type {
   AppointmentResponse,
   AppointmentStatus,
   CreateAppointmentRequest,
+  RescheduleAppointmentRequest,
 } from "../dto/appointment.dto.js";
 
 @Route("appointments")
@@ -41,6 +43,42 @@ export class AppointmentController extends Controller {
     this.setStatus(201);
     return appointmentService.createAppointment(
       getAuthenticatedUser(request).id,
+      body,
+    );
+  }
+
+  /** Cancels an appointment and releases its reserved time range. */
+  @Patch("{appointmentId}/cancel")
+  @SuccessResponse("200", "Appointment cancelled")
+  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
+  @Response<ApiErrorResponse>(404, "Appointment was not found")
+  @Response<ApiErrorResponse>(409, "Appointment cannot be cancelled")
+  @Response<ApiErrorResponse>(422, "Appointment ID is invalid")
+  public cancelAppointment(
+    @Request() request: ExpressRequest,
+    @Path() appointmentId: string,
+  ): Promise<AppointmentResponse> {
+    return appointmentService.cancelAppointment(
+      getAuthenticatedUser(request).id,
+      appointmentId,
+    );
+  }
+
+  /** Reschedules an appointment in its original IANA time zone. */
+  @Patch("{appointmentId}/reschedule")
+  @SuccessResponse("200", "Appointment rescheduled")
+  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
+  @Response<ApiErrorResponse>(404, "Appointment was not found")
+  @Response<ApiErrorResponse>(409, "Appointment cannot be rescheduled or the selected time is unavailable")
+  @Response<ApiErrorResponse>(422, "Request validation failed")
+  public rescheduleAppointment(
+    @Request() request: ExpressRequest,
+    @Path() appointmentId: string,
+    @Body() body: RescheduleAppointmentRequest,
+  ): Promise<AppointmentResponse> {
+    return appointmentService.rescheduleAppointment(
+      getAuthenticatedUser(request).id,
+      appointmentId,
       body,
     );
   }

@@ -16,6 +16,7 @@ import {
   encodeTimestampCursor,
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
+import { normalizeIanaTimeZone } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { AppointmentSlotConflictError } from "../appointments/appointment-slot-conflict.error.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
@@ -428,6 +429,7 @@ export class ChatService {
       appointmentId: request.appointmentId,
       serviceName: request.serviceName,
       scheduledAt: request.scheduledAt,
+      timeZone: request.timeZone,
       durationMinutes: request.durationMinutes,
       notes: request.notes,
       assistantContent: this.normalizeMessageContent(request.assistantContent),
@@ -560,6 +562,10 @@ export class ChatService {
       ? normalizeWhitespace(context.serviceName)
       : undefined;
     const notes = context.notes?.trim() || undefined;
+    const timeZone =
+      context.timeZone !== undefined
+        ? normalizeIanaTimeZone(context.timeZone)
+        : undefined;
 
     if (
       serviceName !== undefined &&
@@ -569,6 +575,16 @@ export class ChatService {
       throwRequestValidationError(
         "bookingContext.serviceName",
         VALIDATION_MESSAGES.APPOINTMENT_SERVICE_NAME,
+      );
+    }
+
+    if (
+      context.timeZone !== undefined &&
+      !timeZone
+    ) {
+      throwRequestValidationError(
+        "bookingContext.timeZone",
+        VALIDATION_MESSAGES.APPOINTMENT_TIME_ZONE,
       );
     }
 
@@ -611,6 +627,7 @@ export class ChatService {
       ...(context.scheduledAt !== undefined
         ? { scheduledAt: context.scheduledAt }
         : {}),
+      ...(timeZone ? { timeZone } : {}),
       ...(context.durationMinutes !== undefined
         ? { durationMinutes: context.durationMinutes }
         : {}),
@@ -644,6 +661,7 @@ export class ChatService {
       ...(context.scheduledAt !== undefined
         ? { scheduledAt: context.scheduledAt.toISOString() }
         : {}),
+      ...(context.timeZone !== undefined ? { timeZone: context.timeZone } : {}),
       ...(context.durationMinutes !== undefined
         ? { durationMinutes: context.durationMinutes }
         : {}),
@@ -669,6 +687,9 @@ export class ChatService {
         : {}),
       ...(scheduledAt && !Number.isNaN(scheduledAt.getTime())
         ? { scheduledAt }
+        : {}),
+      ...(typeof context.timeZone === "string"
+        ? { timeZone: context.timeZone }
         : {}),
       ...(typeof context.durationMinutes === "number"
         ? { durationMinutes: context.durationMinutes }

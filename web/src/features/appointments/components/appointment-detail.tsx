@@ -13,13 +13,12 @@ import {
   GlobeIcon,
   RefreshIcon,
 } from "@/components/ui/icons";
+import { AppointmentActions } from "@/features/appointments/components/appointment-actions";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
-import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { useGetAppointment } from "@/generated/api/appointments/appointments";
 import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
 
 export function AppointmentDetail({ appointmentId }: { appointmentId: string }) {
-  const timeZone = useBrowserTimeZone();
   const appointmentQuery = useGetAppointment(appointmentId, {
     query: { retry: false },
   });
@@ -72,7 +71,7 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
     );
   }
 
-  const appointment = toAppointmentViewModel(appointmentQuery.data, timeZone);
+  const appointment = toAppointmentViewModel(appointmentQuery.data);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
@@ -93,6 +92,8 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
             </p>
           </div>
         </header>
+
+        <AppointmentActions appointment={appointmentQuery.data} />
 
         <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
           <DetailItem icon={<CalendarIcon className="size-[18px]" />} label="Date" value={appointment.date} />

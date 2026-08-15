@@ -98,6 +98,9 @@ export const ERROR_CODES = {
   AI_PROVIDER_UNAVAILABLE: "AI_PROVIDER_UNAVAILABLE",
   AI_REQUEST_TIMEOUT: "AI_REQUEST_TIMEOUT",
   APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
+  APPOINTMENT_CANCELLATION_NOT_ALLOWED:
+    "APPOINTMENT_CANCELLATION_NOT_ALLOWED",
+  APPOINTMENT_RESCHEDULE_NOT_ALLOWED: "APPOINTMENT_RESCHEDULE_NOT_ALLOWED",
   APPOINTMENT_SLOT_UNAVAILABLE: "APPOINTMENT_SLOT_UNAVAILABLE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
@@ -127,6 +130,10 @@ export const ERROR_MESSAGES = {
   AI_PROVIDER_UNAVAILABLE: "The AI provider is temporarily unavailable",
   AI_REQUEST_TIMEOUT: "The AI provider did not respond in time",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
+  APPOINTMENT_CANCELLATION_NOT_ALLOWED:
+    "Completed appointments cannot be cancelled",
+  APPOINTMENT_RESCHEDULE_NOT_ALLOWED:
+    "Cancelled or completed appointments cannot be rescheduled",
   APPOINTMENT_SLOT_UNAVAILABLE:
     "The selected time overlaps with another appointment",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -165,6 +172,9 @@ export const VALIDATION_MESSAGES = {
   APPOINTMENT_SERVICE_NAME:
     "Service name must contain between 2 and 120 characters",
   APPOINTMENT_TIME: "Scheduled time must be a valid future date and time",
+  APPOINTMENT_TIME_ZONE: "Time zone must be a valid IANA time zone",
+  APPOINTMENT_RESCHEDULE_TIME:
+    "Choose a valid future date and time in the appointment time zone",
   APPOINTMENT_DURATION: "Duration must be an integer between 5 and 480 minutes",
   APPOINTMENT_NOTES: "Notes cannot exceed 2000 characters",
   BOOKING_CONTEXT_DURATION:

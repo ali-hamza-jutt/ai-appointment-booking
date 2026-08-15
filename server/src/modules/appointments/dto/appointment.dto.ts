@@ -12,6 +12,9 @@ export interface CreateAppointmentRequest {
 
   scheduledAt: Date;
 
+  /** IANA time zone in which the appointment was created. @maxLength 100 */
+  timeZone: string;
+
   /**
    * @isInt Duration must be a whole number
    * @minimum 5
@@ -27,6 +30,7 @@ export interface AppointmentResponse {
   id: string;
   serviceName: string;
   scheduledAt: Date;
+  timeZone: string;
   durationMinutes: number;
   status: AppointmentStatus;
   source: AppointmentSource;
@@ -38,6 +42,7 @@ export interface AppointmentResponse {
 export interface PreparedAppointment {
   serviceName: string;
   scheduledAt: Date;
+  timeZone: string;
   durationMinutes: number;
   notes: string | null;
 }
@@ -57,6 +62,7 @@ export interface AppointmentRecord {
   id: string;
   serviceName: string;
   scheduledAt: Date;
+  timeZone: string;
   durationMinutes: number;
   status: AppointmentStatus;
   source: AppointmentSource;
@@ -69,6 +75,7 @@ export interface AppointmentScheduleData {
   userId: string;
   scheduledAt: Date;
   durationMinutes: number;
+  excludeAppointmentId?: string;
 }
 
 export interface AppointmentConflictQueryResult {
@@ -77,8 +84,27 @@ export interface AppointmentConflictQueryResult {
 
 export interface CreateAppointmentData extends AppointmentScheduleData {
   serviceName: string;
+  timeZone: string;
   source: AppointmentSource;
   notes: string | null;
+}
+
+export interface RescheduleAppointmentRequest {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ Must use YYYY-MM-DD */
+  scheduledDate: string;
+
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ Must use HH:mm in 24-hour time */
+  scheduledTime: string;
+}
+
+export interface AppointmentMutationData {
+  appointmentId: string;
+  userId: string;
+}
+
+export interface RescheduleAppointmentData extends AppointmentMutationData {
+  scheduledAt: Date;
+  durationMinutes: number;
 }
 
 export interface AppointmentPageCursor {

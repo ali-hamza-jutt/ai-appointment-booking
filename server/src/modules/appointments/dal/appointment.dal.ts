@@ -4,16 +4,19 @@ import { prisma } from "../../../infrastructure/database/prisma.js";
 import { AppointmentSlotConflictError } from "../appointment-slot-conflict.error.js";
 import type {
   AppointmentConflictQueryResult,
+  AppointmentMutationData,
   AppointmentRecord,
   AppointmentScheduleData,
   CreateAppointmentData,
   ListAppointmentsData,
+  RescheduleAppointmentData,
 } from "../dto/appointment.dto.js";
 
 export const appointmentSelect = {
   id: true,
   serviceName: true,
   scheduledAt: true,
+  timeZone: true,
   durationMinutes: true,
   status: true,
   source: true,
@@ -27,6 +30,7 @@ export class AppointmentDal {
     data: CreateAppointmentData,
   ): Promise<AppointmentRecord> {
     return prisma.$transaction(async (transaction) => {
+      await this.lockAppointmentSchedule(transaction, data.userId);
       await this.ensureAppointmentSlotAvailable(transaction, data);
 
       return transaction.appointment.create({
@@ -36,17 +40,66 @@ export class AppointmentDal {
     });
   }
 
-  public async ensureAppointmentSlotAvailable(
+  public async cancelAppointment(
+    data: AppointmentMutationData,
+  ): Promise<AppointmentRecord> {
+    return prisma.$transaction(async (transaction) => {
+      await this.lockAppointmentSchedule(transaction, data.userId);
+
+      return transaction.appointment.update({
+        where: {
+          id: data.appointmentId,
+          userId: data.userId,
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+        data: { status: "CANCELLED" },
+        select: appointmentSelect,
+      });
+    });
+  }
+
+  public async rescheduleAppointment(
+    data: RescheduleAppointmentData,
+  ): Promise<AppointmentRecord> {
+    return prisma.$transaction(async (transaction) => {
+      await this.lockAppointmentSchedule(transaction, data.userId);
+      const appointment = await transaction.appointment.update({
+        where: {
+          id: data.appointmentId,
+          userId: data.userId,
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+        data: { scheduledAt: data.scheduledAt },
+        select: appointmentSelect,
+      });
+
+      await this.ensureAppointmentSlotAvailable(transaction, {
+        userId: data.userId,
+        scheduledAt: data.scheduledAt,
+        durationMinutes: data.durationMinutes,
+        excludeAppointmentId: data.appointmentId,
+      });
+
+      return appointment;
+    });
+  }
+
+  public async lockAppointmentSchedule(
     transaction: Prisma.TransactionClient,
-    data: AppointmentScheduleData,
+    userId: string,
   ): Promise<void> {
     await transaction.$queryRaw`
       SELECT "id"
       FROM "users"
-      WHERE "id" = ${data.userId}::uuid
+      WHERE "id" = ${userId}::uuid
       FOR UPDATE
     `;
+  }
 
+  public async ensureAppointmentSlotAvailable(
+    transaction: Prisma.TransactionClient,
+    data: AppointmentScheduleData,
+  ): Promise<void> {
     const appointmentEndsAt = new Date(
       data.scheduledAt.getTime() +
         data.durationMinutes * APPOINTMENT_CONSTANTS.MILLISECONDS_PER_MINUTE,
@@ -56,6 +109,7 @@ export class AppointmentDal {
         APPOINTMENT_CONSTANTS.MAX_DURATION_MINUTES *
           APPOINTMENT_CONSTANTS.MILLISECONDS_PER_MINUTE,
     );
+    const excludedAppointmentId = data.excludeAppointmentId ?? null;
     const [result] = await transaction.$queryRaw<
       AppointmentConflictQueryResult[]
     >`
@@ -63,6 +117,11 @@ export class AppointmentDal {
         SELECT 1
         FROM "appointments"
         WHERE "user_id" = ${data.userId}::uuid
+          AND "status" <> 'CANCELLED'
+          AND (
+            ${excludedAppointmentId}::uuid IS NULL
+            OR "id" <> ${excludedAppointmentId}::uuid
+          )
           AND "scheduled_at" > ${earliestPossibleExistingStart}
           AND "scheduled_at" < ${appointmentEndsAt}
           AND "scheduled_at" + "duration_minutes" * INTERVAL '1 minute'
