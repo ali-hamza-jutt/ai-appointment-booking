@@ -40,7 +40,17 @@ export const CHAT_CONSTANTS = {
   RESPONSE_LOCALE: "en-US",
   ASSISTANT_MESSAGES: {
     UNKNOWN_INTENT:
-      "I can help you book an appointment. Tell me the service, date, and time you would prefer.",
+      "I’m focused on appointment booking. Tell me the service, date, and time you would prefer, and I’ll help you schedule it.",
+    GREETING:
+      "Hello! I can help you book an appointment. What would you like to schedule?",
+    BOOKING_HELP:
+      "I can collect the service, date, time, duration, and notes for a new appointment. Tell me any details you already know, or use the booking form.",
+    MANAGE_APPOINTMENT:
+      "To cancel or reschedule an existing booking, open My appointments and choose the appointment you want to manage.",
+    PAST_TIME:
+      "That time has already passed in your timezone. Please choose a future date and time.",
+    INVALID_TIME:
+      "I couldn’t interpret that date and time safely. Please provide a specific future date and time.",
     CONFIRMATION_SUFFIX: "Please confirm to create this appointment.",
     BOOKING_SUCCESS_PREFIX: "Your appointment has been booked",
   },
@@ -59,7 +69,14 @@ export const AI_CONSTANTS = {
   HISTORY_QUERY_LIMIT: 51,
   MAX_OUTPUT_TOKENS: 600,
   TEMPERATURE: 0,
-  INTENTS: ["BOOK_APPOINTMENT", "UNKNOWN"] as const,
+  MAX_COMPLETION_ATTEMPTS: 2,
+  INTENTS: [
+    "BOOK_APPOINTMENT",
+    "GREETING",
+    "BOOKING_HELP",
+    "MANAGE_APPOINTMENT",
+    "OUT_OF_SCOPE",
+  ] as const,
   CONVERSATION_ROLES: ["user", "assistant"] as const,
   BOOKING_FIELDS: [
     "serviceName",
@@ -76,8 +93,25 @@ export const AI_CONSTANTS = {
   ] as const,
   MAX_TIME_ZONE_LENGTH: 100,
   MAX_CLARIFICATION_QUESTION_LENGTH: 300,
+  MAX_ASSISTANT_REPLY_LENGTH: 500,
+  PURE_GREETING_PATTERN:
+    /^(?:(?:hi|hello|hey)(?:\s+there)?|good\s+(?:morning|afternoon|evening))[.!?\s]*$/i,
+  BOOKING_HELP_PATTERN:
+    /^(?:help|what\s+can\s+you\s+do|how\s+(?:can|do)\s+(?:i|you)\s+(?:book|schedule)(?:\s+an?\s+appointment)?)[.!?\s]*$/i,
+  MANAGE_APPOINTMENT_PATTERN:
+    /^(?:please\s+)?(?:cancel|reschedule)\s+(?:my\s+)?(?:existing\s+)?appointment[.!?\s]*$/i,
   EXPLICIT_SERVICE_CHANGE_PATTERN:
     /^(?:please\s+)?(?:change|update)\s+(?:the\s+)?service(?:\s+name)?\s+to\s+(.+?)[.!?]*$/i,
+  SERVICE_CHANGE_TRAILING_DETAILS_PATTERN:
+    /\s+(?:and\s+)?(?:(?:move|change|set|schedule|book)\b|(?:the\s+)?(?:date|time|duration|notes?)\s+to\b).*$/i,
+  CLEAR_SERVICE_PATTERN:
+    /^(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?service(?:\s+name)?[.!?\s]*$/i,
+  CLEAR_SCHEDULE_PATTERN:
+    /^(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?(?:date|time|scheduled\s+time|schedule)[.!?\s]*$/i,
+  CLEAR_NOTES_PATTERN:
+    /^(?:(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?notes?|no\s+notes?)[.!?\s]*$/i,
+  DEFAULT_DURATION_PATTERN:
+    /^(?:(?:please\s+)?(?:clear|remove|reset)\s+(?:the\s+)?duration|use\s+(?:the\s+)?default\s+duration)[.!?\s]*$/i,
   CLARIFICATION_QUESTIONS: {
     serviceName: "What service would you like to book?",
     scheduledAt: "What date and time would you prefer for the appointment?",
@@ -125,10 +159,13 @@ export const ERROR_CODES = {
 } as const;
 
 export const ERROR_MESSAGES = {
-  AI_INVALID_RESPONSE: "The AI provider returned an invalid response",
+  AI_INVALID_RESPONSE:
+    "The booking assistant couldn’t understand the response. Please retry your message",
   AI_NOT_CONFIGURED: "The AI integration is not configured",
-  AI_PROVIDER_UNAVAILABLE: "The AI provider is temporarily unavailable",
-  AI_REQUEST_TIMEOUT: "The AI provider did not respond in time",
+  AI_PROVIDER_UNAVAILABLE:
+    "The booking assistant is temporarily unavailable. Please try again",
+  AI_REQUEST_TIMEOUT:
+    "The booking assistant took too long to respond. Please try again",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
     "Completed appointments cannot be cancelled",

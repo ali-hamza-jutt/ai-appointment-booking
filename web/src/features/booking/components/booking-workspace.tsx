@@ -62,10 +62,22 @@ import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
-const suggestions = [
+const initialSuggestions = [
   "Book a consultation next Tuesday at 10 AM",
   "Schedule a 30-minute follow-up this Friday",
   "I need a planning session next week",
+];
+
+const serviceSuggestions = [
+  "Dental consultation",
+  "Planning consultation",
+  "Travel consultation",
+];
+
+const scheduleSuggestions = [
+  "Tomorrow at 10 AM",
+  "Next Tuesday at 2 PM",
+  "Friday at 4 PM",
 ];
 
 function createWelcomeMessage(firstName: string): ChatMessageViewModel {
@@ -219,6 +231,10 @@ function BookingExperience({
     () =>
       mergeBookingMessages(messages, messagePollingQuery.data?.items ?? []),
     [messagePollingQuery.data?.items, messages],
+  );
+  const contextualSuggestions = useMemo(
+    () => getContextualSuggestions(missingFields),
+    [missingFields],
   );
 
   const isSending = isProcessingTurn;
@@ -582,6 +598,14 @@ function BookingExperience({
                     Retry message
                   </Button>
                   <Button
+                    leadingIcon={<EditIcon className="size-3.5" />}
+                    onClick={openStructuredBookingForm}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Use booking form
+                  </Button>
+                  <Button
                     isLoading={isStartingNew}
                     onClick={startAnotherBooking}
                     size="sm"
@@ -594,24 +618,24 @@ function BookingExperience({
             ) : null}
 
             {visibleMessages.length === 1 && !isConfirmed ? (
-              <div className="pt-1">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
-                  Try an example
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      className="rounded-full border border-border bg-surface px-3 py-2 text-left text-xs text-ink-soft transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isComposerDisabled}
-                      key={suggestion}
-                      onClick={() => sendMessage(suggestion)}
-                      type="button"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <BookingSuggestions
+                disabled={isComposerDisabled}
+                label="Try an example"
+                onSelect={sendMessage}
+                suggestions={initialSuggestions}
+              />
+            ) : null}
+
+            {visibleMessages.length > 1 &&
+            contextualSuggestions.length > 0 &&
+            !isConfirmed &&
+            !requestError ? (
+              <BookingSuggestions
+                disabled={isComposerDisabled}
+                label="Quick replies"
+                onSelect={sendMessage}
+                suggestions={contextualSuggestions}
+              />
             ) : null}
           </div>
         </div>
@@ -876,6 +900,50 @@ function getMissingBookingFields(
   if (!context?.scheduledAt) missingFields.push("scheduledAt");
 
   return missingFields;
+}
+
+function getContextualSuggestions(missingFields: string[]): string[] {
+  const needsService = missingFields.includes("serviceName");
+  const needsSchedule = missingFields.includes("scheduledAt");
+
+  if (needsService && needsSchedule) return initialSuggestions;
+  if (needsService) return serviceSuggestions;
+  if (needsSchedule) return scheduleSuggestions;
+
+  return [];
+}
+
+function BookingSuggestions({
+  disabled,
+  label,
+  onSelect,
+  suggestions,
+}: {
+  disabled: boolean;
+  label: string;
+  onSelect: (suggestion: string) => void;
+  suggestions: string[];
+}) {
+  return (
+    <div className="pt-1">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
+        {label}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {suggestions.map((suggestion) => (
+          <button
+            className="rounded-full border border-border bg-surface px-3 py-2 text-left text-xs text-ink-soft transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
+            key={suggestion}
+            onClick={() => onSelect(suggestion)}
+            type="button"
+          >
+            {suggestion}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function BookingResumeSkeleton() {
