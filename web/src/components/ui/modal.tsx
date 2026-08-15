@@ -37,7 +37,7 @@ export function Modal({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-overlay p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-overlay p-3 sm:p-6"
       role="dialog"
     >
       {isDismissible ? (
@@ -50,8 +50,8 @@ export function Modal({
       ) : (
         <div aria-hidden="true" className="absolute inset-0" />
       )}
-      <section className="relative w-full max-w-[480px] rounded-t-[18px] border border-border bg-surface shadow-modal sm:rounded-[14px]">
-        <header className="flex items-start gap-4 border-b border-border px-5 py-4 sm:px-6">
+      <section className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[480px] flex-col overflow-hidden rounded-[14px] border border-border bg-surface shadow-modal sm:max-h-[calc(100dvh-3rem)]">
+        <header className="flex shrink-0 items-start gap-4 border-b border-border px-5 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-ink">{title}</h2>
             {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
@@ -67,7 +67,7 @@ export function Modal({
             </button>
           ) : null}
         </header>
-        {children}
+        <div className="bw-scrollbar min-h-0 overflow-y-auto">{children}</div>
       </section>
     </div>
   );

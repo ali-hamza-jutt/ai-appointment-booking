@@ -3,7 +3,7 @@ import type {
   AppointmentResponse,
 } from "../../appointments/dto/appointment.dto.js";
 
-export type ChatSessionStatus = "ACTIVE" | "CLOSED";
+export type ChatSessionStatus = "ACTIVE" | "CLOSED" | "ABANDONED";
 
 export type ChatMessageRole = "USER" | "ASSISTANT" | "SYSTEM";
 
@@ -57,6 +57,9 @@ export interface CreateChatSessionRequest {
   title?: string;
 
   bookingContext?: AppointmentBookingContext;
+
+  /** Abandons the current active chat before creating this session. */
+  replaceActive?: boolean;
 }
 
 export interface CreateChatMessageRequest {
@@ -173,6 +176,7 @@ export interface CreateChatSessionData {
   userId: string;
   title: string | null;
   bookingContext: StoredAppointmentBookingContext | null;
+  replaceActive: boolean;
 }
 
 export interface ChatSessionPageCursor {

@@ -12,4 +12,5 @@ export type ChatSessionStatus = typeof ChatSessionStatus[keyof typeof ChatSessio
 export const ChatSessionStatus = {
   ACTIVE: 'ACTIVE',
   CLOSED: 'CLOSED',
+  ABANDONED: 'ABANDONED',
 } as const;

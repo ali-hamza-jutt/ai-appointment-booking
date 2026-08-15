@@ -21,7 +21,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - Explicit review and confirmation before an appointment is created.
 - Appointment and conversation lists with cursor pagination.
 - Three-second cursor-based polling for active conversation messages.
-- Active-chat recovery when a user returns to the booking workspace.
+- One active booking conversation per user, with automatic resume and explicit abandonment when a new booking starts.
 - Responsive UI with loading, error, retry, empty, disabled, and skeleton states.
 - Swagger/OpenAPI documentation and Orval-generated frontend API hooks.
 
@@ -83,16 +83,18 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 ## Booking workflow
 
 1. The user signs up or signs in and receives a bearer access token.
-2. The frontend creates a chat session when the first booking message is sent.
-3. Each user message includes a frontend-generated `clientMessageId` and browser IANA time zone.
-4. The backend stores the user message once and checks for an existing assistant reply during retries.
-5. Mistral extracts the service, local date, local time, duration, and notes from conversational input.
-6. The backend validates the AI JSON and converts local wall-clock values to a UTC instant.
-7. If details are incomplete or AI processing fails, the user can enter them in a structured form. Structured values are validated by the server and bypass Mistral.
-8. The evolving booking context and assistant response are persisted on the chat session.
-9. Active clients poll from the latest message cursor every three seconds and merge only newly received messages.
-10. The user reviews the final details and confirms the booking.
-11. One atomic database write closes the chat, creates the appointment, and stores the success message.
+2. The booking workspace automatically retrieves and resumes the user's single active chat without displaying a selection dialog.
+3. If no active chat exists, the frontend creates one when the first booking message is sent.
+4. Selecting **New booking** atomically marks the current chat `ABANDONED` and creates its `ACTIVE` replacement. Abandoned chats remain read-only in conversation history.
+5. Each user message includes a frontend-generated `clientMessageId` and browser IANA time zone.
+6. The backend stores the user message once and checks for an existing assistant reply during retries.
+7. Mistral extracts the service, local date, local time, duration, and notes from conversational input.
+8. The backend validates the AI JSON and converts local wall-clock values to a UTC instant.
+9. If details are incomplete or AI processing fails, the user can enter them in a structured form. Structured values are validated by the server and bypass Mistral.
+10. The evolving booking context and assistant response are persisted on the chat session.
+11. Active clients poll from the latest message cursor every three seconds and merge only newly received messages.
+12. The user reviews the final details and confirms the booking.
+13. One atomic database write closes the chat, creates the appointment, and stores the success message.
 
 ## Repository structure
 
@@ -219,7 +221,7 @@ All domain routes except signup, sign-in, and health require `Authorization: Bea
 | `POST` | `/api/appointments` | Create a form-sourced appointment |
 | `GET` | `/api/appointments` | List owned appointments with cursor pagination |
 | `GET` | `/api/appointments/{appointmentId}` | Retrieve one owned appointment |
-| `POST` | `/api/chat/sessions` | Create a conversation |
+| `POST` | `/api/chat/sessions` | Return the active conversation or abandon and replace it when `replaceActive` is true |
 | `GET` | `/api/chat/sessions` | List owned conversations |
 | `GET` | `/api/chat/sessions/{sessionId}` | Retrieve one owned conversation |
 | `POST` | `/api/chat/sessions/{sessionId}/messages` | Process conversational or structured booking details |
@@ -257,6 +259,7 @@ Important database decisions include:
 - Email uniqueness supports registration and sign-in lookup.
 - Foreign keys enforce ownership relationships and cascade appropriate deletions.
 - Appointment start-time and chat-session uniqueness prevent duplicate booking writes.
+- A PostgreSQL partial unique index permits only one `ACTIVE` chat session per user.
 - Client-message and reply constraints make retries idempotent.
 - Composite indexes support owned appointment, session, and message pagination.
 - JSONB is limited to evolving booking context and structured AI metadata; searchable scheduling fields remain typed relational columns.
@@ -298,6 +301,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Cursor pagination avoids increasingly expensive large offsets.
 - Polling requests begin from the latest cursor instead of downloading full message history.
 - AI history is bounded and database queries retrieve only required fields.
+- Starting a new booking abandons the current active chat and creates its replacement in one transaction.
 - Booking confirmation closes the session, creates the appointment, and stores the success message atomically.
 - Graceful shutdown closes the HTTP listener and PostgreSQL connection.
 
@@ -315,12 +319,14 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 | Browser-stored bearer token | Keeps the prototype stateless and straightforward | Production would prefer secure HttpOnly cookies plus refresh/revocation controls |
 | In-memory rate limiting | Appropriate for one prototype server instance | Multiple instances require a shared store such as Redis |
 | Structured form bypasses AI | Provides a reliable fallback for incomplete or failed conversations | Two input paths must converge on the same domain validation |
+| Single active booking chat | Automatically restores the current draft and prevents competing booking contexts | Starting a new booking permanently abandons the previous active chat |
 
 ## Assumptions
 
 - Each account represents one appointment owner; provider/resource scheduling is outside this prototype.
 - The browser supplies a valid IANA time zone and the user reviews displayed details before confirmation.
 - A chat session produces at most one appointment.
+- Each user has at most one active chat; abandoned chats are retained as read-only history and cannot be resumed.
 - Duration defaults to 30 minutes when it is not supplied.
 - Optional notes do not block booking confirmation.
 - Exact duplicate start times for one user are conflicts.
@@ -362,13 +368,15 @@ Recommended manual verification:
 
 1. Sign up, sign out, and sign in.
 2. Confirm that protected pages redirect unauthenticated users.
-3. Start an incomplete chat request and complete it through the structured form.
-4. Create a conversational booking and correct its time before confirmation.
-5. Confirm that the stored appointment displays in the browser time zone.
-6. Retry a failed message and confirm it is not duplicated.
-7. Open the same active conversation in another tab and verify polling receives new messages.
-8. Confirm the appointment, then review appointment and conversation history.
-9. Verify one user cannot access another user's resource IDs.
+3. Start a chat, leave the booking workspace, and confirm that returning automatically restores it without a selection dialog.
+4. Select **New booking** and verify the previous chat becomes read-only and `ABANDONED` while the replacement is the only active chat.
+5. Start an incomplete chat request and complete it through the structured form.
+6. Create a conversational booking and correct its service or time before confirmation.
+7. Confirm that the stored appointment displays in the browser time zone.
+8. Retry a failed message and confirm it is not duplicated.
+9. Open the same active conversation in another tab and verify polling receives new messages.
+10. Confirm the appointment, then review appointment and conversation history.
+11. Verify one user cannot access another user's resource IDs.
 
 ## Deployment
 

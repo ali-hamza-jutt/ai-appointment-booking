@@ -138,7 +138,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 }
 
 /**
- * Lists appointments chronologically using cursor pagination.
+ * Lists the user's most recently created appointments using cursor pagination.
  */
 export const listAppointments = async (params?: ListAppointmentsParams, options?: Parameters<typeof apiFetch>[1]): Promise<AppointmentListResponse> => {
 

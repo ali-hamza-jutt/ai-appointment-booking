@@ -2,12 +2,14 @@ import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import {
   AI_CONSTANTS,
+  APPOINTMENT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import { normalizeWhitespace } from "../../utils/text.js";
 import {
   getLocalDateTimeValues,
   localDateTimeToUtc,
@@ -61,6 +63,10 @@ export class AiService {
     const currentDateTime = this.validateCurrentDateTime(
       request.currentDateTime ?? new Date(),
     );
+    const explicitServiceName = this.extractExplicitServiceNameChange(
+      userMessage,
+      appointmentContext,
+    );
     const startedAt = Date.now();
 
     try {
@@ -82,6 +88,7 @@ export class AiService {
         currentDateTime,
         timeZone,
         appointmentContext,
+        explicitServiceName,
       );
 
       logger.info(
@@ -238,11 +245,33 @@ export class AiService {
     return currentDateTime;
   }
 
+  private extractExplicitServiceNameChange(
+    userMessage: string,
+    previousContext?: AiAppointmentContext,
+  ): string | undefined {
+    if (!previousContext?.serviceName) {
+      return undefined;
+    }
+
+    const match = AI_CONSTANTS.EXPLICIT_SERVICE_CHANGE_PATTERN.exec(userMessage);
+    const serviceName = normalizeWhitespace(match?.[1] ?? "");
+
+    if (
+      serviceName.length < APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH ||
+      serviceName.length > APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH
+    ) {
+      return undefined;
+    }
+
+    return serviceName;
+  }
+
   private parseExtraction(
     content: string,
     currentDateTime: Date,
     timeZone: string,
     previousContext?: AiAppointmentContext,
+    explicitServiceName?: string,
   ): AppointmentExtractionResult {
     let json: unknown;
 
@@ -267,10 +296,12 @@ export class AiService {
     }
 
     const output = parsedOutput.data;
+    const intent = explicitServiceName ? "BOOK_APPOINTMENT" : output.intent;
     const appointmentContext: AiAppointmentContext = {};
+    const serviceName = explicitServiceName ?? output.serviceName;
 
-    if (output.serviceName) {
-      appointmentContext.serviceName = output.serviceName;
+    if (serviceName) {
+      appointmentContext.serviceName = serviceName;
     }
 
     const previousLocalDateTime = previousContext?.scheduledAt
@@ -296,17 +327,24 @@ export class AiService {
       }
     }
 
-    if (output.durationMinutes !== null) {
+    if (
+      explicitServiceName &&
+      previousContext?.durationMinutes !== undefined
+    ) {
+      appointmentContext.durationMinutes = previousContext.durationMinutes;
+    } else if (output.durationMinutes !== null) {
       appointmentContext.durationMinutes = output.durationMinutes;
     }
 
-    if (output.notes) {
+    if (explicitServiceName && previousContext?.notes) {
+      appointmentContext.notes = previousContext.notes;
+    } else if (output.notes) {
       appointmentContext.notes = output.notes;
     }
 
     const missingFields: AiBookingField[] = [];
 
-    if (output.intent === "BOOK_APPOINTMENT") {
+    if (intent === "BOOK_APPOINTMENT") {
       for (const field of AI_CONSTANTS.REQUIRED_BOOKING_FIELDS) {
         if (!appointmentContext[field]) {
           missingFields.push(field);
@@ -315,15 +353,17 @@ export class AiService {
     }
 
     const confirmationRequired =
-      output.intent === "BOOK_APPOINTMENT" && missingFields.length === 0;
+      intent === "BOOK_APPOINTMENT" && missingFields.length === 0;
     const clarificationQuestion =
-      output.intent === "BOOK_APPOINTMENT" && missingFields.length > 0
-        ? (output.clarificationQuestion ??
+      intent === "BOOK_APPOINTMENT" && missingFields.length > 0
+        ? ((explicitServiceName
+            ? undefined
+            : output.clarificationQuestion) ??
           buildFallbackClarificationQuestion(missingFields))
         : undefined;
 
     return {
-      intent: output.intent,
+      intent,
       appointmentContext,
       missingFields,
       confirmationRequired,

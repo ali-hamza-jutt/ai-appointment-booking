@@ -5,6 +5,7 @@ export const CONVERSATION_UI_CONSTANTS = {
     { label: "All", value: "ALL" },
     { label: "Active", value: "ACTIVE" },
     { label: "Closed", value: "CLOSED" },
+    { label: "Abandoned", value: "ABANDONED" },
   ] satisfies ReadonlyArray<{ label: string; value: ConversationFilter }>,
   MESSAGE_PAGE_SIZE: 50,
   MESSAGE_POLL_INTERVAL_MS: 3_000,

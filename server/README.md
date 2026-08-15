@@ -11,7 +11,7 @@ Controller -> Orchestration/service -> DAL -> PostgreSQL
                               `-----> Mistral provider
 ```
 
-The chat flow stores each frontend-generated `clientMessageId` once, links at most one assistant reply to that user message, and keeps the evolving booking context on the chat session. Confirmation atomically closes the session, creates the appointment, and stores the success message.
+The chat flow stores each frontend-generated `clientMessageId` once, links at most one assistant reply to that user message, and keeps the evolving booking context on the chat session. Each user can have only one `ACTIVE` chat. Session creation returns that chat by default; an explicit replacement atomically marks it `ABANDONED` and creates a new active session. Abandoned sessions remain read-only. Confirmation atomically closes the active session, creates the appointment, and stores the success message.
 
 ## Requirements
 
@@ -51,7 +51,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 
 - `/api/auth`: signup, sign-in, and current-user retrieval.
 - `/api/appointments`: authenticated appointment creation and retrieval.
-- `/api/chat/sessions`: session creation, history, AI-assisted turns, and booking confirmation.
+- `/api/chat/sessions`: active-session retrieval or replacement, history, AI-assisted turns, and booking confirmation.
 - `/api/health`: process availability.
 
 Authentication uses bearer JWTs. The authentication endpoints are rate-limited to 10 attempts per 15 minutes per client IP. AI-backed chat messages and confirmations are rate-limited to 20 requests per minute per client IP. Rate-limit responses use HTTP 429 and include the request ID.
@@ -75,6 +75,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 - Ownership is included in appointment and chat database queries.
 - AI output is runtime-validated before it becomes booking context.
 - Message and confirmation retries are idempotent through client IDs, reply links, and database constraints.
+- A partial unique index and transactional replacement enforce one active chat per user, including under concurrent requests.
 - Provider secrets and conversation content are excluded from AI operational logs.
 - HTTP shutdown closes the listener and PostgreSQL connection cleanly.
 

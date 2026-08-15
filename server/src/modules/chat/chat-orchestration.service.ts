@@ -164,11 +164,11 @@ export class ChatOrchestrationService {
   ): Promise<ChatTurnResponse> {
     const session = await this.chat.getSession(userId, sessionId);
 
-    if (session.status === "CLOSED") {
+    if (session.status !== "ACTIVE") {
       throw new AppError(
         409,
-        ERROR_CODES.CHAT_SESSION_CLOSED,
-        ERROR_MESSAGES.CHAT_SESSION_CLOSED,
+        ERROR_CODES.CHAT_SESSION_NOT_ACTIVE,
+        ERROR_MESSAGES.CHAT_SESSION_NOT_ACTIVE,
       );
     }
 

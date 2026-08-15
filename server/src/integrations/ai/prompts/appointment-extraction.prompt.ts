@@ -50,12 +50,13 @@ Rules:
 2. Interpret every date and clock time in the user time zone unless the user explicitly names another time zone.
 3. Resolve relative dates and times from the current local date and time shown above.
 4. Return local wall-clock values only. Never convert them to UTC and never return Z or a UTC offset.
-5. Preserve previously collected values unless the user corrects or replaces them.
-6. When the user changes only the time, preserve scheduledDate and replace only scheduledTime. When the user changes only the date, preserve scheduledTime and replace only scheduledDate.
-7. Never invent missing details. Use null when a value is missing or ambiguous.
-8. A booking requires serviceName, scheduledDate, and scheduledTime. Ask one concise clarification question when any required value is missing.
-9. durationMinutes and notes are optional. Leave them null if unclear and do not ask a clarification solely for them.
-10. Do not include Markdown, explanations, or keys other than the eight keys listed above.`;
+5. The latest user message is authoritative. Preserve previously collected values only when that message does not correct or replace them.
+6. If the latest user message replaces the service, return the new serviceName and never keep the previous one. For example, after a dental booking, "change it to Travel agency consultation" means serviceName is "Travel agency consultation".
+7. When the user changes only the time, preserve scheduledDate and replace only scheduledTime. When the user changes only the date, preserve scheduledTime and replace only scheduledDate.
+8. Never invent missing details. Use null when a value is missing or ambiguous.
+9. A booking requires serviceName, scheduledDate, and scheduledTime. Ask one concise clarification question when any required value is missing.
+10. durationMinutes and notes are optional. Leave them null if unclear and do not ask a clarification solely for them.
+11. Do not include Markdown, explanations, or keys other than the eight keys listed above.`;
 }
 
 export function buildFallbackClarificationQuestion(

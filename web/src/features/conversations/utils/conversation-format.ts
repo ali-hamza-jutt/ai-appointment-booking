@@ -15,6 +15,7 @@ const statusPresentation: Record<
 > = {
   ACTIVE: { label: "Active", tone: "brand" },
   CLOSED: { label: "Closed", tone: "neutral" },
+  ABANDONED: { label: "Abandoned", tone: "warning" },
 };
 
 export function toConversationSessionViewModel(
@@ -77,8 +78,12 @@ function formatSessionPreview(
 
   if (serviceName) return serviceName;
 
-  return session.status === "ACTIVE"
-    ? "Continue this booking conversation"
+  if (session.status === "ACTIVE") {
+    return "Continue this booking conversation";
+  }
+
+  return session.status === "ABANDONED"
+    ? "Booking conversation abandoned"
     : "Booking conversation closed";
 }
 

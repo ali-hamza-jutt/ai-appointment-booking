@@ -37,17 +37,46 @@ export const chatMessageSelect = {
 
 export class ChatDal {
   public createSession(data: CreateChatSessionData): Promise<ChatSessionRecord> {
-    return prisma.chatSession.create({
-      data: {
-        userId: data.userId,
-        title: data.title,
-        ...(data.bookingContext
-          ? {
-              bookingContext:
-                data.bookingContext as unknown as Prisma.InputJsonObject,
-            }
-          : {}),
-      },
+    return prisma.$transaction(async (transaction) => {
+      if (data.replaceActive) {
+        await transaction.chatSession.updateMany({
+          where: { userId: data.userId, status: "ACTIVE" },
+          data: { status: "ABANDONED" },
+        });
+      } else {
+        const activeSession = await transaction.chatSession.findFirst({
+          where: { userId: data.userId, status: "ACTIVE" },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          select: chatSessionSelect,
+        });
+
+        if (activeSession) {
+          return activeSession;
+        }
+      }
+
+      return transaction.chatSession.create({
+        data: {
+          userId: data.userId,
+          title: data.title,
+          ...(data.bookingContext
+            ? {
+                bookingContext:
+                  data.bookingContext as unknown as Prisma.InputJsonObject,
+              }
+            : {}),
+        },
+        select: chatSessionSelect,
+      });
+    });
+  }
+
+  public findActiveSessionForUser(
+    userId: string,
+  ): Promise<ChatSessionRecord | null> {
+    return prisma.chatSession.findFirst({
+      where: { userId, status: "ACTIVE" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       select: chatSessionSelect,
     });
   }

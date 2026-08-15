@@ -7,6 +7,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useTransition,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -121,6 +122,10 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
     );
   }
 
+  if (sessionQuery.data.status === "ABANDONED") {
+    return <AbandonedBookingNotice />;
+  }
+
   const initialMessages = Array.from(
     new Map(
       messagesQuery.data.pages
@@ -147,6 +152,7 @@ function BookingExperience({
   initialTimeZone,
 }: BookingExperienceProps) {
   const router = useRouter();
+  const [isStartingNew, startNewTransition] = useTransition();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
@@ -191,8 +197,7 @@ function BookingExperience({
   const [isConfirmed, setIsConfirmed] = useState(
     initialSession?.status === "CLOSED",
   );
-  const messageEndRef = useRef<HTMLDivElement | null>(null);
-  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
   const messagePollingQuery = useChatMessagePolling(sessionId ?? "", {
@@ -217,7 +222,14 @@ function BookingExperience({
     !isConfirmed;
 
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const messageScroller = messageScrollRef.current;
+
+    if (!messageScroller) return;
+
+    messageScroller.scrollTo({
+      behavior: "smooth",
+      top: messageScroller.scrollHeight,
+    });
   }, [isSending, visibleMessages]);
 
   function updateOptimisticMessage(
@@ -405,11 +417,6 @@ function BookingExperience({
     setIsStructuredFormOpen(true);
   }
 
-  function focusComposerForChanges() {
-    setComposer("I want to change ");
-    window.requestAnimationFrame(() => composerRef.current?.focus());
-  }
-
   function confirmBooking() {
     if (
       !sessionId ||
@@ -479,32 +486,16 @@ function BookingExperience({
   }
 
   function startAnotherBooking() {
-    router.replace(`/book?new=${crypto.randomUUID()}`);
-    createSessionMutation.reset();
-    createMessageMutation.reset();
-    confirmBookingMutation.reset();
-    setSessionId(null);
-    setMessages([createWelcomeMessage(firstName)]);
-    setComposer("");
-    setDraft(null);
-    setBookingContext(null);
-    setTimeZone(getBrowserTimeZone());
-    setMissingFields([]);
-    setIsReadyToConfirm(false);
-    setIsProcessingTurn(false);
-    setPendingTurn(null);
-    setRequestError(null);
-    setConfirmationError(null);
-    setIsConfirmOpen(false);
-    setIsStructuredFormOpen(false);
-    setIsConfirmed(false);
-    messageRequestLockRef.current = false;
-    confirmationRequestLockRef.current = false;
+    if (isStartingNew) return;
+
+    startNewTransition(() => {
+      router.replace(`/book?new=${crypto.randomUUID()}`);
+    });
   }
 
   return (
-    <div className="grid min-h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px]">
-      <section className="flex min-h-[600px] flex-col bg-surface">
+    <div className="grid xl:h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px] xl:overflow-hidden">
+      <section className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-surface">
         <div className="border-b border-border px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-[10px] bg-brand-soft text-brand">
@@ -517,7 +508,10 @@ function BookingExperience({
           </div>
         </div>
 
-        <div className="bw-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <div
+          className="bw-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+          ref={messageScrollRef}
+        >
           <div className="mx-auto max-w-3xl space-y-5">
             {visibleMessages.map((message) => {
               const isUserMessage = message.role === "user";
@@ -574,7 +568,12 @@ function BookingExperience({
                   >
                     Retry message
                   </Button>
-                  <Button onClick={startAnotherBooking} size="sm" variant="ghost">
+                  <Button
+                    isLoading={isStartingNew}
+                    onClick={startAnotherBooking}
+                    size="sm"
+                    variant="ghost"
+                  >
                     Start over
                   </Button>
                 </div>
@@ -601,7 +600,6 @@ function BookingExperience({
                 </div>
               </div>
             ) : null}
-            <div ref={messageEndRef} />
           </div>
         </div>
 
@@ -627,18 +625,21 @@ function BookingExperience({
                       ? "Retry or start over before sending another message"
                       : "Example: Book a 30-minute consultation next Tuesday at 10 AM"
                 }
-                ref={composerRef}
                 rows={1}
                 value={composer}
               />
               <Button
                 aria-label="Send message"
-                className="size-10 shrink-0 px-0"
+                className="size-12 shrink-0 rounded-full px-0 shadow-sm transition-transform hover:scale-105 disabled:hover:scale-100"
                 disabled={!composer.trim() || isComposerDisabled}
                 isLoading={isSending}
                 type="submit"
               >
-                {isSending ? <span className="sr-only">Sending</span> : <SendIcon className="size-4" />}
+                {isSending ? (
+                  <span className="sr-only">Sending</span>
+                ) : (
+                  <SendIcon className="size-7" strokeWidth={2.5} />
+                )}
               </Button>
             </div>
             <p className="mt-2 text-center text-[11px] text-subtle">
@@ -648,8 +649,8 @@ function BookingExperience({
         </div>
       </section>
 
-      <aside className="border-t border-border bg-canvas px-5 py-6 xl:border-l xl:border-t-0">
-        <div className="mx-auto max-w-xl xl:sticky xl:top-20">
+      <aside className="border-t border-border bg-canvas px-5 py-6 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-t-0">
+        <div className="mx-auto max-w-xl">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-ink">Booking details</h2>
@@ -689,6 +690,7 @@ function BookingExperience({
                 {isConfirmed ? (
                   <Button
                     fullWidth
+                    isLoading={isStartingNew}
                     leadingIcon={<PlusIcon className="size-4" />}
                     onClick={startAnotherBooking}
                   >
@@ -714,15 +716,6 @@ function BookingExperience({
                       {missingFields.length > 0
                         ? "Complete details in form"
                         : "Edit details in form"}
-                    </Button>
-                    <Button
-                      disabled={isSending || hasFailedTurn}
-                      fullWidth
-                      leadingIcon={<EditIcon className="size-4" />}
-                      onClick={focusComposerForChanges}
-                      variant="ghost"
-                    >
-                      Change details in chat
                     </Button>
                   </>
                 )}
@@ -904,6 +897,24 @@ function BookingResumeSkeleton() {
           <Skeleton className="mt-5 h-4 w-3/4" />
         </div>
       </aside>
+    </div>
+  );
+}
+
+function AbandonedBookingNotice() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
+        <h2 className="text-lg font-semibold text-ink">
+          Booking conversation abandoned
+        </h2>
+        <Alert className="mt-4" tone="warning">
+          This conversation is read-only and cannot be resumed.
+        </Alert>
+        <LinkButton className="mt-5" href="/book?new=true">
+          Start a new booking
+        </LinkButton>
+      </div>
     </div>
   );
 }

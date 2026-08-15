@@ -33,7 +33,7 @@ import type {
 @Tags("Chat")
 @Security("jwt")
 export class ChatController extends Controller {
-  /** Creates a chat session for the authenticated user. */
+  /** Returns the active chat or abandons it and creates a replacement when requested. */
   @Post("sessions")
   @SuccessResponse("201", "Chat session created")
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
@@ -87,7 +87,7 @@ export class ChatController extends Controller {
   @SuccessResponse("201", "Chat turn processed")
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "Chat session was not found")
-  @Response<ApiErrorResponse>(409, "Chat session is closed or the client message ID conflicts")
+  @Response<ApiErrorResponse>(409, "Chat session is not active or the client message ID conflicts")
   @Response<ApiErrorResponse>(422, "Request validation failed")
   @Response<ApiErrorResponse>(429, "Too many requests")
   @Response<ApiErrorResponse>(502, "The AI provider response was invalid")
