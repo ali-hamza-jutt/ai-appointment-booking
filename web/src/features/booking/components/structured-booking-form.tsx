@@ -88,7 +88,7 @@ export function StructuredBookingForm({
       onClose={() => !isSubmitting && onClose()}
       title="Complete booking details"
     >
-      <form className="space-y-4 p-5 sm:p-6" onSubmit={handleSubmit}>
+      <form className="space-y-3 p-4 sm:p-5" onSubmit={handleSubmit}>
         {submissionError ? (
           <Alert tone="danger">{submissionError}</Alert>
         ) : null}
@@ -106,7 +106,7 @@ export function StructuredBookingForm({
           value={values.serviceName}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <TextField
             disabled={isSubmitting}
             error={errors.scheduledDate}
@@ -159,7 +159,7 @@ export function StructuredBookingForm({
           maxLength={MAX_NOTES_LENGTH}
           onChange={(event) => updateField("notes", event.target.value)}
           placeholder="Add anything the appointment should include"
-          rows={3}
+          rows={2}
           value={values.notes ?? ""}
         />
 

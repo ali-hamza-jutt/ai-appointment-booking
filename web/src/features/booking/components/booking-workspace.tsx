@@ -197,7 +197,7 @@ function BookingExperience({
   const [isConfirmed, setIsConfirmed] = useState(
     initialSession?.status === "CLOSED",
   );
-  const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
@@ -223,7 +223,14 @@ function BookingExperience({
     !isConfirmed;
 
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const messageScroller = messageScrollRef.current;
+
+    if (!messageScroller) return;
+
+    messageScroller.scrollTo({
+      behavior: "smooth",
+      top: messageScroller.scrollHeight,
+    });
   }, [isSending, visibleMessages]);
 
   function updateOptimisticMessage(
@@ -493,8 +500,8 @@ function BookingExperience({
   }
 
   return (
-    <div className="grid min-h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px]">
-      <section className="flex min-h-[600px] flex-col bg-surface">
+    <div className="grid xl:h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px] xl:overflow-hidden">
+      <section className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-surface">
         <div className="border-b border-border px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-[10px] bg-brand-soft text-brand">
@@ -507,7 +514,10 @@ function BookingExperience({
           </div>
         </div>
 
-        <div className="bw-scrollbar flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+        <div
+          className="bw-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+          ref={messageScrollRef}
+        >
           <div className="mx-auto max-w-3xl space-y-5">
             {visibleMessages.map((message) => {
               const isUserMessage = message.role === "user";
@@ -596,7 +606,6 @@ function BookingExperience({
                 </div>
               </div>
             ) : null}
-            <div ref={messageEndRef} />
           </div>
         </div>
 
@@ -643,8 +652,8 @@ function BookingExperience({
         </div>
       </section>
 
-      <aside className="border-t border-border bg-canvas px-5 py-6 xl:border-l xl:border-t-0">
-        <div className="mx-auto max-w-xl xl:sticky xl:top-20">
+      <aside className="border-t border-border bg-canvas px-5 py-6 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-t-0">
+        <div className="mx-auto max-w-xl">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-ink">Booking details</h2>
