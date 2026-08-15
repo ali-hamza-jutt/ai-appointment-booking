@@ -35,7 +35,7 @@ VALUES (
   '11111111-1111-4111-8111-111111111111',
   'Product discovery consultation',
   'CLOSED',
-  '{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."}'::jsonb,
+  '{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","timeZone":"UTC","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."}'::jsonb,
   '2026-08-15 09:05:00+00',
   '2026-08-15 09:10:00+00'
 )
@@ -47,6 +47,7 @@ INSERT INTO "appointments" (
   "chat_session_id",
   "service_name",
   "scheduled_at",
+  "time_zone",
   "duration_minutes",
   "status",
   "source",
@@ -60,6 +61,7 @@ VALUES (
   '22222222-2222-4222-8222-222222222222',
   'Product discovery consultation',
   '2027-01-15 10:00:00+00',
+  'UTC',
   60,
   'CONFIRMED',
   'CHAT',
@@ -97,7 +99,7 @@ VALUES
     '44444444-4444-4444-8444-444444444444',
     'ASSISTANT',
     'Your appointment has been booked for the product discovery consultation.',
-    '{"intent":"BOOK_APPOINTMENT","bookingContext":{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."},"missingFields":[],"confirmationRequired":false,"appointmentId":"33333333-3333-4333-8333-333333333333"}'::jsonb,
+    '{"intent":"BOOK_APPOINTMENT","bookingContext":{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","timeZone":"UTC","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."},"missingFields":[],"confirmationRequired":false,"appointmentId":"33333333-3333-4333-8333-333333333333"}'::jsonb,
     '2026-08-15 09:10:00+00'
   )
 ON CONFLICT DO NOTHING;

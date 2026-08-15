@@ -58,6 +58,7 @@ model Appointment {
   chatSessionId   String?           @unique(map: "appointments_chat_session_id_key") @map("chat_session_id") @db.Uuid
   serviceName     String            @map("service_name") @db.VarChar(120)
   scheduledAt     DateTime          @map("scheduled_at") @db.Timestamptz(3)
+  timeZone        String            @default("UTC") @map("time_zone") @db.VarChar(100)
   durationMinutes Int               @default(30) @map("duration_minutes") @db.SmallInt
   status          AppointmentStatus @default(PENDING)
   source          AppointmentSource @default(FORM)
@@ -67,7 +68,6 @@ model Appointment {
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, scheduledAt], map: "appointments_user_id_scheduled_at_key")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")
   @@index([userId, status, createdAt, id], map: "appointments_user_id_status_created_at_id_idx")
   @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")

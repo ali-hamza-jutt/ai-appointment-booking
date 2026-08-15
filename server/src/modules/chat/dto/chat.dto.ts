@@ -18,6 +18,9 @@ export interface AppointmentBookingContext {
 
   scheduledAt?: Date;
 
+  /** IANA time zone used to interpret the scheduled date and time. @maxLength 100 */
+  timeZone?: string;
+
   /**
    * @isInt Duration must be a whole number
    * @minimum 5
@@ -40,6 +43,7 @@ export interface ChatMessageMetadata {
 export interface StoredAppointmentBookingContext {
   serviceName?: string;
   scheduledAt?: string;
+  timeZone?: string;
   durationMinutes?: number;
   notes?: string;
 }
@@ -243,6 +247,7 @@ export interface ConfirmChatBookingData {
   appointmentId: string;
   serviceName: string;
   scheduledAt: Date;
+  timeZone: string;
   durationMinutes: number;
   notes: string | null;
   assistantContent: string;
@@ -253,6 +258,7 @@ export interface CompleteChatBookingRequest {
   appointmentId: string;
   serviceName: string;
   scheduledAt: Date;
+  timeZone: string;
   durationMinutes: number;
   notes: string | null;
   assistantContent: string;

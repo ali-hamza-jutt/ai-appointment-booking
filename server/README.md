@@ -50,7 +50,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 ## Main APIs
 
 - `/api/auth`: signup, sign-in, and current-user retrieval.
-- `/api/appointments`: authenticated appointment creation and retrieval.
+- `/api/appointments`: authenticated creation, retrieval, cancellation, and conflict-safe rescheduling.
 - `/api/chat/sessions`: active-session retrieval or replacement, history, AI-assisted turns, and booking confirmation.
 - `/api/health`: process availability.
 
@@ -75,6 +75,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 - Ownership is included in appointment and chat database queries.
 - AI output is runtime-validated before it becomes booking context.
 - Message and confirmation retries are idempotent through client IDs, reply links, and database constraints.
+- Appointment creation, cancellation, and rescheduling serialize schedule writes per user; cancelled appointments release their intervals.
 - A partial unique index and transactional replacement enforce one active chat per user, including under concurrent requests.
 - Provider secrets and conversation content are excluded from AI operational logs.
 - HTTP shutdown closes the listener and PostgreSQL connection cleanly.
@@ -83,7 +84,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 
 - Rate limiting uses the process-local memory store; a distributed deployment should use a shared store and configure trusted proxies deliberately.
 - Chat updates use polling rather than WebSockets.
-- Overlapping appointment time ranges are rejected; directly adjacent appointments remain valid.
+- Overlapping appointment time ranges are rejected during creation and rescheduling; directly adjacent appointments remain valid.
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - The Mistral request is not retried automatically; safe client retries are supported through message idempotency.

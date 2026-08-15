@@ -8,6 +8,10 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   AI_REQUEST_TIMEOUT:
     "The booking assistant took too long to respond. Try again or complete the booking form.",
   APPOINTMENT_NOT_FOUND: "This appointment could not be found.",
+  APPOINTMENT_CANCELLATION_NOT_ALLOWED:
+    "Completed appointments cannot be cancelled.",
+  APPOINTMENT_RESCHEDULE_NOT_ALLOWED:
+    "Cancelled or completed appointments cannot be rescheduled.",
   APPOINTMENT_SLOT_UNAVAILABLE:
     "The selected time overlaps with another appointment.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:

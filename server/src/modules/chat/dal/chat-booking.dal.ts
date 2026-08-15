@@ -19,6 +19,7 @@ export class ChatBookingDal {
     const assistantMessageId = randomUUID();
 
     return prisma.$transaction(async (transaction) => {
+      await appointmentDal.lockAppointmentSchedule(transaction, data.userId);
       await appointmentDal.ensureAppointmentSlotAvailable(transaction, data);
 
       return transaction.chatSession.update({
@@ -36,6 +37,7 @@ export class ChatBookingDal {
               user: { connect: { id: data.userId } },
               serviceName: data.serviceName,
               scheduledAt: data.scheduledAt,
+              timeZone: data.timeZone,
               durationMinutes: data.durationMinutes,
               source: "CHAT",
               notes: data.notes,

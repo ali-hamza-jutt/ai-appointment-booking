@@ -14,6 +14,11 @@ export interface AppointmentBookingContext {
   serviceName?: string;
   scheduledAt?: string;
   /**
+     * IANA time zone used to interpret the scheduled date and time.
+     * @maxLength 100
+     */
+  timeZone?: string;
+  /**
      * @minimum 5
      * @maximum 480
      */

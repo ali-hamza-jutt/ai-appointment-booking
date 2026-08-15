@@ -9,10 +9,10 @@ import {
 import { Modal } from "@/components/ui/modal";
 import type { StructuredBookingFormValues } from "@/features/booking/types/booking-ui";
 import {
-  getCurrentLocalDate,
   toStructuredBookingFormValues,
 } from "@/features/booking/utils/booking-format";
 import type { AppointmentBookingContext } from "@/generated/api/models";
+import { getCurrentLocalDate } from "@/lib/utils/date-time";
 
 const MIN_SERVICE_NAME_LENGTH = 2;
 const MAX_SERVICE_NAME_LENGTH = 120;

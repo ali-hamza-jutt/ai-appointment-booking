@@ -456,10 +456,11 @@ function BookingExperience({
                   },
                 ],
           );
-          setDraft(toConfirmedBookingDraft(response.appointment, timeZone));
+          setDraft(toConfirmedBookingDraft(response.appointment));
           setBookingContext({
             serviceName: response.appointment.serviceName,
             scheduledAt: response.appointment.scheduledAt,
+            timeZone: response.appointment.timeZone,
             durationMinutes: response.appointment.durationMinutes,
             ...(response.appointment.notes
               ? { notes: response.appointment.notes }

@@ -14,7 +14,7 @@ Core fields that are filtered or sorted remain normal relational columns. JSONB 
 | Database object | Purpose |
 | --- | --- |
 | `users_email_key` | Enforces normalized email uniqueness and supports sign-in lookup. |
-| `appointments_user_id_scheduled_at_key` | Provides a database fallback against identical starts and supports indexed overlap checks for one user. |
+| `appointments_user_id_scheduled_at_active_key` | Prevents identical starts for non-cancelled appointments while allowing cancellation to release the previous slot. |
 | `appointments_chat_session_id_key` | Makes chat confirmation idempotent by allowing at most one appointment per chat session. |
 | `appointments_user_id_created_at_id_idx` | Supports stable newest-first appointment pagination across all statuses. |
 | `appointments_user_id_status_created_at_id_idx` | Supports stable newest-first appointment pagination within a status filter. |
@@ -31,11 +31,11 @@ Foreign keys protect ownership relationships. User deletion cascades to that use
 - Always include `user_id` in appointment and chat-session lookups so authorization and retrieval happen in one query.
 - Use explicit Prisma `select` projections and never return password hashes from API queries.
 - Use keyset/cursor pagination for session and message history rather than large offsets.
-- Serialize appointment writes per user and check duration-aware overlap inside the same transaction before insertion.
+- Serialize appointment create, cancel, and reschedule writes per user and check duration-aware overlap inside the same transaction.
 - Fetch only the recent message window required by the AI provider rather than loading full conversation history.
 - Never keep a database transaction open while waiting for an external AI response.
 - Close the chat session, create its appointment, and store the success message in one atomic nested write.
 
 ## Scheduling consistency
 
-Form creation and chat confirmation lock the appointment owner's user row, check the complete proposed time range, and write in the same transaction. This prevents concurrent application requests from creating overlapping appointments while allowing one appointment to start exactly when another ends. The rule currently applies per user because provider/resource scheduling is outside this prototype.
+Form creation, chat confirmation, cancellation, and rescheduling lock the appointment owner's user row and write in one transaction. Create and reschedule operations check the complete proposed time range while excluding cancelled appointments and, during rescheduling, the appointment being moved. This prevents concurrent application requests from producing overlaps, permits directly adjacent appointments, and makes the old interval immediately reusable after cancellation or rescheduling. The rule currently applies per user because provider/resource scheduling is outside this prototype.

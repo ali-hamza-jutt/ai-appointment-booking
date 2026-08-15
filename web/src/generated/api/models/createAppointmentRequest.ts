@@ -14,6 +14,11 @@ export interface CreateAppointmentRequest {
   serviceName: string;
   scheduledAt: string;
   /**
+     * IANA time zone in which the appointment was created.
+     * @maxLength 100
+     */
+  timeZone: string;
+  /**
      * @minimum 5
      * @maximum 480
      */

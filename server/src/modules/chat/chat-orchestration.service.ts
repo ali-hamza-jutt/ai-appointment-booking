@@ -120,6 +120,7 @@ export class ChatOrchestrationService {
     });
     const bookingContext = this.toBookingContext(
       extraction.appointmentContext,
+      timeZone,
     );
     const assistantContent = this.buildAssistantResponse(
       extraction.intent,
@@ -188,6 +189,7 @@ export class ChatOrchestrationService {
     const preparedAppointment = this.appointments.prepareAppointment({
       serviceName: details.serviceName,
       scheduledAt,
+      timeZone,
       ...(details.durationMinutes !== undefined
         ? { durationMinutes: details.durationMinutes }
         : {}),
@@ -196,6 +198,7 @@ export class ChatOrchestrationService {
     const bookingContext: AppointmentBookingContext = {
       serviceName: preparedAppointment.serviceName,
       scheduledAt: preparedAppointment.scheduledAt,
+      timeZone: preparedAppointment.timeZone,
       durationMinutes: preparedAppointment.durationMinutes,
       ...(preparedAppointment.notes
         ? { notes: preparedAppointment.notes }
@@ -260,9 +263,11 @@ export class ChatOrchestrationService {
     }
 
     const appointmentId = randomUUID();
+    const timeZone = normalizeIanaTimeZone(context.timeZone) ?? "UTC";
     const preparedAppointment = this.appointments.prepareAppointment({
       serviceName: context.serviceName,
       scheduledAt: context.scheduledAt,
+      timeZone,
       ...(context.durationMinutes !== undefined
         ? { durationMinutes: context.durationMinutes }
         : {}),
@@ -271,6 +276,7 @@ export class ChatOrchestrationService {
     const bookingContext: AppointmentBookingContext = {
       serviceName: preparedAppointment.serviceName,
       scheduledAt: preparedAppointment.scheduledAt,
+      timeZone: preparedAppointment.timeZone,
       durationMinutes: preparedAppointment.durationMinutes,
       ...(preparedAppointment.notes
         ? { notes: preparedAppointment.notes }
@@ -326,10 +332,12 @@ export class ChatOrchestrationService {
 
   private toBookingContext(
     context: AiAppointmentContext,
+    timeZone: string,
   ): AppointmentBookingContext {
     return {
       ...(context.serviceName ? { serviceName: context.serviceName } : {}),
       ...(context.scheduledAt ? { scheduledAt: context.scheduledAt } : {}),
+      timeZone,
       ...(context.durationMinutes !== undefined
         ? { durationMinutes: context.durationMinutes }
         : {}),
