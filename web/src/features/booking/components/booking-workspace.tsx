@@ -198,7 +198,6 @@ function BookingExperience({
     initialSession?.status === "CLOSED",
   );
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
-  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
   const messagePollingQuery = useChatMessagePolling(sessionId ?? "", {
@@ -418,11 +417,6 @@ function BookingExperience({
     setIsStructuredFormOpen(true);
   }
 
-  function focusComposerForChanges() {
-    setComposer("I want to change ");
-    window.requestAnimationFrame(() => composerRef.current?.focus());
-  }
-
   function confirmBooking() {
     if (
       !sessionId ||
@@ -631,18 +625,21 @@ function BookingExperience({
                       ? "Retry or start over before sending another message"
                       : "Example: Book a 30-minute consultation next Tuesday at 10 AM"
                 }
-                ref={composerRef}
                 rows={1}
                 value={composer}
               />
               <Button
                 aria-label="Send message"
-                className="size-10 shrink-0 px-0"
+                className="size-12 shrink-0 rounded-full px-0 shadow-sm transition-transform hover:scale-105 disabled:hover:scale-100"
                 disabled={!composer.trim() || isComposerDisabled}
                 isLoading={isSending}
                 type="submit"
               >
-                {isSending ? <span className="sr-only">Sending</span> : <SendIcon className="size-4" />}
+                {isSending ? (
+                  <span className="sr-only">Sending</span>
+                ) : (
+                  <SendIcon className="size-7" strokeWidth={2.5} />
+                )}
               </Button>
             </div>
             <p className="mt-2 text-center text-[11px] text-subtle">
@@ -719,15 +716,6 @@ function BookingExperience({
                       {missingFields.length > 0
                         ? "Complete details in form"
                         : "Edit details in form"}
-                    </Button>
-                    <Button
-                      disabled={isSending || hasFailedTurn}
-                      fullWidth
-                      leadingIcon={<EditIcon className="size-4" />}
-                      onClick={focusComposerForChanges}
-                      variant="ghost"
-                    >
-                      Change details in chat
                     </Button>
                   </>
                 )}
