@@ -64,7 +64,6 @@ import { cn } from "@/lib/utils/cn";
 
 const initialSuggestions = [
   "Book a consultation next Tuesday at 10 AM",
-  "Schedule a 30-minute follow-up this Friday",
   "I need a planning session next week",
 ];
 
@@ -364,6 +363,7 @@ function BookingExperience({
       setIsReadyToConfirm(
         response.assistantMessage.structuredData?.confirmationRequired === true,
       );
+      setConfirmationError(null);
       setPendingTurn(null);
       void Promise.all([
         queryClient.invalidateQueries({
@@ -443,6 +443,20 @@ function BookingExperience({
 
     setRequestError(null);
     setIsStructuredFormOpen(true);
+  }
+
+  function openConfirmation() {
+    if (!canConfirm || isConfirming) return;
+
+    setConfirmationError(null);
+    setIsConfirmOpen(true);
+  }
+
+  function closeConfirmation() {
+    if (isConfirming) return;
+
+    setConfirmationError(null);
+    setIsConfirmOpen(false);
   }
 
   function confirmBooking() {
@@ -739,7 +753,7 @@ function BookingExperience({
                       disabled={!canConfirm}
                       fullWidth
                       leadingIcon={<CheckCircleIcon className="size-4" />}
-                      onClick={() => setIsConfirmOpen(true)}
+                      onClick={openConfirmation}
                     >
                       {isReadyToConfirm ? "Confirm booking" : "More details needed"}
                     </Button>
@@ -786,7 +800,7 @@ function BookingExperience({
       <Modal
         description="Check the final details. You can still go back and edit them."
         isOpen={isConfirmOpen}
-        onClose={() => !isConfirming && setIsConfirmOpen(false)}
+        onClose={closeConfirmation}
         title="Confirm appointment"
       >
         <div className="space-y-4 p-5 sm:p-6">
@@ -799,7 +813,7 @@ function BookingExperience({
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               disabled={isConfirming}
-              onClick={() => setIsConfirmOpen(false)}
+              onClick={closeConfirmation}
               variant="secondary"
             >
               Go back
