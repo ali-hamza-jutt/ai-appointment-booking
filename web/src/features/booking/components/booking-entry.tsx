@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/feedback";
@@ -30,8 +30,14 @@ export function BookingEntry({
   const queryClient = useQueryClient();
   const createSessionMutation = useCreateSession();
   const requestedNewBookingRef = useRef<string | null>(null);
+  const [locallyCreatedSessionId, setLocallyCreatedSessionId] = useState<
+    string | null
+  >(null);
   const replacementKey = newBookingKey ?? "new-booking";
-  const shouldCheckActiveSessions = !initialSessionId && !shouldStartNew;
+  const shouldCheckActiveSessions =
+    !initialSessionId &&
+    !shouldStartNew &&
+    !locallyCreatedSessionId;
   const activeSessionsQuery = useListSessions(
     { limit: 1, status: "ACTIVE" },
     {
@@ -104,6 +110,15 @@ export function BookingEntry({
     return <BookingEntrySkeleton label="Starting a new booking" />;
   }
 
+  if (locallyCreatedSessionId) {
+    return (
+      <BookingWorkspace
+        key="no-active-session"
+        onSessionCreated={setLocallyCreatedSessionId}
+      />
+    );
+  }
+
   if (
     activeSessionsQuery.isPending ||
     !activeSessionsQuery.isFetchedAfterMount
@@ -132,7 +147,12 @@ export function BookingEntry({
   const latestActiveSession = activeSessions[0];
 
   if (!latestActiveSession) {
-    return <BookingWorkspace key="no-active-session" />;
+    return (
+      <BookingWorkspace
+        key="no-active-session"
+        onSessionCreated={setLocallyCreatedSessionId}
+      />
+    );
   }
 
   return (
