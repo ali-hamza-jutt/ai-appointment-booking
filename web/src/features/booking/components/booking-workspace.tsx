@@ -112,7 +112,7 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
       <BookingResumeError
         message={getApiErrorMessage(
           error,
-          "This booking conversation could not be resumed. It may no longer be available.",
+          "This booking conversation could not be resumed. Please try again.",
         )}
         onRetry={() =>
           void Promise.all([sessionQuery.refetch(), messagesQuery.refetch()])
@@ -335,9 +335,10 @@ function BookingExperience({
       ]);
 
       if (newlyCreatedSessionId) {
-        router.replace(
+        window.history.replaceState(
+          null,
+          "",
           `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
-          { scroll: false },
         );
       }
       return true;
@@ -346,7 +347,7 @@ function BookingExperience({
       setRequestError(
         getApiErrorMessage(
           error,
-          "The assistant could not process your message. Check your connection and try again.",
+          "We could not process your message. Please try again or use the booking form.",
         ),
       );
       return false;

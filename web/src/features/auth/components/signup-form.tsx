@@ -79,17 +79,32 @@ export function SignupForm() {
         onError: (error) => {
           setErrors({
             email:
-              getApiFieldError(error, "email") ??
+              getApiFieldError(
+                error,
+                "email",
+                "Enter a valid email address.",
+              ) ??
               (isApiError(error) && error.code === "EMAIL_ALREADY_EXISTS"
-                ? error.message
+                ? getApiErrorMessage(
+                    error,
+                    "An account with this email already exists.",
+                  )
                 : undefined),
-            fullName: getApiFieldError(error, "fullName"),
-            password: getApiFieldError(error, "password"),
+            fullName: getApiFieldError(
+              error,
+              "fullName",
+              "Enter a valid full name.",
+            ),
+            password: getApiFieldError(
+              error,
+              "password",
+              "Your password must meet all requirements.",
+            ),
           });
           setSubmitError(
             getApiErrorMessage(
               error,
-              "We could not create your account. Check your connection and try again.",
+              "We could not create your account. Please try again later.",
             ),
           );
         },

@@ -1,7 +1,7 @@
 import { clearAccessToken, getAccessToken } from "@/lib/auth/token-storage";
 import { publicEnv } from "@/lib/config/public-env";
 
-import { ApiError, type ApiErrorBody } from "./api-error";
+import { ApiError } from "./api-error";
 
 async function readResponseBody(response: Response): Promise<unknown> {
   if (response.status === 204 || !response.body) {
@@ -11,22 +11,57 @@ async function readResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type");
 
   if (contentType?.includes("application/json")) {
-    return response.json();
+    try {
+      return await response.json();
+    } catch {
+      return undefined;
+    }
   }
 
-  return response.text();
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getOptionalString(
+  value: unknown,
+  fallback: string,
+): string {
+  return typeof value === "string" && value.trim().length > 0
+    ? value
+    : fallback;
+}
+
+function getFieldErrors(
+  value: unknown,
+): Record<string, string[]> | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const entries = Object.entries(value).flatMap(([field, messages]) => {
+    if (
+      !Array.isArray(messages) ||
+      !messages.every((message) => typeof message === "string")
+    ) {
+      return [];
+    }
+
+    return [[field, messages] as const];
+  });
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function toApiError(response: Response, body: unknown): ApiError {
-  const apiBody = body as ApiErrorBody | undefined;
-  const details = apiBody?.error;
+  const details = isRecord(body) && isRecord(body.error) ? body.error : null;
 
   return new ApiError(
     response.status,
-    details?.code ?? "REQUEST_FAILED",
-    details?.message ?? "The request could not be completed",
-    details?.fieldErrors,
-    details?.requestId,
+    getOptionalString(details?.code, "REQUEST_FAILED"),
+    getOptionalString(details?.message, "The request could not be completed"),
+    getFieldErrors(details?.fieldErrors),
+    typeof details?.requestId === "string" ? details.requestId : undefined,
   );
 }
 

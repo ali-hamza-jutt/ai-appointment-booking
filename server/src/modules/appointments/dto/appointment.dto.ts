@@ -75,8 +75,8 @@ export interface CreateAppointmentData {
 }
 
 export interface AppointmentPageCursor {
+  createdAt: Date;
   id: string;
-  scheduledAt: Date;
 }
 
 export interface ListAppointmentsData {

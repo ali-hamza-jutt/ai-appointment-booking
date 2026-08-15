@@ -79,7 +79,7 @@ export function AppointmentsList() {
           <AppointmentListError
             message={getApiErrorMessage(
               appointmentsQuery.error,
-              "Appointments could not be loaded. Check your connection and try again.",
+              "Appointments could not be loaded. Please try again.",
             )}
             onRetry={() => void appointmentsQuery.refetch()}
           />
