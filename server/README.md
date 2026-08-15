@@ -87,7 +87,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 - Overlapping appointment time ranges are rejected during creation and rescheduling; directly adjacent appointments remain valid.
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.
-- The Mistral request is not retried automatically; safe client retries are supported through message idempotency.
+- Mistral extraction is limited to two provider attempts and retries only timeouts, network failures, invalid responses, HTTP 408 responses, and HTTP 5xx responses. Client retries remain safe through message idempotency.
 
 ## Sample data
 
