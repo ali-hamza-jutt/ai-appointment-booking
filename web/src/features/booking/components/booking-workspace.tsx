@@ -78,6 +78,7 @@ function createWelcomeMessage(firstName: string): ChatMessageViewModel {
 
 interface BookingWorkspaceProps {
   initialSessionId?: string;
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 interface BookingExperienceProps {
@@ -85,9 +86,13 @@ interface BookingExperienceProps {
   initialMessages?: ChatMessageResponse[];
   initialSession?: ChatSessionResponse;
   initialTimeZone: string;
+  onSessionCreated?: (sessionId: string) => void;
 }
 
-export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
+export function BookingWorkspace({
+  initialSessionId,
+  onSessionCreated,
+}: BookingWorkspaceProps) {
   const isResuming = Boolean(initialSessionId);
   const timeZone = useBrowserTimeZone();
   const sessionQuery = useGetSession(initialSessionId ?? "", {
@@ -99,7 +104,12 @@ export function BookingWorkspace({ initialSessionId }: BookingWorkspaceProps) {
   });
 
   if (!isResuming) {
-    return <BookingExperience initialTimeZone={timeZone} />;
+    return (
+      <BookingExperience
+        initialTimeZone={timeZone}
+        onSessionCreated={onSessionCreated}
+      />
+    );
   }
 
   if (sessionQuery.isPending || messagesQuery.isPending) {
@@ -150,6 +160,7 @@ function BookingExperience({
   initialMessages = [],
   initialSession,
   initialTimeZone,
+  onSessionCreated,
 }: BookingExperienceProps) {
   const router = useRouter();
   const [isStartingNew, startNewTransition] = useTransition();
@@ -283,6 +294,7 @@ function BookingExperience({
         activeSessionId = session.id;
         newlyCreatedSessionId = session.id;
         setSessionId(session.id);
+        onSessionCreated?.(session.id);
       }
 
       const browserTimeZone = getBrowserTimeZone();
@@ -348,7 +360,7 @@ function BookingExperience({
 
       if (newlyCreatedSessionId) {
         window.history.replaceState(
-          null,
+          window.history.state,
           "",
           `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
         );
