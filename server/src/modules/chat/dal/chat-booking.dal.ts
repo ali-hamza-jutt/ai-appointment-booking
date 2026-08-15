@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
-import { appointmentSelect } from "../../appointments/dal/appointment.dal.js";
+import {
+  appointmentDal,
+  appointmentSelect,
+} from "../../appointments/dal/appointment.dal.js";
 import type {
   ConfirmChatBookingData,
   ConfirmedChatBookingRecord,
@@ -15,46 +18,50 @@ export class ChatBookingDal {
   ): Promise<ConfirmedChatBookingRecord> {
     const assistantMessageId = randomUUID();
 
-    return prisma.chatSession.update({
-      where: {
-        id: data.sessionId,
-        userId: data.userId,
-        status: "ACTIVE",
-      },
-      data: {
-        status: "CLOSED",
-        updatedAt: new Date(),
-        appointment: {
-          create: {
-            id: data.appointmentId,
-            user: { connect: { id: data.userId } },
-            serviceName: data.serviceName,
-            scheduledAt: data.scheduledAt,
-            durationMinutes: data.durationMinutes,
-            source: "CHAT",
-            notes: data.notes,
+    return prisma.$transaction(async (transaction) => {
+      await appointmentDal.ensureAppointmentSlotAvailable(transaction, data);
+
+      return transaction.chatSession.update({
+        where: {
+          id: data.sessionId,
+          userId: data.userId,
+          status: "ACTIVE",
+        },
+        data: {
+          status: "CLOSED",
+          updatedAt: new Date(),
+          appointment: {
+            create: {
+              id: data.appointmentId,
+              user: { connect: { id: data.userId } },
+              serviceName: data.serviceName,
+              scheduledAt: data.scheduledAt,
+              durationMinutes: data.durationMinutes,
+              source: "CHAT",
+              notes: data.notes,
+            },
+          },
+          messages: {
+            create: {
+              id: assistantMessageId,
+              clientMessageId: null,
+              replyToMessageId: null,
+              role: "ASSISTANT",
+              content: data.assistantContent,
+              structuredData:
+                data.assistantStructuredData as unknown as Prisma.InputJsonObject,
+            },
           },
         },
-        messages: {
-          create: {
-            id: assistantMessageId,
-            clientMessageId: null,
-            replyToMessageId: null,
-            role: "ASSISTANT",
-            content: data.assistantContent,
-            structuredData:
-              data.assistantStructuredData as unknown as Prisma.InputJsonObject,
+        select: {
+          ...chatSessionSelect,
+          appointment: { select: appointmentSelect },
+          messages: {
+            where: { id: assistantMessageId },
+            select: chatMessageSelect,
           },
         },
-      },
-      select: {
-        ...chatSessionSelect,
-        appointment: { select: appointmentSelect },
-        messages: {
-          where: { id: assistantMessageId },
-          select: chatMessageSelect,
-        },
-      },
+      });
     });
   }
 

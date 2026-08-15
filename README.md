@@ -19,6 +19,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - Structured booking form fallback when chat input is incomplete, ambiguous, or AI processing fails.
 - Deterministic IANA-time-zone conversion with UTC storage.
 - Explicit review and confirmation before an appointment is created.
+- Duration-aware conflict detection that rejects overlapping appointments while allowing directly adjacent bookings.
 - Appointment and conversation lists with cursor pagination.
 - Three-second cursor-based polling for active conversation messages.
 - One active booking conversation per user, with automatic resume and explicit abandonment when a new booking starts.
@@ -94,7 +95,8 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 10. The evolving booking context and assistant response are persisted on the chat session.
 11. Active clients poll from the latest message cursor every three seconds and merge only newly received messages.
 12. The user reviews the final details and confirms the booking.
-13. One atomic database write closes the chat, creates the appointment, and stores the success message.
+13. During confirmation, the backend locks that user's appointment schedule and rejects any overlapping time range.
+14. If the slot is available, one atomic database write closes the chat, creates the appointment, and stores the success message.
 
 ## Repository structure
 
@@ -258,7 +260,7 @@ Important database decisions include:
 - UUID primary keys are generated automatically.
 - Email uniqueness supports registration and sign-in lookup.
 - Foreign keys enforce ownership relationships and cascade appropriate deletions.
-- Appointment start-time and chat-session uniqueness prevent duplicate booking writes.
+- Duration-aware checks inside serialized per-user transactions prevent overlapping appointment writes; exact-start uniqueness remains a database fallback.
 - A PostgreSQL partial unique index permits only one `ACTIVE` chat session per user.
 - Client-message and reply constraints make retries idempotent.
 - Composite indexes support owned appointment, session, and message pagination.
@@ -302,6 +304,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Polling requests begin from the latest cursor instead of downloading full message history.
 - AI history is bounded and database queries retrieve only required fields.
 - Starting a new booking abandons the current active chat and creates its replacement in one transaction.
+- Form creation and chat confirmation use the same transaction-safe appointment overlap rule.
 - Booking confirmation closes the session, creates the appointment, and stores the success message atomically.
 - Graceful shutdown closes the HTTP listener and PostgreSQL connection.
 
@@ -329,12 +332,11 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Each user has at most one active chat; abandoned chats are retained as read-only history and cannot be resumed.
 - Duration defaults to 30 minutes when it is not supplied.
 - Optional notes do not block booking confirmation.
-- Exact duplicate start times for one user are conflicts.
+- Overlapping appointment time ranges for one user are conflicts; directly adjacent appointments remain valid.
 - PostgreSQL and the Mistral API are reachable from the deployed backend.
 
 ## Known limitations
 
-- Appointment conflict detection prevents identical start times but not partially overlapping durations.
 - There is no provider availability, calendar synchronization, cancellation, rescheduling, or reminder workflow.
 - The data model does not include optional multi-tenancy through a `business_id`.
 - Polling is near-real-time rather than a WebSocket connection.
@@ -376,7 +378,8 @@ Recommended manual verification:
 8. Retry a failed message and confirm it is not duplicated.
 9. Open the same active conversation in another tab and verify polling receives new messages.
 10. Confirm the appointment, then review appointment and conversation history.
-11. Verify one user cannot access another user's resource IDs.
+11. Create a 30-minute appointment, verify an overlapping booking returns a conflict, and verify a booking starting exactly at its end time succeeds.
+12. Verify one user cannot access another user's resource IDs.
 
 ## Deployment
 
