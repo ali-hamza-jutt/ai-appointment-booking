@@ -352,7 +352,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - JWT access tokens are not refreshed, revoked, or stored in HttpOnly cookies.
 - Rate limiting uses process memory and is not shared across multiple server instances.
 - The health endpoint checks process availability but not database readiness.
-- Mistral requests are not automatically retried; safe client retries rely on message idempotency.
+- Mistral extraction is limited to two provider attempts and retries only eligible transient failures; client retries remain safe through message idempotency.
 - The prototype has no automated test suite; linting, strict type checks, production builds, and manual workflow verification are used currently.
 - Free backend hosting can introduce cold-start delays after inactivity.
 

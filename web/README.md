@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BookWise AI web application
 
-## Getting Started
+Next.js 16, React 19, TypeScript, and Tailwind CSS frontend for the BookWise AI appointment-booking prototype.
 
-First, run the development server:
+The primary project documentation, including the complete architecture, booking workflow, database design, deployment instructions, tradeoffs, assumptions, and limitations, is in the [root README](../README.md).
+
+## Architecture
+
+- App Router pages under `src/app` compose feature-level components and route loading/error states.
+- Auth context manages the current user and chooses session or local browser storage for the bearer token.
+- TanStack Query manages server state, caching, mutations, cursor pagination, and three-second chat polling.
+- Orval generates typed React Query hooks and models from the backend OpenAPI specification.
+- Feature folders contain booking, authentication, appointment, conversation, and profile UI.
+- Shared components and CSS design tokens provide consistent colors, typography, loading states, and interactions.
+
+The application uses the Inter font through `next/font` and reusable design tokens defined in `src/app/globals.css`.
+
+## Local setup
+
+1. Copy `.env.example` to `.env.local`.
+2. Set `NEXT_PUBLIC_API_BASE_URL` to the backend API base URL.
+3. Install the locked dependencies with `npm ci`.
+4. Start the frontend with `npm run dev`.
 
 ```bash
+cp .env.example .env.local
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+On Windows PowerShell, use `Copy-Item .env.example .env.local` instead of `cp`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The frontend runs at [http://localhost:3000](http://localhost:3000). For local development, the backend defaults to `http://localhost:4000/api`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variable
 
-## Learn More
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | Public backend URL including the `/api` base path. |
 
-To learn more about Next.js, take a look at the following resources:
+Never place private credentials in a `NEXT_PUBLIC_*` variable because Next.js exposes it to the browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Run the Next.js development server. |
+| `npm run build` | Create and validate the production build. |
+| `npm start` | Run the compiled production application. |
+| `npm run lint` | Run ESLint. |
+| `npx tsc --noEmit` | Check TypeScript without emitting files. |
+| `npm run api:generate` | Regenerate the OpenAPI specification and Orval API client. |
 
-## Deploy on Vercel
+## API client generation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The backend tsoa controllers and DTOs are the API contract source. After changing that contract, run:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run api:generate
+```
+
+This command regenerates `server/src/generated/swagger.json` and the hooks and models under `src/generated/api`. Generated API files should not be edited manually.
+
+## Deployment
+
+Deploy this directory as the Vercel project root and configure `NEXT_PUBLIC_API_BASE_URL` with the deployed Render API URL, including `/api`. Configure the backend `WEB_ORIGIN` with the exact Vercel origin.
