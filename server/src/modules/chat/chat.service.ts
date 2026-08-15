@@ -17,6 +17,7 @@ import {
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import { AppointmentSlotConflictError } from "../appointments/appointment-slot-conflict.error.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
@@ -440,6 +441,7 @@ export class ChatService {
       return this.toChatBookingPersistence(record);
     } catch (error) {
       if (
+        error instanceof AppointmentSlotConflictError ||
         isUniqueConstraintError(error) ||
         isRecordNotFoundError(error)
       ) {
@@ -453,7 +455,10 @@ export class ChatService {
         }
       }
 
-      if (isUniqueConstraintError(error)) {
+      if (
+        error instanceof AppointmentSlotConflictError ||
+        isUniqueConstraintError(error)
+      ) {
         throw new AppError(
           409,
           ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE,

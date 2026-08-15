@@ -13,6 +13,7 @@ import {
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import { AppointmentSlotConflictError } from "./appointment-slot-conflict.error.js";
 import { appointmentDal } from "./dal/appointment.dal.js";
 import type {
   AppointmentListResponse,
@@ -41,7 +42,10 @@ export class AppointmentService {
 
       return this.toResponse(appointment);
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
+      if (
+        error instanceof AppointmentSlotConflictError ||
+        isUniqueConstraintError(error)
+      ) {
         throw new AppError(
           409,
           ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE,

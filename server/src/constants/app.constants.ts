@@ -16,6 +16,7 @@ export const AUTH_CONSTANTS = {
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
+  MILLISECONDS_PER_MINUTE: 60_000,
   DEFAULT_DURATION_MINUTES: 30,
   MIN_DURATION_MINUTES: 5,
   MAX_DURATION_MINUTES: 480,
@@ -127,7 +128,7 @@ export const ERROR_MESSAGES = {
   AI_REQUEST_TIMEOUT: "The AI provider did not respond in time",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_SLOT_UNAVAILABLE:
-    "An appointment already exists at the selected time",
+    "The selected time overlaps with another appointment",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:

@@ -9,7 +9,7 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
     "The booking assistant took too long to respond. Try again or complete the booking form.",
   APPOINTMENT_NOT_FOUND: "This appointment could not be found.",
   APPOINTMENT_SLOT_UNAVAILABLE:
-    "An appointment already exists at the selected time.",
+    "The selected time overlaps with another appointment.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "Complete the service, date, and time before confirming the booking.",
   CHAT_MESSAGE_ALREADY_EXISTS:

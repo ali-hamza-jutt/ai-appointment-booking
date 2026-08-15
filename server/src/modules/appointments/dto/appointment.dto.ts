@@ -65,11 +65,18 @@ export interface AppointmentRecord {
   updatedAt: Date;
 }
 
-export interface CreateAppointmentData {
+export interface AppointmentScheduleData {
   userId: string;
-  serviceName: string;
   scheduledAt: Date;
   durationMinutes: number;
+}
+
+export interface AppointmentConflictQueryResult {
+  hasConflict: boolean;
+}
+
+export interface CreateAppointmentData extends AppointmentScheduleData {
+  serviceName: string;
   source: AppointmentSource;
   notes: string | null;
 }

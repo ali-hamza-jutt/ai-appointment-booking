@@ -83,7 +83,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 
 - Rate limiting uses the process-local memory store; a distributed deployment should use a shared store and configure trusted proxies deliberately.
 - Chat updates use polling rather than WebSockets.
-- Appointment conflicts prevent identical start times but do not detect partially overlapping durations.
+- Overlapping appointment time ranges are rejected; directly adjacent appointments remain valid.
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - The Mistral request is not retried automatically; safe client retries are supported through message idempotency.
