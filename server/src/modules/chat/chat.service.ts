@@ -1,5 +1,6 @@
 import {
   APPOINTMENT_CONSTANTS,
+  BUSINESS_CONSTANTS,
   CHAT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
@@ -424,6 +425,7 @@ export class ChatService {
     this.validateSessionId(sessionId);
 
     const data: ConfirmChatBookingData = {
+      businessId: BUSINESS_CONSTANTS.DEMO_BUSINESS_ID,
       userId,
       sessionId,
       appointmentId: request.appointmentId,

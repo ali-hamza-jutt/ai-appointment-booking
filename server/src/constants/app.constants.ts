@@ -15,6 +15,61 @@ export const AUTH_CONSTANTS = {
   RATE_LIMIT_MAX_REQUESTS: 10,
 } as const;
 
+export const AUTHORIZATION_SCOPES = {
+  BUSINESS_READ: "business:read",
+  BUSINESS_OPERATE: "business:operate",
+  BUSINESS_MANAGE: "business:manage",
+  BUSINESS_OWNER: "business:owner",
+  PLATFORM_ADMIN: "platform:admin",
+} as const;
+
+export const ROLE_SCOPES = {
+  OWNER: [
+    AUTHORIZATION_SCOPES.BUSINESS_READ,
+    AUTHORIZATION_SCOPES.BUSINESS_OPERATE,
+    AUTHORIZATION_SCOPES.BUSINESS_MANAGE,
+    AUTHORIZATION_SCOPES.BUSINESS_OWNER,
+  ],
+  MANAGER: [
+    AUTHORIZATION_SCOPES.BUSINESS_READ,
+    AUTHORIZATION_SCOPES.BUSINESS_OPERATE,
+    AUTHORIZATION_SCOPES.BUSINESS_MANAGE,
+  ],
+  STAFF: [
+    AUTHORIZATION_SCOPES.BUSINESS_READ,
+    AUTHORIZATION_SCOPES.BUSINESS_OPERATE,
+  ],
+} as const;
+
+export const BUSINESS_CONSTANTS = {
+  DEMO_BUSINESS_ID: "00000000-0000-4000-8000-000000000001",
+  BUSINESS_ID_PARAM: "businessId",
+  MIN_NAME_LENGTH: 2,
+  MAX_NAME_LENGTH: 120,
+  MAX_SLUG_LENGTH: 60,
+  SLUG_PATTERN: /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/,
+  SLUG_SUFFIX_LENGTH: 4,
+  MAX_SLUG_ATTEMPTS: 5,
+  DEFAULT_CURRENCY: "USD",
+  MAX_ADDRESS_LENGTH: 300,
+  INVITATION_TTL_DAYS: 14,
+  INVITABLE_ROLES: ["MANAGER", "STAFF"] as const,
+  DEFAULT_LOCATION_NAME: "Main location",
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 50,
+  MAX_CUSTOMER_SEARCH_LENGTH: 100,
+  MAX_PHONE_LENGTH: 32,
+  PHONE_PATTERN: /^\+?[0-9 ()-]{6,32}$/,
+} as const;
+
+export const TENANT_SCOPE_FIELDS = {
+  Location: ["businessId"],
+  Customer: ["businessId"],
+  BusinessInvitation: ["businessId", "email"],
+  Membership: ["businessId", "userId"],
+  Appointment: ["businessId", "userId"],
+} as const;
+
 export const APPOINTMENT_CONSTANTS = {
   MILLISECONDS_PER_MINUTE: 60_000,
   DEFAULT_DURATION_MINUTES: 30,
@@ -131,6 +186,14 @@ export const ERROR_CODES = {
   AI_NOT_CONFIGURED: "AI_NOT_CONFIGURED",
   AI_PROVIDER_UNAVAILABLE: "AI_PROVIDER_UNAVAILABLE",
   AI_REQUEST_TIMEOUT: "AI_REQUEST_TIMEOUT",
+  BUSINESS_NOT_FOUND: "BUSINESS_NOT_FOUND",
+  BUSINESS_SLUG_TAKEN: "BUSINESS_SLUG_TAKEN",
+  CUSTOMER_ALREADY_EXISTS: "CUSTOMER_ALREADY_EXISTS",
+  LOCATION_NOT_FOUND: "LOCATION_NOT_FOUND",
+  MEMBER_ALREADY_EXISTS: "MEMBER_ALREADY_EXISTS",
+  MEMBER_NOT_FOUND: "MEMBER_NOT_FOUND",
+  MEMBER_CHANGE_NOT_ALLOWED: "MEMBER_CHANGE_NOT_ALLOWED",
+  INVITATION_NOT_FOUND: "INVITATION_NOT_FOUND",
   APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
     "APPOINTMENT_CANCELLATION_NOT_ALLOWED",
@@ -166,6 +229,15 @@ export const ERROR_MESSAGES = {
     "The booking assistant is temporarily unavailable. Please try again",
   AI_REQUEST_TIMEOUT:
     "The booking assistant took too long to respond. Please try again",
+  BUSINESS_NOT_FOUND: "Business was not found",
+  BUSINESS_SLUG_TAKEN: "This booking link is already in use",
+  CUSTOMER_ALREADY_EXISTS: "A customer with this email already exists",
+  LOCATION_NOT_FOUND: "Location was not found",
+  MEMBER_ALREADY_EXISTS: "This person is already a member of the business",
+  MEMBER_NOT_FOUND: "Team member was not found",
+  MEMBER_CHANGE_NOT_ALLOWED:
+    "The business owner cannot be removed or changed",
+  INVITATION_NOT_FOUND: "Invitation was not found",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
     "Completed appointments cannot be cancelled",
@@ -214,6 +286,18 @@ export const VALIDATION_MESSAGES = {
     "Choose a valid future date and time in the appointment time zone",
   APPOINTMENT_DURATION: "Duration must be an integer between 5 and 480 minutes",
   APPOINTMENT_NOTES: "Notes cannot exceed 2000 characters",
+  BUSINESS_CURRENCY: "Currency must be a supported ISO 4217 code",
+  BUSINESS_NAME: "Business name must contain between 2 and 120 characters",
+  BUSINESS_SETTINGS: "Business settings contain an invalid value",
+  BUSINESS_SLUG:
+    "Booking link may contain lowercase letters, numbers and hyphens only",
+  BUSINESS_TIME_ZONE: "Time zone must be a valid IANA time zone",
+  CUSTOMER_EMAIL: "Customer email must be a valid email address",
+  CUSTOMER_NAME: "Customer name must contain between 2 and 120 characters",
+  CUSTOMER_PHONE: "Phone number must contain 6 to 32 digits",
+  LOCATION_ADDRESS: "Address cannot exceed 300 characters",
+  LOCATION_NAME: "Location name must contain between 2 and 120 characters",
+  RESOURCE_ID: "Identifier must be a valid UUID",
   BOOKING_CONTEXT_DURATION:
     "Booking duration must be an integer between 5 and 480 minutes",
   BOOKING_CONTEXT_TIME: "Booking time must be a valid future date and time",

@@ -1,6 +1,8 @@
 import { APPOINTMENT_CONSTANTS } from "../../../constants/app.constants.js";
-import type { Prisma } from "../../../generated/prisma/client.js";
-import { prisma } from "../../../infrastructure/database/prisma.js";
+import {
+  prisma,
+  type TransactionClient,
+} from "../../../infrastructure/database/prisma.js";
 import { AppointmentSlotConflictError } from "../appointment-slot-conflict.error.js";
 import type {
   AppointmentConflictQueryResult,
@@ -85,7 +87,7 @@ export class AppointmentDal {
   }
 
   public async lockAppointmentSchedule(
-    transaction: Prisma.TransactionClient,
+    transaction: TransactionClient,
     userId: string,
   ): Promise<void> {
     await transaction.$queryRaw`
@@ -97,7 +99,7 @@ export class AppointmentDal {
   }
 
   public async ensureAppointmentSlotAvailable(
-    transaction: Prisma.TransactionClient,
+    transaction: TransactionClient,
     data: AppointmentScheduleData,
   ): Promise<void> {
     const appointmentEndsAt = new Date(

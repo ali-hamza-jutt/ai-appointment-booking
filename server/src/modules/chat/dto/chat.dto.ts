@@ -242,6 +242,7 @@ export interface AssistantTurnPersistenceResult {
 }
 
 export interface ConfirmChatBookingData {
+  businessId: string;
   userId: string;
   sessionId: string;
   appointmentId: string;
