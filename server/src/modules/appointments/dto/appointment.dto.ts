@@ -83,6 +83,7 @@ export interface AppointmentConflictQueryResult {
 }
 
 export interface CreateAppointmentData extends AppointmentScheduleData {
+  businessId: string;
   serviceName: string;
   timeZone: string;
   source: AppointmentSource;

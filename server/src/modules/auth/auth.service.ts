@@ -13,6 +13,7 @@ import {
   verifyPassword,
 } from "../../utils/password.js";
 import { normalizeEmail, normalizeFullName } from "../../utils/text.js";
+import { memberService } from "../businesses/member.service.js";
 import { authDal } from "./dal/auth.dal.js";
 import type {
   AuthResponse,
@@ -53,6 +54,8 @@ export class AuthService {
         fullName,
         passwordHash,
       });
+
+      await memberService.acceptPendingInvitations(user.id, user.email);
 
       return this.createAuthResponse(user);
     } catch (error) {

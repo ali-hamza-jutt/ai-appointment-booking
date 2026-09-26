@@ -14,6 +14,14 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
     "Cancelled or completed appointments cannot be rescheduled.",
   APPOINTMENT_SLOT_UNAVAILABLE:
     "The selected time overlaps with another appointment.",
+  BUSINESS_NOT_FOUND: "This business could not be found.",
+  BUSINESS_SLUG_TAKEN: "This booking link is already in use. Choose another.",
+  CUSTOMER_ALREADY_EXISTS: "A customer with this email already exists.",
+  INVITATION_NOT_FOUND: "This invitation no longer exists.",
+  LOCATION_NOT_FOUND: "This location could not be found.",
+  MEMBER_ALREADY_EXISTS: "This person is already on your team.",
+  MEMBER_CHANGE_NOT_ALLOWED: "The business owner cannot be removed or changed.",
+  MEMBER_NOT_FOUND: "This team member could not be found.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "Complete the service, date, and time before confirming the booking.",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -45,6 +53,12 @@ export const API_FIELD_ERROR_MESSAGES: Readonly<
 > = {
   INVALID_FULL_NAME: {
     fullName: "Full name must contain at least 2 characters.",
+  },
+  BUSINESS_SLUG_TAKEN: {
+    slug: "This booking link is already in use. Choose another.",
+  },
+  CUSTOMER_ALREADY_EXISTS: {
+    email: "A customer with this email already exists.",
   },
   WEAK_PASSWORD: {
     password:

@@ -1,5 +1,6 @@
 import {
   APPOINTMENT_CONSTANTS,
+  BUSINESS_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
@@ -43,6 +44,7 @@ export class AppointmentService {
 
     try {
       const appointment = await appointmentDal.createAppointment({
+        businessId: BUSINESS_CONSTANTS.DEMO_BUSINESS_ID,
         userId,
         ...preparedAppointment,
         source,

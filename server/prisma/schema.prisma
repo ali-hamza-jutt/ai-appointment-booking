@@ -31,6 +31,33 @@ enum ChatSessionStatus {
   @@map("chat_session_status")
 }
 
+enum PlatformRole {
+  USER
+  ADMIN
+
+  @@map("platform_role")
+}
+
+enum MembershipRole {
+  OWNER
+  MANAGER
+  STAFF
+
+  @@map("membership_role")
+}
+
+enum BusinessVertical {
+  SALON
+  CLINIC
+  CONSULTANT
+  SPA_WELLNESS
+  FITNESS_STUDIO
+  TUTORING
+  PET_GROOMING
+
+  @@map("business_vertical")
+}
+
 enum ChatMessageRole {
   USER
   ASSISTANT
@@ -40,20 +67,108 @@ enum ChatMessageRole {
 }
 
 model User {
-  id           String        @id @default(uuid()) @db.Uuid
-  email        String        @unique @db.VarChar(254)
-  passwordHash String        @map("password_hash") @db.VarChar(255)
-  fullName     String        @map("full_name") @db.VarChar(80)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String               @id @default(uuid()) @db.Uuid
+  email        String               @unique @db.VarChar(254)
+  passwordHash String               @map("password_hash") @db.VarChar(255)
+  fullName     String               @map("full_name") @db.VarChar(80)
+  platformRole PlatformRole         @default(USER) @map("platform_role")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   appointments Appointment[]
   chatSessions ChatSession[]
+  memberships  Membership[]
+  customers    Customer[]
+  invitations  BusinessInvitation[]
 
   @@map("users")
 }
 
+model Business {
+  id           String               @id @default(uuid()) @db.Uuid
+  slug         String               @unique @db.VarChar(60)
+  name         String               @db.VarChar(120)
+  vertical     BusinessVertical
+  timeZone     String               @map("time_zone") @db.VarChar(100)
+  currency     String               @db.Char(3)
+  settings     Json                 @default("{}") @db.JsonB
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  locations    Location[]
+  memberships  Membership[]
+  customers    Customer[]
+  invitations  BusinessInvitation[]
+  appointments Appointment[]
+
+  @@map("businesses")
+}
+
+model Location {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  name       String   @db.VarChar(120)
+  address    String?  @db.VarChar(300)
+  timeZone   String   @map("time_zone") @db.VarChar(100)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt], map: "locations_business_id_created_at_idx")
+  @@map("locations")
+}
+
+model Membership {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  businessId String         @map("business_id") @db.Uuid
+  role       MembershipRole
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId], map: "memberships_user_id_business_id_key")
+  @@index([businessId, role], map: "memberships_business_id_role_idx")
+  @@map("memberships")
+}
+
+model BusinessInvitation {
+  id              String         @id @default(uuid()) @db.Uuid
+  businessId      String         @map("business_id") @db.Uuid
+  email           String         @db.VarChar(254)
+  role            MembershipRole
+  invitedByUserId String?        @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime       @map("expires_at") @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  business        Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy       User?          @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, email], map: "business_invitations_business_id_email_key")
+  @@index([email], map: "business_invitations_email_idx")
+  @@map("business_invitations")
+}
+
+model Customer {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  name       String   @db.VarChar(120)
+  email      String?  @db.VarChar(254)
+  phone      String?  @db.VarChar(32)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, userId], map: "customers_business_id_user_id_key")
+  @@unique([businessId, email], map: "customers_business_id_email_key")
+  @@index([businessId, createdAt, id], map: "customers_business_id_created_at_id_idx")
+  @@map("customers")
+}
+
 model Appointment {
   id              String            @id @default(uuid()) @db.Uuid
+  businessId      String            @map("business_id") @db.Uuid
   userId          String            @map("user_id") @db.Uuid
   chatSessionId   String?           @unique(map: "appointments_chat_session_id_key") @map("chat_session_id") @db.Uuid
   serviceName     String            @map("service_name") @db.VarChar(120)
@@ -65,9 +180,11 @@ model Appointment {
   notes           String?           @db.Text
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business        Business          @relation(fields: [businessId], references: [id], onDelete: Restrict)
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
 
+  @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")
   @@index([userId, status, createdAt, id], map: "appointments_user_id_status_created_at_id_idx")
   @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")

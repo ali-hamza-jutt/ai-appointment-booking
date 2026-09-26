@@ -1,0 +1,80 @@
+export const BUSINESS_VERTICALS = {
+  SALON: {
+    label: "Salon and barber",
+    description: "Hair, beauty and grooming appointments with stylists.",
+    providerLabel: "Stylist",
+    customerLabel: "Client",
+    supportsClasses: false,
+    suggestedServices: ["Haircut", "Hair colour", "Beard trim", "Blow dry"],
+  },
+  CLINIC: {
+    label: "Clinic",
+    description: "Medical, dental and therapy visits with practitioners.",
+    providerLabel: "Practitioner",
+    customerLabel: "Patient",
+    supportsClasses: false,
+    suggestedServices: [
+      "General consultation",
+      "Follow-up visit",
+      "Dental check-up",
+      "Physiotherapy session",
+    ],
+  },
+  CONSULTANT: {
+    label: "Consultant",
+    description: "Advisory, coaching and professional service sessions.",
+    providerLabel: "Consultant",
+    customerLabel: "Client",
+    supportsClasses: false,
+    suggestedServices: [
+      "Discovery call",
+      "Strategy session",
+      "Coaching session",
+      "Review meeting",
+    ],
+  },
+  SPA_WELLNESS: {
+    label: "Spa and wellness",
+    description: "Massages, facials and wellness treatments.",
+    providerLabel: "Therapist",
+    customerLabel: "Guest",
+    supportsClasses: false,
+    suggestedServices: ["Swedish massage", "Facial", "Manicure", "Pedicure"],
+  },
+  FITNESS_STUDIO: {
+    label: "Fitness studio",
+    description: "Group classes and personal training with instructors.",
+    providerLabel: "Instructor",
+    customerLabel: "Member",
+    supportsClasses: true,
+    suggestedServices: [
+      "Yoga class",
+      "Pilates class",
+      "HIIT class",
+      "Personal training",
+    ],
+  },
+  TUTORING: {
+    label: "Tutoring and lessons",
+    description: "One-to-one lessons and small group classes.",
+    providerLabel: "Tutor",
+    customerLabel: "Student",
+    supportsClasses: true,
+    suggestedServices: [
+      "Maths lesson",
+      "Language lesson",
+      "Music lesson",
+      "Exam preparation class",
+    ],
+  },
+  PET_GROOMING: {
+    label: "Pet grooming",
+    description: "Grooming, bathing and care appointments for pets.",
+    providerLabel: "Groomer",
+    customerLabel: "Pet owner",
+    supportsClasses: false,
+    suggestedServices: ["Full groom", "Bath and brush", "Nail trim", "Puppy groom"],
+  },
+} as const;
+
+export type BusinessVerticalKey = keyof typeof BUSINESS_VERTICALS;

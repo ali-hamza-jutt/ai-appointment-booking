@@ -48,3 +48,14 @@ export function getLocalDateTimeInputValues(
 export function getCurrentLocalDate(timeZone: string): string {
   return getLocalDateTimeInputValues(new Date(), timeZone)?.date ?? "";
 }
+
+export function formatDate(value: string | Date, timeZone?: string): string {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    ...(timeZone ? { timeZone } : {}),
+  }).format(date);
+}

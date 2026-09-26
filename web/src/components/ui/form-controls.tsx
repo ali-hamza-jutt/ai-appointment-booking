@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils/cn";
 interface FieldFrameProps {
   children: ReactNode;
   error?: string;
+  hideLabel?: boolean;
   hint?: string;
   id: string;
   label: string;
@@ -18,6 +19,7 @@ interface FieldFrameProps {
 function FieldFrame({
   children,
   error,
+  hideLabel = false,
   hint,
   id,
   label,
@@ -26,7 +28,10 @@ function FieldFrame({
 
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-ink" htmlFor={id}>
+      <label
+        className={cn("mb-1.5 block text-xs font-semibold text-ink", hideLabel && "sr-only")}
+        htmlFor={id}
+      >
         {label}
       </label>
       {children}
@@ -48,6 +53,7 @@ const controlClasses =
 
 export interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
+  hideLabel?: boolean;
   hint?: string;
   label: string;
   trailingAction?: ReactNode;
@@ -56,6 +62,7 @@ export interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 export function TextField({
   className,
   error,
+  hideLabel,
   hint,
   id,
   label,
@@ -69,7 +76,7 @@ export function TextField({
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (
-    <FieldFrame error={error} hint={hint} id={id} label={label}>
+    <FieldFrame error={error} hideLabel={hideLabel} hint={hint} id={id} label={label}>
       <div className="relative">
         <input
           aria-describedby={describedBy}
@@ -97,6 +104,7 @@ export function TextField({
 export interface SelectFieldProps
   extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
+  hideLabel?: boolean;
   hint?: string;
   label: string;
 }
@@ -105,6 +113,7 @@ export function SelectField({
   children,
   className,
   error,
+  hideLabel,
   hint,
   id,
   label,
@@ -115,7 +124,7 @@ export function SelectField({
   }
 
   return (
-    <FieldFrame error={error} hint={hint} id={id} label={label}>
+    <FieldFrame error={error} hideLabel={hideLabel} hint={hint} id={id} label={label}>
       <select
         aria-invalid={Boolean(error)}
         className={cn(
@@ -166,5 +175,47 @@ export function TextAreaField({
         {...props}
       />
     </FieldFrame>
+  );
+}
+
+export interface CheckboxFieldProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  hint?: string;
+  label: string;
+}
+
+export function CheckboxField({
+  className,
+  hint,
+  id,
+  label,
+  ...props
+}: CheckboxFieldProps) {
+  if (!id) {
+    throw new Error("CheckboxField requires an id");
+  }
+
+  const hintId = hint ? `${id}-hint` : undefined;
+
+  return (
+    <div className={cn("flex items-start gap-3", className)}>
+      <input
+        aria-describedby={hintId}
+        className="mt-0.5 size-4 shrink-0 rounded border-border-strong accent-brand disabled:cursor-not-allowed"
+        id={id}
+        type="checkbox"
+        {...props}
+      />
+      <div>
+        <label className="block text-sm font-semibold text-ink" htmlFor={id}>
+          {label}
+        </label>
+        {hint ? (
+          <p className="mt-0.5 text-xs leading-5 text-muted" id={hintId}>
+            {hint}
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

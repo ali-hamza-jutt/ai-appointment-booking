@@ -220,3 +220,135 @@ export function RefreshIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function BuildingIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="18" rx="1.5" width="14" x="5" y="3" />
+      <path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3" />
+    </svg>
+  );
+}
+
+export function UsersIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8" />
+    </svg>
+  );
+}
+
+export function SettingsIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+    </svg>
+  );
+}
+
+export function MapPinIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+export function MailIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="16" rx="2" width="20" x="2" y="4" />
+      <path d="m22 7-10 6L2 7" />
+    </svg>
+  );
+}
+
+export function ScissorsIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" />
+    </svg>
+  );
+}
+
+export function StethoscopeIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M5 3v5a5 5 0 0 0 10 0V3" />
+      <path d="M10 13v2a5 5 0 0 0 10 0v-2" />
+      <circle cx="20" cy="11" r="2" />
+    </svg>
+  );
+}
+
+export function BriefcaseIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="14" rx="2" width="20" x="2" y="7" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20" />
+    </svg>
+  );
+}
+
+export function LeafIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M11 20A7 7 0 0 1 4 13c0-6 5-10 16-10 0 11-4 17-9 17Z" />
+      <path d="M4 21c3-4 6-7 11-10" />
+    </svg>
+  );
+}
+
+export function DumbbellIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12" />
+    </svg>
+  );
+}
+
+export function BookIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5Z" />
+      <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5" />
+    </svg>
+  );
+}
+
+export function PawIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="5.5" cy="10" r="2" />
+      <circle cx="9.5" cy="5.5" r="2" />
+      <circle cx="14.5" cy="5.5" r="2" />
+      <circle cx="18.5" cy="10" r="2" />
+      <path d="M12 12c-3 0-5.5 3.5-5.5 6a2.5 2.5 0 0 0 3.5 2.3 5 5 0 0 1 4 0A2.5 2.5 0 0 0 17.5 18c0-2.5-2.5-6-5.5-6Z" />
+    </svg>
+  );
+}
+
+export function ContactIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="18" rx="2" width="16" x="4" y="3" />
+      <circle cx="12" cy="10" r="3" />
+      <path d="M8 17a4 4 0 0 1 8 0" />
+    </svg>
+  );
+}

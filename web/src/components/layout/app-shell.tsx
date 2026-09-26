@@ -2,36 +2,75 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 
 import { BookWiseLogo } from "@/components/brand/bookwise-logo";
 import { Button } from "@/components/ui/button";
 import {
+  BuildingIcon,
   CalendarIcon,
   ChatIcon,
   CloseIcon,
+  ContactIcon,
   ConversationsIcon,
   LogoutIcon,
   MenuIcon,
   PlusIcon,
+  SettingsIcon,
   UserIcon,
+  UsersIcon,
+  type IconProps,
 } from "@/components/ui/icons";
 import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
+import { BusinessSwitcher } from "@/features/business-settings/components/business-switcher";
+import { useActiveBusiness } from "@/features/business-settings/context/active-business-context";
 import { cn } from "@/lib/utils/cn";
 
 interface AppShellProps {
   children: ReactNode;
 }
 
-const navigation = [
+interface NavigationItem {
+  href: string;
+  icon: ComponentType<IconProps>;
+  label: string;
+}
+
+const navigation: NavigationItem[] = [
   { href: "/book", icon: ChatIcon, label: "Book an appointment" },
   { href: "/appointments", icon: CalendarIcon, label: "My appointments" },
   { href: "/conversations", icon: ConversationsIcon, label: "Conversations" },
   { href: "/profile", icon: UserIcon, label: "Profile" },
 ];
 
+const businessNavigation: NavigationItem[] = [
+  { href: "/business/settings", icon: SettingsIcon, label: "Business settings" },
+  { href: "/business/team", icon: UsersIcon, label: "Team" },
+  { href: "/business/customers", icon: ContactIcon, label: "Customers" },
+];
+
+const setupNavigation: NavigationItem[] = [
+  { href: "/business/setup", icon: BuildingIcon, label: "Set up your business" },
+];
+
+const pageTitles: ReadonlyArray<[string, string]> = [
+  ["/business/setup", "Set up your business"],
+  ["/business/settings", "Business settings"],
+  ["/business/team", "Team"],
+  ["/business/customers", "Customers"],
+];
+
 function getPageTitle(pathname: string) {
+  const businessTitle = pageTitles.find(([prefix]) => pathname.startsWith(prefix));
+
+  if (businessTitle) return businessTitle[1];
   if (pathname.startsWith("/appointments/")) return "Appointment details";
   if (pathname.startsWith("/appointments")) return "My appointments";
   if (pathname.startsWith("/conversations/")) return "Conversation";
@@ -44,6 +83,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
+  const { activeBusiness, isLoading: isBusinessLoading } = useActiveBusiness();
   const fullName = user?.fullName ?? "BookWise user";
   const email = user?.email ?? "";
 
@@ -74,28 +114,35 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Button>
       </div>
 
-      <nav aria-label="Primary navigation" className="flex-1 space-y-1 px-3">
-        {navigation.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href || pathname.startsWith(`${href}/`);
+      <nav
+        aria-label="Primary navigation"
+        className="bw-scrollbar flex-1 space-y-6 overflow-y-auto px-3 pb-4"
+      >
+        <NavigationList items={navigation} onNavigate={onNavigate} pathname={pathname} />
 
-          return (
-            <Link
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "flex min-h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-brand-soft text-brand"
-                  : "text-muted hover:bg-surface-subtle hover:text-ink",
-              )}
-              href={href}
-              key={href}
-              onClick={onNavigate}
-            >
-              <Icon className="size-[18px]" />
-              {label}
-            </Link>
-          );
-        })}
+        <div>
+          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">
+            Business
+          </p>
+          {activeBusiness ? (
+            <>
+              <div className="mb-2">
+                <BusinessSwitcher />
+              </div>
+              <NavigationList
+                items={businessNavigation}
+                onNavigate={onNavigate}
+                pathname={pathname}
+              />
+            </>
+          ) : isBusinessLoading ? null : (
+            <NavigationList
+              items={setupNavigation}
+              onNavigate={onNavigate}
+              pathname={pathname}
+            />
+          )}
+        </div>
       </nav>
 
       <div className="border-t border-border p-3">
@@ -117,6 +164,42 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           Sign out
         </button>
       </div>
+    </div>
+  );
+}
+
+function NavigationList({
+  items,
+  onNavigate,
+  pathname,
+}: {
+  items: NavigationItem[];
+  onNavigate?: () => void;
+  pathname: string;
+}) {
+  return (
+    <div className="space-y-1">
+      {items.map(({ href, icon: Icon, label }) => {
+        const isActive = pathname === href || pathname.startsWith(`${href}/`);
+
+        return (
+          <Link
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "flex min-h-10 items-center gap-3 rounded-[9px] px-3 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-brand-soft text-brand"
+                : "text-muted hover:bg-surface-subtle hover:text-ink",
+            )}
+            href={href}
+            key={href}
+            onClick={onNavigate}
+          >
+            <Icon className="size-[18px]" />
+            {label}
+          </Link>
+        );
+      })}
     </div>
   );
 }

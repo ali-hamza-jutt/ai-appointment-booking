@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
+import { BUSINESS_CONSTANTS } from "../../src/constants/app.constants.js";
 import { prisma } from "../../src/infrastructure/database/prisma.js";
 import { AppointmentSlotConflictError } from "../../src/modules/appointments/appointment-slot-conflict.error.js";
 import { appointmentDal } from "../../src/modules/appointments/dal/appointment.dal.js";
@@ -20,6 +21,7 @@ async function createUser(): Promise<string> {
 
 function appointmentAt(userId: string, scheduledAt: Date) {
   return {
+    businessId: BUSINESS_CONSTANTS.DEMO_BUSINESS_ID,
     userId,
     scheduledAt,
     durationMinutes: 60,

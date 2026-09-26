@@ -5,3 +5,7 @@ import type { AuthenticatedUser } from "../models/authenticated-user.js";
 export function getAuthenticatedUser(request: Request): AuthenticatedUser {
   return (request as Request & { user: AuthenticatedUser }).user;
 }
+
+export function getBusinessRole(request: Request) {
+  return getAuthenticatedUser(request).businessRole ?? null;
+}

@@ -7,6 +7,7 @@ import {
 } from "../constants/app.constants.js";
 import type { AuthenticatedUser } from "../models/authenticated-user.js";
 import { AppError } from "./app-error.js";
+import { authorizeScopes } from "./authorization.js";
 import {
   extractBearerToken,
   verifyAccessToken,
@@ -25,14 +26,6 @@ export async function expressAuthentication(
     );
   }
 
-  if (scopes.length > 0) {
-    throw new AppError(
-      403,
-      ERROR_CODES.INSUFFICIENT_SCOPE,
-      ERROR_MESSAGES.INSUFFICIENT_SCOPE,
-    );
-  }
-
   const token = extractBearerToken(request.header("authorization"));
 
   if (!token) {
@@ -43,10 +36,12 @@ export async function expressAuthentication(
     );
   }
 
+  let user: AuthenticatedUser;
+
   try {
     const claims = await verifyAccessToken(token);
 
-    return {
+    user = {
       id: claims.subject,
       email: claims.email,
     };
@@ -57,4 +52,6 @@ export async function expressAuthentication(
       ERROR_MESSAGES.INVALID_TOKEN,
     );
   }
+
+  return scopes.length > 0 ? authorizeScopes(request, user, scopes) : user;
 }

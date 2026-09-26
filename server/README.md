@@ -52,7 +52,23 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/auth`: signup, sign-in, and current-user retrieval.
 - `/api/appointments`: authenticated creation, retrieval, cancellation, and conflict-safe rescheduling.
 - `/api/chat/sessions`: active-session retrieval or replacement, history, AI-assisted turns, and booking confirmation.
+- `/api/businesses`: create a business (caller becomes owner), list your businesses, profile and booking-policy settings, and locations.
+- `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
+- `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
+- `/api/business-verticals`: supported business types (salon, clinic, consultant, spa and wellness, fitness studio, tutoring, pet grooming).
 - `/api/health`: process availability.
+
+### Tenancy and roles
+
+A `Business` is the tenant. Users join through a `Membership` with an `OWNER`, `MANAGER` or `STAFF` role; platform admins are flagged on `User.platformRole`. Business routes declare scopes with `@Security("jwt", ["business:manage"])`, and `middleware/authorization.ts` resolves the caller's role for the route's `{businessId}`:
+
+| Scope | Granted to |
+| --- | --- |
+| `business:read`, `business:operate` | Owner, manager, staff |
+| `business:manage` | Owner, manager |
+| `business:owner` | Owner |
+
+Non-members receive 404 so business IDs cannot be probed. A Prisma client extension (`infrastructure/database/tenant-scope.extension.ts`) rejects any query on a tenant-owned model that is not scoped by `businessId` (or the model's owner key, such as `userId` for a customer's own appointments). Booking policies live in the `settings` JSONB and are validated with Zod, so new policies need no migration. Appointments created before tenancy belong to the seeded `bookwise-demo` business.
 
 Authentication uses bearer JWTs. The authentication endpoints are rate-limited to 10 attempts per 15 minutes per client IP. AI-backed chat messages and confirmations are rate-limited to 20 requests per minute per client IP. Rate-limit responses use HTTP 429 and include the request ID.
 

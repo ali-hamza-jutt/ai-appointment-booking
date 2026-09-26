@@ -1,6 +1,8 @@
 {
   "entryFile": "src/app.ts",
-  "controllerPathGlobs": ["src/modules/**/*.controller.ts"],
+  "controllerPathGlobs": [
+    "src/modules/**/*.controller.ts"
+  ],
   "noImplicitAdditionalProperties": "throw-on-extras",
   "spec": {
     "outputDirectory": "src/generated",
@@ -25,6 +27,18 @@
       {
         "name": "Health",
         "description": "Server availability and status"
+      },
+      {
+        "name": "Businesses",
+        "description": "Business profile, booking policies and locations"
+      },
+      {
+        "name": "Team",
+        "description": "Business members, roles and invitations"
+      },
+      {
+        "name": "Customers",
+        "description": "Customers of a business"
       }
     ],
     "securityDefinitions": {

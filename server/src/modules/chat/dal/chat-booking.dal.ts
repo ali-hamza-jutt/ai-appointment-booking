@@ -34,6 +34,7 @@ export class ChatBookingDal {
           appointment: {
             create: {
               id: data.appointmentId,
+              business: { connect: { id: data.businessId } },
               user: { connect: { id: data.userId } },
               serviceName: data.serviceName,
               scheduledAt: data.scheduledAt,
