@@ -47,6 +47,10 @@
       {
         "name": "Public booking",
         "description": "Unauthenticated endpoints behind a business booking link"
+      },
+      {
+        "name": "Staff",
+        "description": "Staff members, the services they offer, and bookable resources"
       }
     ],
     "securityDefinitions": {

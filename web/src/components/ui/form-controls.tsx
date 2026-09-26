@@ -219,3 +219,69 @@ export function CheckboxField({
     </div>
   );
 }
+
+export interface CheckboxListOption {
+  description?: string;
+  label: string;
+  value: string;
+}
+
+export interface CheckboxListProps {
+  emptyMessage?: string;
+  hint?: string;
+  id: string;
+  label: string;
+  onChange: (values: string[]) => void;
+  options: CheckboxListOption[];
+  values: string[];
+}
+
+export function CheckboxList({
+  emptyMessage = "Nothing to choose yet.",
+  hint,
+  id,
+  label,
+  onChange,
+  options,
+  values,
+}: CheckboxListProps) {
+  const selected = new Set(values);
+
+  function toggle(value: string, checked: boolean) {
+    const next = new Set(selected);
+
+    if (checked) next.add(value);
+    else next.delete(value);
+
+    onChange(options.map((option) => option.value).filter((option) => next.has(option)));
+  }
+
+  return (
+    <fieldset aria-describedby={hint ? `${id}-hint` : undefined}>
+      <legend className="mb-1.5 block text-xs font-semibold text-ink">{label}</legend>
+      {hint ? (
+        <p className="-mt-0.5 mb-2 text-xs leading-5 text-muted" id={`${id}-hint`}>
+          {hint}
+        </p>
+      ) : null}
+      {options.length === 0 ? (
+        <p className="rounded-[10px] border border-dashed border-border-strong px-3 py-2.5 text-xs text-muted">
+          {emptyMessage}
+        </p>
+      ) : (
+        <div className="bw-scrollbar max-h-56 space-y-2 overflow-y-auto rounded-[10px] border border-border p-3">
+          {options.map((option) => (
+            <CheckboxField
+              checked={selected.has(option.value)}
+              id={`${id}-${option.value}`}
+              key={option.value}
+              label={option.label}
+              onChange={(event) => toggle(option.value, event.target.checked)}
+              {...(option.description ? { hint: option.description } : {})}
+            />
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}

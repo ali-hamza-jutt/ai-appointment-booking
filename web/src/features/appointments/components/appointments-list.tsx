@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/feedback";
+import { Tabs } from "@/components/ui/tabs";
 import {
   CalendarIcon,
   ClockIcon,
@@ -17,7 +18,6 @@ import { useAppointments } from "@/features/appointments/hooks/use-appointments"
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
 import { getApiErrorMessage } from "@/lib/api/api-error";
-import { cn } from "@/lib/utils/cn";
 
 export function AppointmentsList() {
   const [activeFilter, setActiveFilter] = useState<AppointmentFilter>("ALL");
@@ -42,33 +42,13 @@ export function AppointmentsList() {
         </LinkButton>
       </div>
 
-      <div
-        aria-label="Filter appointments by status"
-        className="mb-5 flex gap-1 overflow-x-auto border-b border-border"
-        role="tablist"
-      >
-        {APPOINTMENT_UI_CONSTANTS.FILTERS.map((filter) => (
-          <button
-            aria-controls="appointment-results"
-            aria-selected={activeFilter === filter.value}
-            className={cn(
-              "relative min-h-11 shrink-0 px-4 text-sm font-semibold transition-colors",
-              activeFilter === filter.value
-                ? "text-brand"
-                : "text-muted hover:text-ink",
-            )}
-            key={filter.value}
-            onClick={() => setActiveFilter(filter.value)}
-            role="tab"
-            type="button"
-          >
-            {filter.label}
-            {activeFilter === filter.value ? (
-              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand" />
-            ) : null}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        ariaLabel="Filter appointments by status"
+        controls="appointment-results"
+        onChange={setActiveFilter}
+        options={APPOINTMENT_UI_CONSTANTS.FILTERS}
+        value={activeFilter}
+      />
 
       <section id="appointment-results" role="tabpanel">
         {appointmentsQuery.isPending ? (
