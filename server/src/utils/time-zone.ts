@@ -17,6 +17,7 @@ const MIN_TIME_ZONE_OFFSET_MINUTES = -14 * 60;
 const MAX_TIME_ZONE_OFFSET_MINUTES = 14 * 60;
 const TIME_ZONE_OFFSET_STEP_MINUTES = 15;
 const MILLISECONDS_PER_MINUTE = 60_000;
+const MILLISECONDS_PER_DAY = 86_400_000;
 
 export function normalizeIanaTimeZone(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -186,4 +187,108 @@ function partsMatch(
     actual.hour === expected.hour &&
     actual.minute === expected.minute
   );
+}
+
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function getCachedFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = formatterCache.get(timeZone);
+
+  if (!formatter) {
+    formatter = createLocalDateTimeFormatter(timeZone);
+    formatterCache.set(timeZone, formatter);
+  }
+
+  return formatter;
+}
+
+/** Minutes the zone is ahead of UTC at `instant` (e.g. +60 for BST). */
+export function getTimeZoneOffsetMinutes(instant: Date, timeZone: string): number {
+  const parts = getLocalDateTimeParts(instant, getCachedFormatter(timeZone));
+
+  if (!parts) throw new RangeError(`Cannot resolve time zone ${timeZone}`);
+
+  const wallClockAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+  );
+  const instantToMinute =
+    Math.floor(instant.getTime() / MILLISECONDS_PER_MINUTE) * MILLISECONDS_PER_MINUTE;
+
+  return Math.round((wallClockAsUtc - instantToMinute) / MILLISECONDS_PER_MINUTE);
+}
+
+/**
+ * Converts a wall-clock time to an instant. `minuteOfDay` may exceed 1440 for
+ * overnight shifts. A time in a spring-forward gap moves forward by the gap
+ * (London 01:30 on the change day becomes 02:30 BST); an ambiguous time in an
+ * autumn fold resolves to its first occurrence.
+ */
+export function wallClockToUtc(
+  localDate: string,
+  minuteOfDay: number,
+  timeZone: string,
+): Date {
+  const [year, month, day] = localDate.split("-").map(Number) as [number, number, number];
+  const wallClockAsUtc =
+    Date.UTC(year, month - 1, day) + minuteOfDay * MILLISECONDS_PER_MINUTE;
+  // Offsets a day either side bracket at most one transition.
+  const candidates = [-1, 1]
+    .map((direction) =>
+      getTimeZoneOffsetMinutes(
+        new Date(wallClockAsUtc + direction * MILLISECONDS_PER_DAY),
+        timeZone,
+      ),
+    )
+    .map((offset) => wallClockAsUtc - offset * MILLISECONDS_PER_MINUTE);
+  const exact = candidates.filter(
+    (candidate) =>
+      candidate + getTimeZoneOffsetMinutes(new Date(candidate), timeZone) *
+        MILLISECONDS_PER_MINUTE ===
+      wallClockAsUtc,
+  );
+
+  return new Date(exact.length > 0 ? Math.min(...exact) : Math.max(...candidates));
+}
+
+/** Adds whole days to a YYYY-MM-DD calendar date. */
+export function addDaysToLocalDate(localDate: string, days: number): string {
+  const [year, month, day] = localDate.split("-").map(Number) as [number, number, number];
+
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/** ISO weekday of a calendar date: 1 = Monday … 7 = Sunday. */
+export function getIsoWeekday(localDate: string): number {
+  const [year, month, day] = localDate.split("-").map(Number) as [number, number, number];
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+  return weekday === 0 ? 7 : weekday;
+}
+
+export function isValidLocalDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (!match) return false;
+
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+
+  return date.toISOString().slice(0, 10) === value;
+}
+
+export function localTimeToMinutes(value: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+export function minutesToLocalTime(minutes: number): string {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+
+  return `${Math.floor(normalized / 60)
+    .toString()
+    .padStart(2, "0")}:${(normalized % 60).toString().padStart(2, "0")}`;
 }

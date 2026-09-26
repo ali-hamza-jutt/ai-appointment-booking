@@ -16,6 +16,7 @@ import {
   BuildingIcon,
   CalendarIcon,
   ChatIcon,
+  ClockIcon,
   CloseIcon,
   ContactIcon,
   ConversationsIcon,
@@ -54,6 +55,7 @@ const navigation: NavigationItem[] = [
 const businessNavigation: NavigationItem[] = [
   { href: "/business/services", icon: TagIcon, label: "Services" },
   { href: "/business/staff", icon: UserIcon, label: "Staff" },
+  { href: "/business/availability", icon: ClockIcon, label: "Availability" },
   { href: "/business/settings", icon: SettingsIcon, label: "Business settings" },
   { href: "/business/team", icon: UsersIcon, label: "Team" },
   { href: "/business/customers", icon: ContactIcon, label: "Customers" },
@@ -67,6 +69,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/setup", "Set up your business"],
   ["/business/services", "Services"],
   ["/business/staff", "Staff"],
+  ["/business/availability", "Availability"],
   ["/business/settings", "Business settings"],
   ["/business/team", "Team"],
   ["/business/customers", "Customers"],

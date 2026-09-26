@@ -57,6 +57,8 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
+- `/api/businesses/{businessId}/staff/{staffId}/working-hours` and `/time-off`, and `/api/businesses/{businessId}/closures`: weekly shifts (several per day for breaks, overnight shifts allowed), time off and whole-day closures.
+- `/api/public/{slug}/availability?serviceId&staffId&from&to&tz`: bookable start times grouped by local date, with the staff who can take each slot and seats left for classes.
 - `/api/public/{slug}` and `/api/public/{slug}/services`: unauthenticated booking-link profile and online-bookable services; `?search=` fuzzy-matches names with `pg_trgm` (spacing and punctuation insensitive). `/api/public/{slug}/staff?serviceId=` lists who can be booked for a service.
 - `/api/business-verticals`: supported business types (salon, clinic, consultant, spa and wellness, fitness studio, tutoring, pet grooming).
 - `/api/health`: process availability.
@@ -89,6 +91,10 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 | `npm run db:validate` | Validate Prisma configuration and schema. |
 | `npm run db:migrate` | Create/apply a development migration. |
 | `npm run db:deploy` | Apply existing migrations in a deployment environment. |
+
+## Availability engine
+
+`modules/availability/slot-generator.ts` is a pure function with no Prisma import. It expands each staff member's weekly rules into dated windows in the rule's time zone (so DST days keep their wall-clock hours; a spring-forward gap moves forward and an autumn fold resolves to the first occurrence), removes closures, time off and busy intervals, then walks each free window in policy steps from the shift start while the service duration and its buffers still fit. Minimum notice and the booking window come from business settings. "Any provider" is the union of providers, remembering who owns each slot; class services report seats left, and every resource a service requires must have spare capacity. The service layer loads inputs through `dal/availability.dal.ts` and passes them in, and `test/unit/slot-generator.test.ts` covers DST start and end, overnight shifts, touching buffers, breaks, closures, classes and resources.
 
 ## Tests
 

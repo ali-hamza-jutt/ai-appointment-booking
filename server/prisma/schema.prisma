@@ -110,6 +110,9 @@ model Business {
   services     Service[]
   staff        Staff[]
   resources    Resource[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  closures     BusinessClosure[]
 
   @@map("businesses")
 }
@@ -127,6 +130,7 @@ model Location {
   services       Service[]
   staffLocations StaffLocation[]
   resources      Resource[]
+  workingHours   WorkingHours[]
 
   @@index([businessId, createdAt], map: "locations_business_id_created_at_idx")
   @@map("locations")
@@ -180,21 +184,23 @@ model Service {
 }
 
 model Staff {
-  id          String            @id @default(uuid()) @db.Uuid
-  businessId  String            @map("business_id") @db.Uuid
-  userId      String?           @map("user_id") @db.Uuid
-  displayName String            @map("display_name") @db.VarChar(80)
-  email       String?           @db.VarChar(254)
-  bio         String?           @db.VarChar(1000)
-  avatarUrl   String?           @map("avatar_url") @db.VarChar(500)
-  isActive    Boolean           @default(true) @map("is_active")
-  sortOrder   Int               @default(0) @map("sort_order")
-  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  business    Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user        User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  services    ServiceProvider[]
-  locations   StaffLocation[]
+  id           String            @id @default(uuid()) @db.Uuid
+  businessId   String            @map("business_id") @db.Uuid
+  userId       String?           @map("user_id") @db.Uuid
+  displayName  String            @map("display_name") @db.VarChar(80)
+  email        String?           @db.VarChar(254)
+  bio          String?           @db.VarChar(1000)
+  avatarUrl    String?           @map("avatar_url") @db.VarChar(500)
+  isActive     Boolean           @default(true) @map("is_active")
+  sortOrder    Int               @default(0) @map("sort_order")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business     Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services     ServiceProvider[]
+  locations    StaffLocation[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -255,6 +261,55 @@ model ServiceResource {
   @@id([serviceId, resourceId], map: "service_resources_pkey")
   @@index([resourceId], map: "service_resources_resource_id_idx")
   @@map("service_resources")
+}
+
+/// Weekly recurring shift in the local time of its location (or the business).
+/// Several rows per weekday model split shifts and breaks; an end past 24:00
+/// is an overnight shift.
+model WorkingHours {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @map("business_id") @db.Uuid
+  staffId     String    @map("staff_id") @db.Uuid
+  locationId  String?   @map("location_id") @db.Uuid
+  /// ISO weekday, 1 = Monday … 7 = Sunday.
+  weekday     Int       @db.SmallInt
+  startMinute Int       @map("start_minute") @db.SmallInt
+  endMinute   Int       @map("end_minute") @db.SmallInt
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff       Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, staffId, weekday], map: "working_hours_business_id_staff_id_weekday_idx")
+  @@map("working_hours")
+}
+
+model TimeOff {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  staffId    String   @map("staff_id") @db.Uuid
+  startsAt   DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt     DateTime @map("ends_at") @db.Timestamptz(3)
+  reason     String?  @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, staffId, startsAt], map: "time_off_business_id_staff_id_starts_at_idx")
+  @@map("time_off")
+}
+
+/// A whole local day the business is closed, such as a public holiday.
+model BusinessClosure {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  date       DateTime @db.Date
+  reason     String?  @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, date], map: "business_closures_business_id_date_key")
+  @@map("business_closures")
 }
 
 model Membership {
