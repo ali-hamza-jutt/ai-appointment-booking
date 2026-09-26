@@ -45,6 +45,10 @@
         "description": "Service categories and bookable services"
       },
       {
+        "name": "Knowledge base",
+        "description": "FAQs, policies and instructions the booking assistant answers from"
+      },
+      {
         "name": "Public booking",
         "description": "Unauthenticated endpoints behind a business booking link"
       },

@@ -13,6 +13,7 @@ import {
 import { BookWiseLogo } from "@/components/brand/bookwise-logo";
 import { Button } from "@/components/ui/button";
 import {
+  BookIcon,
   BuildingIcon,
   CalendarIcon,
   ChatIcon,
@@ -61,6 +62,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/settings", icon: SettingsIcon, label: "Business settings" },
   { href: "/business/team", icon: UsersIcon, label: "Team" },
   { href: "/business/customers", icon: ContactIcon, label: "Customers" },
+  { href: "/business/knowledge", icon: BookIcon, label: "Knowledge base" },
   { href: "/business/handoffs", icon: ChatIcon, label: "Chat handoffs" },
 ];
 
@@ -77,6 +79,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/settings", "Business settings"],
   ["/business/team", "Team"],
   ["/business/customers", "Customers"],
+  ["/business/knowledge", "Knowledge base"],
   ["/business/handoffs", "Chat handoffs"],
 ];
 

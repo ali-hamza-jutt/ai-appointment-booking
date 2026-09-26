@@ -17,6 +17,7 @@ import { availabilityService } from "../../availability/availability.service.js"
 import { bookingService } from "../../bookings/booking.service.js";
 import type { AppointmentResponse, BookingRecord } from "../../bookings/dto/booking.dto.js";
 import { catalogService } from "../../catalog/catalog.service.js";
+import { knowledgeService } from "../../knowledge/knowledge.service.js";
 import type { PublicServiceResponse } from "../../catalog/dto/catalog.dto.js";
 import { staffService } from "../../staff/staff.service.js";
 import { chatService } from "../chat.service.js";
@@ -358,6 +359,27 @@ export class BookingAssistantService {
           action: { type: "reschedule_booking", bookingId: booking.id, slotToken: input.slotToken },
         },
       ],
+    };
+  }
+
+  /** Passages from the business's FAQs and policies; the reply must come from these. */
+  public async searchKnowledge(context: AssistantContext, query: string): Promise<Result> {
+    const { results } = await knowledgeService.search(context.business.id, query);
+
+    if (results.length === 0) {
+      return {
+        data: {
+          results: [],
+          next: `Nothing in ${context.business.name}'s information covers this. Say you don't know and offer to pass the question to the team.`,
+        },
+      };
+    }
+
+    return {
+      data: {
+        results: results.map((result) => ({ source: result.sourceTitle, kind: result.kind, text: result.content })),
+        next: "Answer only from these passages and mention the source title. If they don't answer the question, say you don't know.",
+      },
     };
   }
 

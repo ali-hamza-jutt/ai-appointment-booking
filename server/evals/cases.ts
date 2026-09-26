@@ -20,6 +20,28 @@ export const EVAL_STAFF = [
   { name: "Omar", services: ["Haircut", "Beard trim", "Kids haircut"], weekdays: [2, 3, 4, 5, 6], start: "12:00", end: "20:00" },
 ] as const;
 
+/** What the owner has written down; the agent answers questions from these alone. */
+export const EVAL_KNOWLEDGE = [
+  {
+    title: "Cancellation policy",
+    kind: "POLICY",
+    content:
+      "## Cancelling\n\nYou can cancel free of charge up to 24 hours before your appointment. Cancellations within 24 hours are charged 50% of the service price.\n\n## Missed appointments\n\nNo-shows are charged the full price of the service.",
+  },
+  {
+    title: "Before your colour appointment",
+    kind: "PREPARATION",
+    content:
+      "Hair colouring needs a patch test at least 48 hours before your appointment; pop in any time we are open. Please arrive with unwashed hair, as natural oils protect your scalp during colouring.",
+  },
+  {
+    title: "Visiting the studio",
+    kind: "FAQ",
+    content:
+      "## Parking\n\nFree parking is available behind the studio on Mill Lane.\n\n## Payment\n\nWe accept card and cash. Payment is taken after your appointment.",
+  },
+] as const;
+
 export type EvalService = (typeof EVAL_SERVICES)[number]["name"];
 
 export type EvalExpectation =
@@ -40,7 +62,11 @@ export type EvalExpectation =
   /** Declined: nothing held and no booking buttons. */
   | { outcome: "refused" }
   /** The chat is flagged for staff. */
-  | { outcome: "handoff" };
+  | { outcome: "handoff" }
+  /** Answered from the knowledge base: searched it, and the reply states every fact. */
+  | { outcome: "answered"; mentions: string[] }
+  /** Searched the knowledge base, found nothing relevant, and said so instead of guessing. */
+  | { outcome: "unknown" };
 
 export interface EvalCase {
   id: string;
@@ -151,4 +177,14 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "handoff-01", category: "handoff", turns: ["I want to speak to a real person"], expect: { outcome: "handoff" } },
   { id: "handoff-02", category: "handoff", turns: ["My last haircut was terrible and I want a refund"], expect: { outcome: "handoff" } },
   { id: "handoff-03", category: "handoff", turns: ["Do you do group bookings for a wedding party of 8?"], expect: { outcome: "handoff" } },
+
+  // Questions about the business, answered only from what the owner wrote.
+  { id: "kb-01", category: "knowledge", turns: ["How late can I cancel without paying anything?"], expect: { outcome: "answered", mentions: ["24 hours"] } },
+  { id: "kb-02", category: "knowledge", turns: ["What happens if I just don't show up?"], expect: { outcome: "answered", mentions: ["full price"] } },
+  { id: "kb-03", category: "knowledge", turns: ["Do I need a patch test before hair colouring?"], expect: { outcome: "answered", mentions: ["48 hours"] } },
+  { id: "kb-04", category: "knowledge", turns: ["Where can I park?"], expect: { outcome: "answered", mentions: ["Mill Lane"] } },
+  { id: "kb-05", category: "knowledge", turns: ["Can I pay with cash?"], expect: { outcome: "answered", mentions: ["cash"] } },
+  { id: "kb-06", category: "knowledge", turns: ["Should I wash my hair before my colour appointment?"], expect: { outcome: "answered", mentions: ["unwashed"] } },
+  { id: "kb-07", category: "knowledge", turns: ["Is the studio wheelchair accessible?"], expect: { outcome: "unknown" } },
+  { id: "kb-08", category: "knowledge", turns: ["Do you have wifi I can use while I wait?"], expect: { outcome: "unknown" } },
 ];

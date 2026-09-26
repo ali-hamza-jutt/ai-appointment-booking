@@ -1,5 +1,7 @@
 import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
+import { KNOWLEDGE_CONSTANTS } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
+import { knowledgeService } from "../knowledge/knowledge.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
 const BOOKING_EVENT_PREFIX = "booking.";
@@ -24,8 +26,24 @@ export const bookingMetricsConsumer: OutboxConsumer = {
   },
 };
 
+/** Re-embeds a knowledge source after it changes; stale hashes are skipped. */
+export const knowledgeIndexConsumer: OutboxConsumer = {
+  name: "knowledge-index",
+  handles: (type) => type === KNOWLEDGE_CONSTANTS.SOURCE_CHANGED_EVENT,
+  async handle(message) {
+    const { businessId, sourceId, contentHash } = message.payload;
+
+    if (typeof businessId !== "string" || typeof sourceId !== "string" || typeof contentHash !== "string") {
+      return;
+    }
+
+    await knowledgeService.indexSource(businessId, sourceId, contentHash);
+  },
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
   bookingMetricsConsumer,
+  knowledgeIndexConsumer,
 ];

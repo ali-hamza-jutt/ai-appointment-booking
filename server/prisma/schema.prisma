@@ -59,6 +59,24 @@ enum PhoneVerificationPurpose {
   @@map("phone_verification_purpose")
 }
 
+enum KnowledgeSourceKind {
+  FAQ
+  POLICY
+  PREPARATION
+  OTHER
+
+  @@map("knowledge_source_kind")
+}
+
+enum KnowledgeSourceStatus {
+  /// Chunks saved; embeddings not computed yet.
+  PENDING
+  READY
+  FAILED
+
+  @@map("knowledge_source_status")
+}
+
 enum PlatformRole {
   USER
   ADMIN
@@ -181,28 +199,30 @@ model PhoneVerification {
 }
 
 model Business {
-  id           String               @id @default(uuid()) @db.Uuid
-  slug         String               @unique @db.VarChar(60)
-  name         String               @db.VarChar(120)
-  vertical     BusinessVertical
-  timeZone     String               @map("time_zone") @db.VarChar(100)
-  currency     String               @db.Char(3)
-  settings     Json                 @default("{}") @db.JsonB
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  locations    Location[]
-  memberships  Membership[]
-  customers    Customer[]
-  invitations  BusinessInvitation[]
-  bookings     Booking[]
-  chatSessions ChatSession[]
-  categories   ServiceCategory[]
-  services     Service[]
-  staff        Staff[]
-  resources    Resource[]
-  workingHours WorkingHours[]
-  timeOff      TimeOff[]
-  closures     BusinessClosure[]
+  id               String               @id @default(uuid()) @db.Uuid
+  slug             String               @unique @db.VarChar(60)
+  name             String               @db.VarChar(120)
+  vertical         BusinessVertical
+  timeZone         String               @map("time_zone") @db.VarChar(100)
+  currency         String               @db.Char(3)
+  settings         Json                 @default("{}") @db.JsonB
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  locations        Location[]
+  memberships      Membership[]
+  customers        Customer[]
+  invitations      BusinessInvitation[]
+  bookings         Booking[]
+  chatSessions     ChatSession[]
+  categories       ServiceCategory[]
+  services         Service[]
+  staff            Staff[]
+  resources        Resource[]
+  workingHours     WorkingHours[]
+  timeOff          TimeOff[]
+  closures         BusinessClosure[]
+  knowledgeSources KnowledgeSource[]
+  knowledgeChunks  KnowledgeChunk[]
 
   @@map("businesses")
 }
@@ -597,4 +617,44 @@ model ChatMessage {
   @@unique([sessionId, replyToMessageId], map: "chat_messages_session_id_reply_to_message_id_key")
   @@index([sessionId, createdAt, id], map: "chat_messages_session_id_created_at_id_idx")
   @@map("chat_messages")
+}
+
+/// FAQs, policies and prep instructions an owner gives the assistant to quote.
+model KnowledgeSource {
+  id          String                @id @default(uuid()) @db.Uuid
+  businessId  String                @map("business_id") @db.Uuid
+  title       String                @db.VarChar(200)
+  kind        KnowledgeSourceKind   @default(FAQ)
+  content     String
+  /// Hash of the content the current chunks were built from.
+  contentHash String                @map("content_hash") @db.Char(64)
+  status      KnowledgeSourceStatus @default(PENDING)
+  lastError   String?               @map("last_error") @db.VarChar(500)
+  chunkCount  Int                   @default(0) @map("chunk_count")
+  embeddedAt  DateTime?             @map("embedded_at") @db.Timestamptz(3)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business    Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  chunks      KnowledgeChunk[]
+
+  @@index([businessId, updatedAt], map: "knowledge_sources_business_id_updated_at_idx")
+  @@map("knowledge_sources")
+}
+
+/// A ~500-token passage of a source, with its embedding and a full-text index.
+model KnowledgeChunk {
+  id         String                       @id @default(uuid()) @db.Uuid
+  businessId String                       @map("business_id") @db.Uuid
+  sourceId   String                       @map("source_id") @db.Uuid
+  position   Int
+  content    String
+  tokenCount Int                          @map("token_count")
+  embedding  Unsupported("vector(1024)")?
+  createdAt  DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  source     KnowledgeSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, position], map: "knowledge_chunks_source_id_position_key")
+  @@index([businessId], map: "knowledge_chunks_business_id_idx")
+  @@map("knowledge_chunks")
 }
