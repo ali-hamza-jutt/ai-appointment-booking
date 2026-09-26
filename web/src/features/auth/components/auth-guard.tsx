@@ -33,7 +33,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
             <Button leadingIcon={<RefreshIcon className="size-4" />} onClick={retryAuthentication}>
               Try again
             </Button>
-            <Button onClick={signOut} variant="secondary">Sign out</Button>
+            <Button onClick={() => void signOut()} variant="secondary">Sign out</Button>
           </div>
         </div>
       </main>

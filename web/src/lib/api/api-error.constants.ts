@@ -1,4 +1,13 @@
 export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  CROSS_SITE_REQUEST: "Please sign in again from the BookWise app.",
+  GOOGLE_NOT_CONFIGURED: "Google sign-in isn't available right now.",
+  INVALID_AUTH_LINK: "This link is invalid or has expired.",
+  INVALID_PHONE_CODE: "That code is incorrect or has expired. Check it or send a new one.",
+  INVALID_PHONE_NUMBER: "Enter the number with its country code, for example +44 7700 900123.",
+  PHONE_ALREADY_IN_USE: "This phone number is already linked to another account.",
+  PHONE_CODE_RECENTLY_SENT: "We just sent a code. Please wait a minute before asking for another.",
+  SESSION_EXPIRED: "Your session has ended. Please sign in again.",
+  SMS_NOT_CONFIGURED: "Text messages aren't available right now.",
   AI_INVALID_RESPONSE:
     "The booking assistant returned an unexpected response. Try again or complete the booking form.",
   AI_NOT_CONFIGURED:

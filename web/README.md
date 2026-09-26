@@ -7,7 +7,7 @@ The primary project documentation, including the complete architecture, booking 
 ## Architecture
 
 - App Router pages under `src/app` compose feature-level components and route loading/error states.
-- Auth context manages the current user and chooses session or local browser storage for the bearer token.
+- Auth context manages the current user. The access token is kept in memory only (`src/lib/auth/session.ts`); the API sets the refresh token as an httpOnly cookie. On load, and whenever a request returns 401, the app refreshes once through a cross-tab lock, and sign-in or sign-out in one tab is broadcast to the others.
 - TanStack Query manages server state, caching, mutations, cursor pagination, and three-second chat polling.
 - Orval generates typed React Query hooks and models from the backend OpenAPI specification.
 - Feature folders contain booking, authentication, appointment, conversation, and profile UI.

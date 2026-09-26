@@ -43,6 +43,10 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `JWT_ISSUER` | Expected token issuer. |
 | `JWT_AUDIENCE` | Expected token audience. |
 | `JWT_ACCESS_TOKEN_TTL_SECONDS` | Access-token lifetime. |
+| `API_PUBLIC_URL` | Public base URL of the API, used for the Google redirect URI. |
+| `COOKIE_DOMAIN` | Optional refresh-cookie domain for sibling subdomains. |
+| `SMTP_URL`, `MAIL_FROM` | Optional SMTP connection and sender for verification and reset emails. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional; enable "Continue with Google". |
 | `MISTRAL_API_KEY` | Mistral API key; chat processing returns 503 when omitted. |
 | `MISTRAL_MODEL` | Mistral chat-completion model. |
 | `MISTRAL_API_URL` | Mistral API base URL. |
@@ -54,7 +58,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 
 ## Main APIs
 
-- `/api/auth`: signup, sign-in, and current-user retrieval.
+- `/api/auth`: signup, sign-in, token refresh and sign-out, email verification, password reset, `/providers` (which optional methods are on), Google sign-in (`/google/start`) and phone codes (`/phone/link/*`, `/phone/sign-in*`).
 - `/api/appointments`: the signed-in customer's bookings at every business: `POST /holds` reserves an open slot for a few minutes, `POST /{id}/confirm` books it, and cancel/reschedule follow the business's policies (`canCancel` and `canReschedule` say what is still allowed).
 - `/api/businesses/{businessId}/bookings`: the business view: bookings by date, manual bookings for walk-in or phone customers, approve/decline, check-in, complete, no-show, cancel, reschedule (including to another staff member) and each booking's audit trail. `/api/businesses/{businessId}/availability` shows staff the open times without online-only limits.
 - `/api/chat/sessions`: active-session retrieval or replacement, history, AI-assisted turns, and booking confirmation.
@@ -128,6 +132,17 @@ Policies (minimum notice, booking window, cancellation window, reschedule limit,
 
 The chat assistant books with one business per session: when the customer's request is complete it fuzzy-matches the service against the catalog, checks real availability and holds the slot, or answers with the closest open times. Confirming the chat turns the hold into a booking.
 
+## Authentication
+
+Sign-in returns a 15-minute access token in the body and sets a refresh token in an `httpOnly`, `SameSite=Lax` cookie scoped to `/api/auth` (`Secure` in production; `COOKIE_DOMAIN` when the web app and API are on sibling subdomains). "Keep me signed in" makes the cookie last 30 days; otherwise it ends with the browser and the server stops honouring it after a day.
+
+- **Rotation and reuse detection.** `POST /api/auth/refresh` swaps the cookie for a new token in the same family. Only hashes are stored (`refresh_tokens`). Presenting a token that was already rotated revokes the whole family, except within 10 seconds of the rotation, which covers two tabs refreshing at once. Rotation never extends a session past its original expiry. Cookie endpoints reject requests whose `Origin` is not `WEB_ORIGIN`.
+- **Email verification and password reset.** Single-use links (`auth_tokens`, 48 hours and 1 hour). A newer link retires older ones. Resetting a password also confirms the email and signs out every session. Forgot-password answers the same whether or not the email exists.
+- **Google sign-in.** Authorization code flow with PKCE and a nonce; the state lives in a signed `httpOnly` cookie and the ID token is verified against Google's keys. A Google identity signs in to the account already linked to it, links to an existing account with the same Google-verified email, or creates one. Linking to an account whose email was never verified drops that account's password and sessions, so someone who registered another person's address can't keep access. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and register `{API_PUBLIC_URL}/api/auth/google/callback` as the redirect URI.
+- **Phone codes.** Signed-in users confirm a number with a 6-digit SMS code to link it (unique per account); linked numbers can then sign in with a code. Codes are stored as keyed hashes, expire after 10 minutes, allow 5 guesses and one resend per minute. Sign-in code requests answer the same whether or not the number is registered. No SMS provider is wired up yet, so codes are logged in development and the phone endpoints return 503 in production.
+- **Email delivery.** Set `SMTP_URL` (and `MAIL_FROM`) to send email; without it, emails are written to the log outside production.
+- **Rate limits** (per IP, in Redis when configured): sign-in, signup, phone sign-in, code checks and password reset 10 per 15 minutes; anything that sends email or SMS 5 per hour; refresh 30 per minute.
+
 ## Background jobs and outbox
 
 `src/worker.ts` is a separate process from the API. It needs PostgreSQL and Redis and runs:
@@ -166,7 +181,7 @@ Integration and contract tests migrate and truncate the database in `TEST_DATABA
 
 - Rate limits are shared through Redis when `REDIS_URL` is set and fall back to per-process memory otherwise; trusted proxies still need deliberate configuration behind a load balancer.
 - Chat updates use polling rather than WebSockets.
-- JWT access tokens are not refreshed or revoked.
+- Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - Mistral extraction is limited to two provider attempts and retries only timeouts, network failures, invalid responses, HTTP 408 responses, and HTTP 5xx responses. Client retries remain safe through message idempotency.
 

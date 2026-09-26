@@ -18,6 +18,8 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4_000),
   WEB_ORIGIN: z.url().default("http://localhost:3000"),
+  /** Public base URL of this API, used for OAuth redirect URIs. */
+  API_PUBLIC_URL: z.url().default("http://localhost:4000"),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
@@ -48,6 +50,13 @@ const environmentSchema = z.object({
     .min(AI_CONSTANTS.MIN_REQUEST_TIMEOUT_MS)
     .max(AI_CONSTANTS.MAX_REQUEST_TIMEOUT_MS)
     .default(AI_CONSTANTS.DEFAULT_REQUEST_TIMEOUT_MS),
+  /** Domain for the refresh cookie when the web app and API use sibling subdomains. */
+  COOKIE_DOMAIN: optionalNonEmptyString,
+  /** SMTP connection URL; without it, emails are written to the log outside production. */
+  SMTP_URL: optionalNonEmptyString,
+  MAIL_FROM: z.string().trim().min(3).default("BookWise <no-reply@bookwise.local>"),
+  GOOGLE_CLIENT_ID: optionalNonEmptyString,
+  GOOGLE_CLIENT_SECRET: optionalNonEmptyString,
   /** Enables the job queue, shared rate limits and the availability cache. */
   REDIS_URL: optionalNonEmptyString,
   OUTBOX_RELAY_INTERVAL_MS: z.coerce

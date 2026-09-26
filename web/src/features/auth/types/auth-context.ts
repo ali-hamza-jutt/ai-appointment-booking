@@ -2,7 +2,6 @@ import type {
   AuthResponse,
   AuthUserResponse,
 } from "@/generated/api/models";
-import type { AccessTokenPersistence } from "@/lib/auth/token-storage";
 
 export type AuthenticationStatus =
   | "loading"
@@ -11,13 +10,12 @@ export type AuthenticationStatus =
   | "error";
 
 export interface AuthContextValue {
-  completeAuthentication: (
-    response: AuthResponse,
-    persistence: AccessTokenPersistence,
-  ) => void;
+  completeAuthentication: (response: AuthResponse) => void;
   error: Error | null;
   retryAuthentication: () => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
+  /** Replaces the cached user after a profile change (email or phone verified). */
+  updateUser: (user: AuthUserResponse) => void;
   status: AuthenticationStatus;
   user: AuthUserResponse | null;
 }

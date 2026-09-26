@@ -1,4 +1,4 @@
-import { clearAccessToken, getAccessToken } from "@/lib/auth/token-storage";
+import { getAccessToken, refreshSession, setAccessToken } from "@/lib/auth/session";
 import { publicEnv } from "@/lib/config/public-env";
 
 import { ApiError } from "./api-error";
@@ -65,11 +65,7 @@ function toApiError(response: Response, body: unknown): ApiError {
   );
 }
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const token = getAccessToken();
+function send(path: string, options: RequestInit, token: string | null): Promise<Response> {
   const headers = new Headers(options.headers);
 
   headers.set("Accept", "application/json");
@@ -82,16 +78,32 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${publicEnv.apiBaseUrl}${path}`, {
+  return fetch(`${publicEnv.apiBaseUrl}${path}`, {
     ...options,
     headers,
+    credentials: "include",
   });
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = getAccessToken();
+  let response = await send(path, options, token);
+
+  // A request made with an access token got 401: the token expired, so
+  // refresh once and retry. Tokenless 401s (wrong password) are final.
+  if (response.status === 401 && token) {
+    const session = await refreshSession().catch(() => null);
+
+    if (session) response = await send(path, options, session.accessToken);
+  }
+
   const body = await readResponseBody(response);
 
   if (!response.ok) {
-    if (response.status === 401) {
-      clearAccessToken();
-    }
+    if (response.status === 401 && token) setAccessToken(null);
 
     throw toApiError(response, body);
   }

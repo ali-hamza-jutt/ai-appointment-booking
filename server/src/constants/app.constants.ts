@@ -13,6 +13,34 @@ export const AUTH_CONSTANTS = {
     "$argon2id$v=19$m=19456,p=1,t=2$ee687CeZQTTF7lmoaFvrzA$fMN19SUVpiBZK3jJWaLePMkJLF23TJ2u8g8nAJSWX/o",
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1_000,
   RATE_LIMIT_MAX_REQUESTS: 10,
+  REFRESH_COOKIE_NAME: "bw_refresh",
+  REFRESH_COOKIE_PATH: "/api/auth",
+  OAUTH_STATE_COOKIE_NAME: "bw_oauth",
+  OAUTH_STATE_COOKIE_PATH: "/api/auth/google",
+  OAUTH_STATE_TTL_SECONDS: 10 * 60,
+  /** "Keep me signed in" sessions; others end with the browser or after a day. */
+  PERSISTENT_REFRESH_TTL_DAYS: 30,
+  SESSION_REFRESH_TTL_HOURS: 24,
+  /** A rotated token presented again within this window is a concurrent refresh, not theft. */
+  REFRESH_REUSE_GRACE_SECONDS: 10,
+  TOKEN_BYTES: 32,
+  EMAIL_VERIFICATION_TTL_HOURS: 48,
+  PASSWORD_RESET_TTL_MINUTES: 60,
+  PHONE_CODE_LENGTH: 6,
+  PHONE_CODE_TTL_MINUTES: 10,
+  PHONE_CODE_MAX_ATTEMPTS: 5,
+  PHONE_CODE_RESEND_SECONDS: 60,
+  E164_PHONE_PATTERN: /^\+[1-9]\d{6,14}$/,
+  GOOGLE_AUTHORIZE_URL: "https://accounts.google.com/o/oauth2/v2/auth",
+  GOOGLE_TOKEN_URL: "https://oauth2.googleapis.com/token",
+  GOOGLE_JWKS_URL: "https://www.googleapis.com/oauth2/v3/certs",
+  GOOGLE_ISSUERS: ["https://accounts.google.com", "accounts.google.com"],
+  GOOGLE_SCOPES: "openid email profile",
+  /** Stricter per-route limits, on top of the general auth limit. */
+  SENSITIVE_RATE_LIMIT_WINDOW_MS: 60 * 60 * 1_000,
+  SENSITIVE_RATE_LIMIT_MAX_REQUESTS: 5,
+  REFRESH_RATE_LIMIT_WINDOW_MS: 60 * 1_000,
+  REFRESH_RATE_LIMIT_MAX_REQUESTS: 30,
 } as const;
 
 export const AUTHORIZATION_SCOPES = {
@@ -277,6 +305,15 @@ export const VALIDATION_PATTERNS = {
 } as const;
 
 export const ERROR_CODES = {
+  SESSION_EXPIRED: "SESSION_EXPIRED",
+  INVALID_AUTH_LINK: "INVALID_AUTH_LINK",
+  INVALID_PHONE_CODE: "INVALID_PHONE_CODE",
+  INVALID_PHONE_NUMBER: "INVALID_PHONE_NUMBER",
+  PHONE_ALREADY_IN_USE: "PHONE_ALREADY_IN_USE",
+  PHONE_CODE_RECENTLY_SENT: "PHONE_CODE_RECENTLY_SENT",
+  SMS_NOT_CONFIGURED: "SMS_NOT_CONFIGURED",
+  GOOGLE_NOT_CONFIGURED: "GOOGLE_NOT_CONFIGURED",
+  CROSS_SITE_REQUEST: "CROSS_SITE_REQUEST",
   AI_INVALID_RESPONSE: "AI_INVALID_RESPONSE",
   AI_NOT_CONFIGURED: "AI_NOT_CONFIGURED",
   AI_PROVIDER_UNAVAILABLE: "AI_PROVIDER_UNAVAILABLE",
@@ -332,6 +369,15 @@ export const ERROR_CODES = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  SESSION_EXPIRED: "Your session has ended. Please sign in again",
+  INVALID_AUTH_LINK: "This link is invalid or has expired",
+  INVALID_PHONE_CODE: "The code is incorrect or has expired",
+  INVALID_PHONE_NUMBER: "Enter the number in international format, for example +447700900123",
+  PHONE_ALREADY_IN_USE: "This phone number is linked to another account",
+  PHONE_CODE_RECENTLY_SENT: "A code was sent recently. Please wait a minute before asking again",
+  SMS_NOT_CONFIGURED: "Text message delivery is not available yet",
+  GOOGLE_NOT_CONFIGURED: "Google sign-in is not available",
+  CROSS_SITE_REQUEST: "This request must come from the BookWise app",
   AI_INVALID_RESPONSE:
     "The booking assistant couldn’t understand the response. Please retry your message",
   AI_NOT_CONFIGURED: "The AI integration is not configured",

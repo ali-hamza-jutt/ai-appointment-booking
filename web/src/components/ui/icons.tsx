@@ -369,3 +369,39 @@ export function FolderIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="20" rx="2.5" width="12" x="6" y="2" />
+      <path d="M11 18h2" />
+    </svg>
+  );
+}
+
+export function ShieldIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+export function KeyIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m10.8 12.2 9.2-9.2M16 7l3 3M14 9l2 2" />
+    </svg>
+  );
+}
+
+/** Single-colour Google "G" mark, drawn in the current text colour. */
+export function GoogleIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="currentColor" viewBox="0 0 24 24" {...props}>
+      <path d="M21.35 11.1H12v2.98h5.35c-.23 1.4-1.64 4.1-5.35 4.1-3.22 0-5.85-2.67-5.85-5.96S8.78 6.26 12 6.26c1.83 0 3.06.78 3.76 1.45l2.57-2.47C16.68 3.7 14.54 2.75 12 2.75 6.9 2.75 2.75 6.9 2.75 12S6.9 21.25 12 21.25c5.34 0 8.88-3.75 8.88-9.04 0-.61-.07-1.07-.15-1.53Z" />
+    </svg>
+  );
+}

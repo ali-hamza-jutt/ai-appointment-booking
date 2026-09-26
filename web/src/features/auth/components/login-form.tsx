@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/form-controls";
 import { useAuth } from "@/features/auth/auth-context";
+import { AlternativeSignIn } from "@/features/auth/components/alternative-sign-in";
+import { AUTH_LINK_CLASS, AuthCard } from "@/features/auth/components/auth-card";
 import { PasswordToggle } from "@/features/auth/components/password-toggle";
 import type { LoginFormErrors } from "@/features/auth/types/auth-context";
 import { isValidEmail } from "@/features/auth/utils/auth-validation";
@@ -24,7 +26,12 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [errors, setErrors] = useState<LoginFormErrors>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [submitError, setSubmitError] = useState<string | null>(() =>
+    searchParams.get("error") === "google"
+      ? "Google sign-in didn't complete. Please try again or use your password."
+      : null,
+  );
   const isSubmitting = signInMutation.isPending || isNavigating;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -48,6 +55,7 @@ export function LoginForm() {
         data: {
           email: email.trim(),
           password,
+          rememberMe,
         },
       },
       {
@@ -72,7 +80,7 @@ export function LoginForm() {
           );
         },
         onSuccess: (response) => {
-          completeAuthentication(response, rememberMe ? "local" : "session");
+          completeAuthentication(response);
           startTransition(() => router.replace("/book"));
         },
       },
@@ -80,11 +88,18 @@ export function LoginForm() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-6 shadow-card sm:p-8">
-      <h1 className="text-[22px] font-bold tracking-tight text-ink">Welcome back</h1>
-      <p className="mb-6 mt-1 text-sm text-muted">
-        Sign in to manage and book your appointments.
-      </p>
+    <AuthCard
+      description="Sign in to manage and book your appointments."
+      footer={(
+        <>
+          Don&apos;t have an account?{" "}
+          <Link className={AUTH_LINK_CLASS} href="/signup">
+            Create one
+          </Link>
+        </>
+      )}
+      title="Welcome back"
+    >
 
       <form className="space-y-4" noValidate onSubmit={handleSubmit}>
         {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
@@ -139,9 +154,14 @@ export function LoginForm() {
               onChange={(event) => setRememberMe(event.target.checked)}
               type="checkbox"
             />
-            Remember me
+            Keep me signed in
           </label>
-          <span className="text-xs text-subtle">Forgot password support coming soon</span>
+          <Link
+            className="text-xs font-semibold text-brand hover:text-brand-hover"
+            href="/forgot-password"
+          >
+            Forgot password?
+          </Link>
         </div>
 
         <Button fullWidth isLoading={isSubmitting} size="lg" type="submit">
@@ -149,12 +169,8 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-muted">
-        Don&apos;t have an account?{" "}
-        <Link className="font-semibold text-brand hover:text-brand-hover" href="/signup">
-          Create one
-        </Link>
-      </p>
-    </section>
+      <AlternativeSignIn />
+
+    </AuthCard>
   );
 }
