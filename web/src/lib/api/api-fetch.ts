@@ -3,7 +3,7 @@ import { publicEnv } from "@/lib/config/public-env";
 
 import { ApiError } from "./api-error";
 
-async function readResponseBody(response: Response): Promise<unknown> {
+export async function readResponseBody(response: Response): Promise<unknown> {
   if (response.status === 204 || !response.body) {
     return undefined;
   }
@@ -53,7 +53,7 @@ function getFieldErrors(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function toApiError(response: Response, body: unknown): ApiError {
+export function toApiError(response: Response, body: unknown): ApiError {
   const details = isRecord(body) && isRecord(body.error) ? body.error : null;
 
   return new ApiError(
@@ -65,10 +65,15 @@ function toApiError(response: Response, body: unknown): ApiError {
   );
 }
 
-function send(path: string, options: RequestInit, token: string | null): Promise<Response> {
+function send(
+  path: string,
+  options: RequestInit,
+  token: string | null,
+  accept: string,
+): Promise<Response> {
   const headers = new Headers(options.headers);
 
-  headers.set("Accept", "application/json");
+  headers.set("Accept", accept);
 
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -85,25 +90,38 @@ function send(path: string, options: RequestInit, token: string | null): Promise
   });
 }
 
+/**
+ * Sends a request with the in-memory access token. A request made with a
+ * token that gets 401 means the token expired, so refresh once and retry;
+ * tokenless 401s (wrong password) are final.
+ */
+export async function sendAuthenticated(
+  path: string,
+  options: RequestInit = {},
+  accept = "application/json",
+): Promise<Response> {
+  const token = getAccessToken();
+  let response = await send(path, options, token, accept);
+
+  if (response.status === 401 && token) {
+    const session = await refreshSession().catch(() => null);
+
+    if (session) response = await send(path, options, session.accessToken, accept);
+    else setAccessToken(null);
+  }
+
+  return response;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getAccessToken();
-  let response = await send(path, options, token);
-
-  // A request made with an access token got 401: the token expired, so
-  // refresh once and retry. Tokenless 401s (wrong password) are final.
-  if (response.status === 401 && token) {
-    const session = await refreshSession().catch(() => null);
-
-    if (session) response = await send(path, options, session.accessToken);
-  }
-
+  const response = await sendAuthenticated(path, options);
   const body = await readResponseBody(response);
 
   if (!response.ok) {
-    if (response.status === 401 && token) setAccessToken(null);
+    if (response.status === 401) setAccessToken(null);
 
     throw toApiError(response, body);
   }

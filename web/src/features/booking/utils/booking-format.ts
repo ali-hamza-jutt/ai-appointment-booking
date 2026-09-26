@@ -5,6 +5,7 @@ import type {
 import type {
   AppointmentResponse,
   ChatBookingDraft,
+  ChatMessagePart,
 } from "@/generated/api/models";
 import { getLocalDateTimeInputValues } from "@/lib/utils/date-time";
 import { formatMoney } from "@/lib/utils/money";
@@ -127,4 +128,17 @@ function formatDraft(input: {
     timezone: input.timeZone,
     title: input.serviceName || "Service not provided",
   };
+}
+
+/**
+ * Adds a card that arrived mid-stream, mirroring how the server trims the
+ * final reply: the latest card of each kind wins, and once something is
+ * ready to confirm only its summary and button remain.
+ */
+export function mergeLivePart(parts: ChatMessagePart[], part: ChatMessagePart): ChatMessagePart[] {
+  const merged = [...parts.filter((existing) => existing.type !== part.type), part];
+
+  return merged.some((existing) => existing.type === "confirm")
+    ? merged.filter((existing) => existing.type === "booking_summary" || existing.type === "confirm")
+    : merged;
 }

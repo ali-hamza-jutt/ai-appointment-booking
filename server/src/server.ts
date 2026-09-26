@@ -9,6 +9,7 @@ import {
 } from "./infrastructure/database/prisma.js";
 import { flushErrorReporting, reportError } from "./infrastructure/observability/error-reporting.js";
 import { stopTelemetry } from "./infrastructure/observability/telemetry.js";
+import { closeAllEventStreams } from "./infrastructure/realtime/event-stream.js";
 import { closeRedis } from "./infrastructure/redis/redis.js";
 
 let httpServer: Server | undefined;
@@ -83,7 +84,11 @@ async function shutdown(reason: ShutdownReason, exitCode = 0): Promise<void> {
   forceShutdownTimer.unref();
 
   try {
-    await closeHttpServer();
+    const closing = closeHttpServer();
+
+    // Open event streams would hold the server open until the timeout.
+    closeAllEventStreams();
+    await closing;
     await closeRedis();
     await disconnectDatabase();
     await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);

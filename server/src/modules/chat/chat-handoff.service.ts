@@ -1,6 +1,7 @@
 import { ERROR_CODES, ERROR_MESSAGES } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { assertUuid } from "../../utils/identifiers.js";
+import { publishChatEvent } from "./chat-events.js";
 import { chatHandoffDal } from "./dal/chat-handoff.dal.js";
 import type { ChatHandoffListResponse } from "./dto/chat-handoff.dto.js";
 
@@ -29,6 +30,8 @@ export class ChatHandoffService {
     if (!(await chatHandoffDal.resolve(businessId, sessionId, new Date()))) {
       throw new AppError(404, ERROR_CODES.CHAT_SESSION_NOT_FOUND, ERROR_MESSAGES.CHAT_SESSION_NOT_FOUND);
     }
+
+    publishChatEvent({ type: "handoff", sessionId, businessId, state: "resolved" });
   }
 }
 

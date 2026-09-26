@@ -4,6 +4,7 @@ import { withSpan } from "../../../infrastructure/observability/tracing.js";
 import type {
   AiProvider,
   AiProviderName,
+  AiTokenListener,
   AiToolCompletionRequest,
   AiToolCompletionResponse,
 } from "../dto/ai.dto.js";
@@ -24,6 +25,24 @@ export class InstrumentedAiProvider implements AiProvider {
   }
 
   public completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
+    return this.instrument(request, false, () => this.provider.completeWithTools(request));
+  }
+
+  public get stream():
+    | ((request: AiToolCompletionRequest, onToken: AiTokenListener) => Promise<AiToolCompletionResponse>)
+    | undefined {
+    const inner = this.provider.stream?.bind(this.provider);
+
+    if (!inner) return undefined;
+
+    return (request, onToken) => this.instrument(request, true, () => inner(request, onToken));
+  }
+
+  private instrument(
+    request: AiToolCompletionRequest,
+    streamed: boolean,
+    call: () => Promise<AiToolCompletionResponse>,
+  ): Promise<AiToolCompletionResponse> {
     const startedAt = performance.now();
     const seconds = () => (performance.now() - startedAt) / 1_000;
 
@@ -34,11 +53,12 @@ export class InstrumentedAiProvider implements AiProvider {
         "gen_ai.system": this.provider.name,
         "gen_ai.request.model": this.provider.model,
         "gen_ai.request.max_tokens": request.maxOutputTokens,
+        "gen_ai.request.stream": streamed,
         ...(request.businessId ? { [OBSERVABILITY_CONSTANTS.BUSINESS_ID_ATTRIBUTE]: request.businessId } : {}),
       },
       async (span) => {
         try {
-          const response = await this.provider.completeWithTools(request);
+          const response = await call();
 
           span.setAttributes({
             "gen_ai.response.model": response.model,

@@ -277,6 +277,28 @@ export const AGENT_CONSTANTS = {
   },
 } as const;
 
+export const REALTIME_CONSTANTS = {
+  EVENT_STREAM_TYPE: "text/event-stream",
+  /** A comment line keeps proxies from closing idle streams. */
+  HEARTBEAT_INTERVAL_MS: 15_000,
+  /** Tells EventSource-style clients how long to wait before reconnecting. */
+  RECONNECT_DELAY_MS: 3_000,
+  SESSION_CHANNEL_PREFIX: "chat-session",
+  BUSINESS_CHANNEL_PREFIX: "chat-business",
+  /** Shown while the agent works; tool-specific ones come from describeToolCall. */
+  STATUS: {
+    THINKING: "Thinking…",
+    SEARCH_SERVICES: "Looking up services…",
+    LIST_STAFF: "Checking who's available…",
+    CHECK_DAY: "Checking",
+    PROPOSE_BOOKING: "Holding that time for you…",
+    LIST_BOOKINGS: "Looking up your bookings…",
+    PREPARE_CHANGE: "Preparing that change…",
+    SEARCH_KNOWLEDGE: "Checking our information…",
+    HANDOFF: "Passing this to the team…",
+  },
+} as const;
+
 export const KNOWLEDGE_CONSTANTS = {
   EMBEDDING_DIMENSIONS: 1024,
   DEFAULT_EMBED_MODEL: "mistral-embed",

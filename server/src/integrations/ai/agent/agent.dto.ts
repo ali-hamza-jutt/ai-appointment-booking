@@ -26,12 +26,23 @@ export interface AgentToolCallLog {
   error?: string;
 }
 
+/** Progress callbacks for streaming a turn to the client as it happens. */
+export interface AgentRunListener<Part> {
+  /** Reply text as the model writes it. Text from a round that ends in tool calls is superseded. */
+  token?(text: string): void;
+  /** A tool is about to run, with its validated arguments. */
+  toolCall?(name: string, args: unknown): void;
+  /** A tool produced cards or buttons. */
+  parts?(parts: Part[]): void;
+}
+
 export interface AgentRunRequest<Context, Part> {
   systemPrompt: string;
   history: AiAgentMessage[];
   tools: AgentTool<Context, Part, never>[];
   context: Context;
   businessId?: string;
+  listener?: AgentRunListener<Part>;
 }
 
 export interface AgentRunResult<Part> {

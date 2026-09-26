@@ -52,11 +52,22 @@ export interface AiToolCompletionResponse {
   finishReason?: string | null;
 }
 
+/** Receives reply text as the model writes it. */
+export type AiTokenListener = (text: string) => void;
+
 export interface AiProvider {
   readonly name: AiProviderName;
   readonly model: string;
 
   completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse>;
+
+  /**
+   * Same as completeWithTools, but passes reply text to onToken as it
+   * arrives. Providers without streaming leave this out.
+   */
+  readonly stream?:
+    | ((request: AiToolCompletionRequest, onToken: AiTokenListener) => Promise<AiToolCompletionResponse>)
+    | undefined;
 }
 
 export interface MistralProviderConfig {
@@ -104,6 +115,47 @@ export const mistralChatCompletionResponseSchema = z.object({
       completion_tokens: z.number().int().nonnegative(),
       total_tokens: z.number().int().nonnegative(),
     })
+    .optional(),
+});
+
+/** One server-sent chunk of a streamed Mistral completion. */
+export const mistralStreamChunkSchema = z.object({
+  model: z.string().optional(),
+  choices: z
+    .array(
+      z.object({
+        index: z.number().int().optional(),
+        delta: z
+          .object({
+            content: mistralContentSchema,
+            tool_calls: z
+              .array(
+                z.object({
+                  index: z.number().int().optional(),
+                  id: z.string().optional(),
+                  function: z
+                    .object({
+                      name: z.string().optional(),
+                      arguments: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+                    })
+                    .optional(),
+                }),
+              )
+              .nullable()
+              .optional(),
+          })
+          .optional(),
+        finish_reason: z.string().nullable().optional(),
+      }),
+    )
+    .default([]),
+  usage: z
+    .object({
+      prompt_tokens: z.number().int().nonnegative(),
+      completion_tokens: z.number().int().nonnegative(),
+      total_tokens: z.number().int().nonnegative(),
+    })
+    .nullable()
     .optional(),
 });
 

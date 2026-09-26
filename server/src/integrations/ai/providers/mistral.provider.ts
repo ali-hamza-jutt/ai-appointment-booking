@@ -1,21 +1,34 @@
 import { randomBytes } from "node:crypto";
 
 import { AI_CONSTANTS } from "../../../constants/app.constants.js";
+import { readServerSentEvents } from "../../../utils/sse.js";
 import type {
   AiAgentMessage,
   AiProvider,
   AiProviderName,
+  AiTokenListener,
+  AiTokenUsage,
   AiToolCompletionRequest,
   AiToolCompletionResponse,
   MistralAssistantContent,
   MistralProviderConfig,
 } from "../dto/ai.dto.js";
-import { mistralChatCompletionResponseSchema } from "../dto/ai.dto.js";
+import { mistralChatCompletionResponseSchema, mistralStreamChunkSchema } from "../dto/ai.dto.js";
 import { AiProviderError } from "../errors/ai-provider.error.js";
 
 /** Mistral expects 9-character alphanumeric tool call ids. */
-function toolCallId(): string {
+function normalizeToolCallId(id: string | undefined): string {
+  if (id && /^[a-zA-Z0-9]{9}$/.test(id)) return id;
+
   return randomBytes(12).toString("base64url").replace(/[^a-zA-Z0-9]/g, "").slice(0, 9).padEnd(9, "0");
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 export class MistralProvider implements AiProvider {
@@ -34,21 +47,15 @@ export class MistralProvider implements AiProvider {
   }
 
   public async completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
-    const body = await this.post({
-      model: this.model,
-      messages: [{ role: "system", content: request.systemPrompt }, ...request.messages.map(toMistralMessage)],
-      ...(request.tools.length > 0
-        ? {
-            tools: request.tools.map((tool) => ({
-              type: "function",
-              function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-            })),
-            tool_choice: request.toolChoice,
-          }
-        : {}),
-      temperature: request.temperature,
-      max_tokens: request.maxOutputTokens,
-    });
+    const response = await this.send(this.toPayload(request, false));
+    let body: unknown;
+
+    try {
+      body = await response.json();
+    } catch {
+      throw new AiProviderError("INVALID_RESPONSE", "Mistral returned invalid JSON");
+    }
+
     const parsed = mistralChatCompletionResponseSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -62,7 +69,7 @@ export class MistralProvider implements AiProvider {
     }
 
     const toolCalls = (choice.message.tool_calls ?? []).map((call) => ({
-      id: call.id && /^[a-zA-Z0-9]{9}$/.test(call.id) ? call.id : toolCallId(),
+      id: normalizeToolCallId(call.id),
       name: call.function.name,
       arguments:
         typeof call.function.arguments === "string"
@@ -95,7 +102,108 @@ export class MistralProvider implements AiProvider {
     };
   }
 
-  private async post(payload: Record<string, unknown>): Promise<unknown> {
+  /** Streams the completion; tool calls arrive in pieces and are assembled by index. */
+  public async stream(request: AiToolCompletionRequest, onToken: AiTokenListener): Promise<AiToolCompletionResponse> {
+    const response = await this.send(this.toPayload(request, true));
+
+    if (!response.body) throw new AiProviderError("INVALID_RESPONSE", "Mistral stream had no body");
+
+    let content = "";
+    let model = this.model;
+    let usage: AiTokenUsage | undefined;
+    let finishReason: string | null | undefined;
+    const calls = new Map<number, { id?: string; name: string; arguments: string }>();
+
+    try {
+      for await (const event of readServerSentEvents(response.body)) {
+        if (event.data === "[DONE]") break;
+
+        const parsed = mistralStreamChunkSchema.safeParse(safeJson(event.data));
+
+        if (!parsed.success) throw new AiProviderError("INVALID_RESPONSE", "Mistral stream chunk was malformed");
+
+        model = parsed.data.model ?? model;
+        if (parsed.data.usage) {
+          usage = {
+            promptTokens: parsed.data.usage.prompt_tokens,
+            completionTokens: parsed.data.usage.completion_tokens,
+            totalTokens: parsed.data.usage.total_tokens,
+          };
+        }
+
+        for (const choice of parsed.data.choices) {
+          const text = this.toText(choice.delta?.content);
+
+          if (text) {
+            content += text;
+            onToken(text);
+          }
+
+          for (const [position, call] of (choice.delta?.tool_calls ?? []).entries()) {
+            const index = call.index ?? position;
+            const current = calls.get(index) ?? { name: "", arguments: "" };
+            const argumentsPart = call.function?.arguments;
+
+            calls.set(index, {
+              ...(call.id ?? current.id ? { id: call.id ?? current.id } : {}),
+              name: current.name + (call.function?.name ?? ""),
+              arguments:
+                current.arguments +
+                (typeof argumentsPart === "string" ? argumentsPart : argumentsPart ? JSON.stringify(argumentsPart) : ""),
+            });
+          }
+
+          if (choice.finish_reason !== undefined) finishReason = choice.finish_reason;
+        }
+      }
+    } catch (error) {
+      if (error instanceof AiProviderError) throw error;
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+        throw new AiProviderError("TIMEOUT", "Mistral stream timed out");
+      }
+
+      throw new AiProviderError("NETWORK_ERROR", "Mistral stream was interrupted");
+    }
+
+    const toolCalls = [...calls.entries()]
+      .sort(([a], [b]) => a - b)
+      .filter(([, call]) => call.name)
+      .map(([, call]) => ({ id: normalizeToolCallId(call.id), name: call.name, arguments: call.arguments }));
+
+    if (!content.trim() && toolCalls.length === 0) {
+      throw new AiProviderError("INVALID_RESPONSE", "Mistral response content was empty");
+    }
+
+    return {
+      content: content.trim(),
+      toolCalls,
+      provider: this.name,
+      model,
+      ...(usage ? { usage } : {}),
+      ...(finishReason !== undefined ? { finishReason } : {}),
+    };
+  }
+
+  private toPayload(request: AiToolCompletionRequest, stream: boolean): Record<string, unknown> {
+    return {
+      model: this.model,
+      messages: [{ role: "system", content: request.systemPrompt }, ...request.messages.map(toMistralMessage)],
+      ...(request.tools.length > 0
+        ? {
+            tools: request.tools.map((tool) => ({
+              type: "function",
+              function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+            })),
+            tool_choice: request.toolChoice,
+          }
+        : {}),
+      temperature: request.temperature,
+      max_tokens: request.maxOutputTokens,
+      ...(stream ? { stream: true } : {}),
+    };
+  }
+
+  private async send(payload: Record<string, unknown>): Promise<Response> {
     let response: Response;
 
     try {
@@ -117,11 +225,7 @@ export class MistralProvider implements AiProvider {
       throw new AiProviderError("HTTP_ERROR", "Mistral returned a non-success status", response.status);
     }
 
-    try {
-      return await response.json();
-    } catch {
-      throw new AiProviderError("INVALID_RESPONSE", "Mistral returned invalid JSON");
-    }
+    return response;
   }
 
   private toText(content: MistralAssistantContent): string {

@@ -10,6 +10,7 @@ import { ChatIcon, CheckCircleIcon, MailIcon, PhoneIcon } from "@/components/ui/
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/section-card";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
+import { useBusinessChatEvents } from "@/features/chat-handoffs/hooks/use-business-chat-events";
 import {
   getListHandoffsQueryKey,
   useListHandoffs,
@@ -21,18 +22,30 @@ import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 import { formatDateTime } from "@/lib/utils/date-time";
 
+const HANDOFF_POLL_INTERVAL_MS = 30_000;
+
 export function HandoffsView() {
   return <BusinessRequired>{(business) => <HandoffsContent business={business} />}</BusinessRequired>;
 }
 
 function HandoffsContent({ business }: { business: BusinessSummaryResponse }) {
   const timeZone = useBrowserTimeZone();
-  const handoffsQuery = useListHandoffs(business.id);
+  const isLive = useBusinessChatEvents(business.id);
+  const handoffsQuery = useListHandoffs(business.id, {
+    // Poll only while the live channel is down.
+    query: { refetchInterval: isLive ? false : HANDOFF_POLL_INTERVAL_MS },
+  });
   const handoffs = handoffsQuery.data?.items ?? [];
 
   return (
     <PageContainer>
       <PageHeader
+        actions={
+          <Badge className="gap-1.5" tone={isLive ? "success" : "neutral"}>
+            <span className={cn("size-1.5 rounded-full bg-current", isLive && "animate-bw-pulse")} />
+            {isLive ? "Live" : "Reconnecting"}
+          </Badge>
+        }
         description="Chats where the assistant asked for a person. Get in touch with the customer, then mark it resolved."
         title="Chat handoffs"
       />

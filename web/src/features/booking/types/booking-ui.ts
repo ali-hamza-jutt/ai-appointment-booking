@@ -41,3 +41,11 @@ export interface StructuredBookingFormValues {
   serviceId: string;
   staffId?: string;
 }
+
+/** An assistant reply while it streams in, before it is saved. */
+export interface LiveReplyViewModel {
+  /** What the assistant is doing right now, such as "Checking Thursday…". */
+  status: string | null;
+  text: string;
+  parts: ChatMessagePart[];
+}

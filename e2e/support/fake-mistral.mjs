@@ -6,6 +6,8 @@
 import { createServer } from "node:http";
 
 const PORT = Number(process.env.FAKE_MISTRAL_PORT ?? 4010);
+/** Pause between streamed chunks, to watch replies arrive when running locally. */
+const CHUNK_DELAY_MS = Number(process.env.FAKE_MISTRAL_CHUNK_DELAY_MS ?? 0);
 const SERVICES = ["haircut", "beard trim"];
 let callSequence = 0;
 
@@ -80,21 +82,42 @@ createServer((request, response) => {
   let body = "";
 
   request.on("data", (chunk) => (body += chunk));
-  request.on("end", () => {
+  request.on("end", async () => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
       response.writeHead(404).end();
       return;
     }
 
-    const step = nextStep(JSON.parse(body).messages);
+    const payload = JSON.parse(body);
+    const step = nextStep(payload.messages);
+    const finishReason = step.tool_calls ? "tool_calls" : "stop";
+    const usage = { prompt_tokens: 120, completion_tokens: 40, total_tokens: 160 };
+
+    if (payload.stream) {
+      // Server-sent chunks, as Mistral streams them: text a few words at a time.
+      const words = (step.content ?? "").match(/\S+\s*/g) ?? [];
+      const chunks = [
+        ...words.map((word) => ({ choices: [{ index: 0, delta: { content: word } }] })),
+        ...(step.tool_calls ? [{ choices: [{ index: 0, delta: { tool_calls: step.tool_calls.map((call, index) => ({ index, ...call })) } }] }] : []),
+        { model: "mistral-small-e2e", choices: [{ index: 0, delta: {}, finish_reason: finishReason }], usage },
+      ];
+
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      for (const chunk of chunks) {
+        response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        if (CHUNK_DELAY_MS) await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+      }
+      response.end("data: [DONE]\n\n");
+      return;
+    }
 
     response.writeHead(200, { "content-type": "application/json" });
     response.end(
       JSON.stringify({
         id: "e2e",
         model: "mistral-small-e2e",
-        choices: [{ index: 0, message: { role: "assistant", content: step.content ?? "", ...(step.tool_calls ? { tool_calls: step.tool_calls } : {}) }, finish_reason: step.tool_calls ? "tool_calls" : "stop" }],
-        usage: { prompt_tokens: 120, completion_tokens: 40, total_tokens: 160 },
+        choices: [{ index: 0, message: { role: "assistant", content: step.content ?? "", ...(step.tool_calls ? { tool_calls: step.tool_calls } : {}) }, finish_reason: finishReason }],
+        usage,
       }),
     );
   });

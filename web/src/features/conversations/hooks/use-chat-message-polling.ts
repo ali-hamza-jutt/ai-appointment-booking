@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
+import { useChatSessionEvents } from "@/features/conversations/hooks/use-chat-session-events";
 import type {
   ChatMessagePollingOptions,
   ChatMessagePollingState,
@@ -10,15 +12,24 @@ import type {
 import { listMessages } from "@/generated/api/chat/chat";
 import type { ChatMessageResponse } from "@/generated/api/models";
 
+/**
+ * New messages for a chat. Refetches when the live event stream reports a
+ * change, and falls back to polling whenever the stream isn't connected.
+ */
 export function useChatMessagePolling(
   sessionId: string,
   { enabled = true, initialCursor }: ChatMessagePollingOptions = {},
 ) {
   const queryClient = useQueryClient();
   const queryKey = ["chat-message-polling", sessionId] as const;
+  const isEnabled = enabled && Boolean(sessionId);
+  const refetchOnChange = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["chat-message-polling", sessionId] });
+  }, [queryClient, sessionId]);
+  const isLive = useChatSessionEvents(sessionId, isEnabled, refetchOnChange);
 
   return useQuery({
-    enabled: enabled && Boolean(sessionId),
+    enabled: isEnabled,
     queryFn: async ({ signal }): Promise<ChatMessagePollingState> => {
       const previous =
         queryClient.getQueryData<ChatMessagePollingState>(queryKey);
@@ -39,7 +50,7 @@ export function useChatMessagePolling(
       };
     },
     queryKey,
-    refetchInterval: CONVERSATION_UI_CONSTANTS.MESSAGE_POLL_INTERVAL_MS,
+    refetchInterval: isLive ? false : CONVERSATION_UI_CONSTANTS.MESSAGE_POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 0,

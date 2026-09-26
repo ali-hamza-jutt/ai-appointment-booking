@@ -20,6 +20,7 @@ import { throwRequestValidationError } from "../../utils/validation.js";
 import { businessService } from "../businesses/business.service.js";
 import { parseStoredParts } from "./chat-parts.schema.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
+import { publishChatEvent } from "./chat-events.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
   AssistantTurnPersistenceResult,
@@ -293,7 +294,11 @@ export class ChatService {
     this.validateSessionId(sessionId);
 
     try {
-      return this.toSessionResponse(await chatDal.requestHandoff(userId, sessionId, reason));
+      const session = this.toSessionResponse(await chatDal.requestHandoff(userId, sessionId, reason));
+
+      publishChatEvent({ type: "handoff", sessionId, businessId: session.business.id, state: "requested" });
+
+      return session;
     } catch (error) {
       if (isRecordNotFoundError(error)) this.throwSessionNotFound();
 

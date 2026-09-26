@@ -31,6 +31,7 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { ChatMessageParts } from "@/features/booking/components/chat-message-parts";
+import { LiveReply } from "@/features/booking/components/live-reply";
 import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
 import { BOOKING_UI_CONSTANTS } from "@/features/bookings/constants/booking-status.constants";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
@@ -40,15 +41,18 @@ import type {
   BookingDraftViewModel,
   ChatMessageDeliveryStatus,
   ChatMessageViewModel,
+  LiveReplyViewModel,
   PendingChatTurn,
   StructuredBookingFormValues,
 } from "@/features/booking/types/booking-ui";
 import {
   getBrowserTimeZone,
   getMissingDraftFields,
+  mergeLivePart,
   toBookingDraft,
   toConfirmedBookingDraft,
 } from "@/features/booking/utils/booking-format";
+import { streamChatTurn } from "@/features/booking/utils/chat-stream";
 import { getListAppointmentsQueryKey } from "@/generated/api/appointments/appointments";
 import {
   getListMessagesQueryKey,
@@ -63,13 +67,15 @@ import type {
   ChatBookingDraft,
   ChatMessageResponse,
   ChatSessionResponse,
+  ChatTurnResponse,
+  ProcessChatMessageRequest,
 } from "@/generated/api/models";
 import {
   useGetPublicBusiness,
   useListPublicServices,
 } from "@/generated/api/public-booking/public-booking";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
-import { getApiErrorMessage } from "@/lib/api/api-error";
+import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
 const MAX_SERVICE_SUGGESTIONS = 3;
@@ -232,6 +238,7 @@ function BookingExperience({
     initialSession?.status === "ACTIVE" && Boolean(initialSession.draft.hold),
   );
   const [isProcessingTurn, setIsProcessingTurn] = useState(false);
+  const [liveReply, setLiveReply] = useState<LiveReplyViewModel | null>(null);
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
@@ -313,6 +320,42 @@ function BookingExperience({
     });
   }
 
+  /**
+   * Streams the reply when the API supports it. If the stream can't open or
+   * drops, the JSON endpoint returns the same turn: the message id makes the
+   * request idempotent, so nothing is processed twice.
+   */
+  async function sendTurn(
+    activeSessionId: string,
+    data: ProcessChatMessageRequest,
+  ): Promise<ChatTurnResponse> {
+    setLiveReply({ status: null, text: "", parts: [] });
+
+    try {
+      return await streamChatTurn(activeSessionId, data, {
+        onStatus: (status) => setLiveReply((current) => ({ status, text: "", parts: current?.parts ?? [] })),
+        onToken: (text) =>
+          setLiveReply((current) => ({
+            status: current?.status ?? null,
+            text: `${current?.text ?? ""}${text}`,
+            parts: current?.parts ?? [],
+          })),
+        onPart: (part) =>
+          setLiveReply((current) => ({
+            status: current?.status ?? null,
+            text: current?.text ?? "",
+            parts: mergeLivePart(current?.parts ?? [], part),
+          })),
+      });
+    } catch (error) {
+      if (isApiError(error)) throw error;
+
+      return createMessageMutation.mutateAsync({ data, sessionId: activeSessionId });
+    } finally {
+      setLiveReply(null);
+    }
+  }
+
   async function processTurn(turn: PendingChatTurn): Promise<boolean> {
     if (messageRequestLockRef.current || isConfirmed) return false;
 
@@ -340,17 +383,14 @@ function BookingExperience({
       const browserTimeZone = getBrowserTimeZone();
       setTimeZone(browserTimeZone);
 
-      const response = await createMessageMutation.mutateAsync({
-        data: {
-          clientMessageId: turn.clientMessageId,
-          content: turn.text,
-          timeZone: browserTimeZone,
-          ...(turn.bookingDetails
-            ? { bookingDetails: turn.bookingDetails }
-            : {}),
-          ...(turn.action ? { action: turn.action } : {}),
-        },
-        sessionId: activeSessionId,
+      const response = await sendTurn(activeSessionId, {
+        clientMessageId: turn.clientMessageId,
+        content: turn.text,
+        timeZone: browserTimeZone,
+        ...(turn.bookingDetails
+          ? { bookingDetails: turn.bookingDetails }
+          : {}),
+        ...(turn.action ? { action: turn.action } : {}),
       });
 
       setMessages((current) => {
@@ -615,16 +655,7 @@ function BookingExperience({
               );
             })}
 
-            {isSending ? (
-              <div className="flex justify-start" role="status">
-                <div className="flex items-center gap-1 rounded-2xl rounded-bl-[5px] border border-border bg-surface-subtle px-4 py-3 text-muted">
-                  <span className="size-1.5 animate-bw-pulse rounded-full bg-current" />
-                  <span className="size-1.5 animate-bw-pulse rounded-full bg-current [animation-delay:120ms]" />
-                  <span className="size-1.5 animate-bw-pulse rounded-full bg-current [animation-delay:240ms]" />
-                  <span className="sr-only">Assistant is preparing a response</span>
-                </div>
-              </div>
-            ) : null}
+            {isSending ? <LiveReply reply={liveReply} /> : null}
 
             {requestError ? (
               <Alert tone="danger">
