@@ -3,13 +3,17 @@
 import { BookWiseLogo } from "@/components/brand/bookwise-logo";
 import { Button } from "@/components/ui/button";
 import { AlertIcon, RefreshIcon } from "@/components/ui/icons";
+import { useReportError } from "@/lib/observability/use-report-error";
 
 export default function ApplicationError({
+  error,
   retry,
 }: {
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  useReportError(error);
+
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas px-4 py-10">
       <div className="max-w-sm text-center">

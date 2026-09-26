@@ -46,6 +46,9 @@ export interface ExtractAppointmentRequest {
 
   /** Injectable reference time for deterministic internal callers; defaults to now. */
   currentDateTime?: Date;
+
+  /** Business the conversation is with, for per-business usage and cost metrics. */
+  businessId?: string;
 }
 
 export interface AppointmentExtractionResult {
@@ -69,6 +72,8 @@ export interface AiProviderCompletionRequest {
   messages: AiProviderMessage[];
   maxOutputTokens: number;
   temperature: number;
+  /** Attributes usage to a business; never sent to the provider. */
+  businessId?: string;
 }
 
 export interface AiTokenUsage {

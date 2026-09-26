@@ -16,11 +16,13 @@ import {
   sensitiveAuthRateLimiter,
 } from "./middleware/rate-limit.js";
 import { requestLogger } from "./middleware/request-logger.js";
+import { requestContext } from "./infrastructure/observability/request-context.js";
 
 export const app = express();
 
 app.disable("x-powered-by");
 app.use(requestLogger);
+app.use(requestContext);
 app.use("/docs", swaggerRouter);
 app.use(helmet());
 app.use(

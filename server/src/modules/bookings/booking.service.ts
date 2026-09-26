@@ -5,12 +5,15 @@ import {
   BUSINESS_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
+  OBSERVABILITY_CONSTANTS,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import {
   prisma,
   type TransactionClient,
 } from "../../infrastructure/database/prisma.js";
+import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
+import { withSpan } from "../../infrastructure/observability/tracing.js";
 import { AppError } from "../../middleware/app-error.js";
 import { isExclusionViolationError } from "../../utils/database.js";
 import { assertUuid } from "../../utils/identifiers.js";
@@ -38,6 +41,7 @@ import type {
   BookingEventType,
   BookingListResponse,
   BookingRecord,
+  BookingStatus,
   BookingResponse,
   CreateHoldRequest,
   CreateStaffBookingRequest,
@@ -49,6 +53,13 @@ import type {
 } from "./dto/booking.dto.js";
 
 const MILLISECONDS_PER_MINUTE = 60_000;
+const MILLISECONDS_PER_SECOND = 1_000;
+
+const ATTEMPT_OUTCOME_BY_STATUS: Partial<Record<BookingStatus, "held" | "confirmed" | "pending">> = {
+  HELD: "held",
+  CONFIRMED: "confirmed",
+  PENDING: "pending",
+};
 const MILLISECONDS_PER_HOUR = 3_600_000;
 const MILLISECONDS_PER_DAY = 86_400_000;
 
@@ -63,7 +74,40 @@ export class BookingService {
    * exclusion constraint is the final guard. With no staff chosen, each
    * provider who owns the slot is tried in turn.
    */
-  public async placeBooking(input: PlaceBookingInput): Promise<BookingRecord> {
+  public placeBooking(input: PlaceBookingInput): Promise<BookingRecord> {
+    const labels = { source: input.source, mode: input.mode };
+
+    return withSpan(
+      "booking.place",
+      {
+        [OBSERVABILITY_CONSTANTS.BUSINESS_ID_ATTRIBUTE]: input.businessId,
+        "booking.source": input.source,
+        "booking.mode": input.mode,
+      },
+      async (span) => {
+        try {
+          const booking = await this.placeBookingOnSchedule(input);
+
+          span.setAttribute("booking.id", booking.id);
+          bookingMetrics.attempt(ATTEMPT_OUTCOME_BY_STATUS[booking.status] ?? "confirmed", labels);
+
+          return booking;
+        } catch (error) {
+          bookingMetrics.attempt(this.attemptOutcomeFor(error), labels);
+          throw error;
+        }
+      },
+    );
+  }
+
+  private attemptOutcomeFor(error: unknown): "conflict" | "rejected" | "error" {
+    if (!(error instanceof AppError)) return "error";
+    if (error.code === ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE) return "conflict";
+
+    return error.statusCode < 500 ? "rejected" : "error";
+  }
+
+  private async placeBookingOnSchedule(input: PlaceBookingInput): Promise<BookingRecord> {
     const [business, service] = await Promise.all([
       businessDal.findBusinessById(input.businessId),
       availabilityDal.findBookableService(input.businessId, input.serviceId),
@@ -319,10 +363,18 @@ export class BookingService {
     );
 
     if (outcome.expired) {
+      bookingMetrics.attempt("conflict", { source: booking.source, mode: "CONFIRM" });
       throw new AppError(
         409,
         ERROR_CODES.BOOKING_HOLD_EXPIRED,
         ERROR_MESSAGES.BOOKING_HOLD_EXPIRED,
+      );
+    }
+
+    if (outcome.booking.status === "CONFIRMED" || outcome.booking.status === "PENDING") {
+      bookingMetrics.holdConfirmed(
+        (Date.now() - booking.createdAt.getTime()) / MILLISECONDS_PER_SECOND,
+        booking.source,
       );
     }
 

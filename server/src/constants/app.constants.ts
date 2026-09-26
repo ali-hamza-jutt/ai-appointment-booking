@@ -172,6 +172,32 @@ export const JOB_CONSTANTS = {
   REDIS_COMMAND_TIMEOUT_MS: 500,
 } as const;
 
+export const OBSERVABILITY_CONSTANTS = {
+  API_SERVICE_NAME: "bookwise-api",
+  WORKER_SERVICE_NAME: "bookwise-worker",
+  METER_NAME: "bookwise",
+  TRACER_NAME: "bookwise",
+  /** Requests that are too frequent and too boring to trace. */
+  UNTRACED_PATHS: ["/api/health"],
+  REQUEST_ID_ATTRIBUTE: "http.request_id",
+  BUSINESS_ID_ATTRIBUTE: "bookwise.business_id",
+  /** Latency buckets in seconds for HTTP-scale work. */
+  LATENCY_BUCKETS_SECONDS: [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30],
+  /** Hold-to-confirm buckets in seconds: from instant to the longest hold. */
+  HOLD_TO_CONFIRM_BUCKETS_SECONDS: [5, 15, 30, 60, 120, 300, 600, 1_800, 3_600],
+  /**
+   * Estimated Mistral list prices in USD per million tokens, matched by model
+   * family prefix. Used only for the cost metric; update when prices change.
+   */
+  LLM_PRICING_USD_PER_MILLION: [
+    { prefix: "mistral-large", input: 2, output: 6 },
+    { prefix: "mistral-medium", input: 0.4, output: 2 },
+    { prefix: "mistral-small", input: 0.1, output: 0.3 },
+    { prefix: "ministral", input: 0.1, output: 0.1 },
+    { prefix: "open-mistral-nemo", input: 0.15, output: 0.15 },
+  ],
+} as const;
+
 export const TENANT_SCOPE_FIELDS = {
   Location: ["businessId"],
   ServiceCategory: ["businessId"],

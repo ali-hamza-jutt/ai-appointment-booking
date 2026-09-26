@@ -20,7 +20,7 @@ import { OutboxRelayService } from "../../src/modules/outbox/outbox-relay.servic
 import { ProcessedEventStore } from "../../src/modules/outbox/processed-event.store.js";
 import { QueueOutboxPublisher } from "../../src/modules/outbox/queue-outbox.publisher.js";
 import { createTestUser } from "../helpers/auth.js";
-import { bookSlot, createBookableSetup } from "../helpers/booking.js";
+import { bookSlot, createBookableSetup, holdSlot } from "../helpers/booking.js";
 import { disconnectTestDatabase, resetDatabase } from "../helpers/database.js";
 import { getTestRedis, resetRedis } from "../helpers/redis.js";
 
@@ -86,6 +86,22 @@ describe("outbox relay", () => {
       payload: { status: "CONFIRMED", previousStatus: "HELD" },
     });
     await expect(prisma.outboxEvent.count({ where: { publishedAt: null } })).resolves.toBe(0);
+  });
+
+  it("tags events with the request that caused them", async () => {
+    const setup = await createBookableSetup();
+    const customer = await createTestUser();
+    const hold = await holdSlot(customer, setup, setup.at("10:00"))
+      .set("x-request-id", "req-outbox-1")
+      .expect(201);
+
+    expect(hold.headers["x-request-id"]).toBe("req-outbox-1");
+
+    const event = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: hold.body.id, type: "booking.held" },
+    });
+
+    expect(event.payload).toMatchObject({ meta: { requestId: "req-outbox-1" } });
   });
 
   it("keeps events and counts attempts when publishing fails", async () => {

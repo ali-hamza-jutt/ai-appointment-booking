@@ -7,6 +7,11 @@ import {
   connectDatabase,
   disconnectDatabase,
 } from "./infrastructure/database/prisma.js";
+import { flushErrorReporting, reportError } from "./infrastructure/observability/error-reporting.js";
+import { jobMetrics } from "./infrastructure/observability/metrics.js";
+import { runWithRequestId } from "./infrastructure/observability/request-context.js";
+import { stopTelemetry } from "./infrastructure/observability/telemetry.js";
+import { withSpan, withTraceContext } from "./infrastructure/observability/tracing.js";
 import { createQueue, QUEUE_PREFIX } from "./infrastructure/queue/queues.js";
 import {
   closeRedis,
@@ -17,6 +22,7 @@ import { bookingMaintenanceService } from "./modules/bookings/booking-maintenanc
 import type { OutboxMessage } from "./modules/outbox/dto/outbox.dto.js";
 import { OutboxConsumerRunner } from "./modules/outbox/outbox-consumer.runner.js";
 import { outboxConsumers } from "./modules/outbox/outbox-consumers.js";
+import { readOutboxMeta } from "./modules/outbox/outbox-meta.js";
 import { OutboxRelayService } from "./modules/outbox/outbox-relay.service.js";
 import { ProcessedEventStore } from "./modules/outbox/processed-event.store.js";
 import { QueueOutboxPublisher } from "./modules/outbox/queue-outbox.publisher.js";
@@ -46,16 +52,51 @@ function isMaintenanceJob(name: string): name is MaintenanceJobName {
   return name in MAINTENANCE_TASKS;
 }
 
+/** Runs a job in its own span and records its duration and outcome. */
+async function observeJob<Result>(queue: string, job: Job, work: () => Promise<Result>): Promise<Result> {
+  const startedAt = performance.now();
+  const seconds = () => (performance.now() - startedAt) / 1_000;
+
+  try {
+    const result = await withSpan(
+      `job ${queue}/${job.name}`,
+      { "messaging.system": "bullmq", "messaging.destination.name": queue, "job.id": job.id ?? "" },
+      work,
+    );
+
+    jobMetrics.run(queue, job.name, "success", seconds());
+
+    return result;
+  } catch (error) {
+    jobMetrics.run(queue, job.name, "error", seconds());
+    // Only the last attempt is worth an alert; earlier ones are retried.
+    if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) reportError(error, { queue, job: job.name });
+    throw error;
+  }
+}
+
 async function runMaintenanceJob(job: Job): Promise<number> {
   if (!isMaintenanceJob(job.name)) {
     throw new Error(`Unknown maintenance job ${job.name}`);
   }
 
-  const changed = await MAINTENANCE_TASKS[job.name]();
+  const changed = await observeJob(QUEUES.MAINTENANCE, job, MAINTENANCE_TASKS[job.name]);
 
   if (changed > 0) logger.info({ job: job.name, changed }, "Booking maintenance applied");
 
   return changed;
+}
+
+/** Continues the trace and request id of the request that wrote the event. */
+function runOutboxJob(runner: OutboxConsumerRunner, job: Job<OutboxMessage>): Promise<string[]> {
+  const message = job.data;
+  const meta = readOutboxMeta(message.payload);
+
+  return withTraceContext(meta.trace, () =>
+    runWithRequestId(meta.requestId ?? message.id, () =>
+      observeJob(QUEUES.OUTBOX, job, () => runner.dispatch(message)),
+    ),
+  );
 }
 
 function startRelay(relay: OutboxRelayService): void {
@@ -109,7 +150,7 @@ async function startWorker(): Promise<void> {
     }
 
     watch(
-      new Worker<OutboxMessage>(QUEUES.OUTBOX, (job) => runner.dispatch(job.data), {
+      new Worker<OutboxMessage>(QUEUES.OUTBOX, (job) => runOutboxJob(runner, job), {
         connection: createRedisConnection(),
         prefix: QUEUE_PREFIX,
       }),
@@ -151,6 +192,7 @@ async function shutdown(exitCode = 0): Promise<void> {
     await Promise.all(workers.map((worker) => worker.close()));
     await closeRedis();
     await disconnectDatabase();
+    await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);
     logger.info("BookWise worker stopped");
   } catch (error) {
     logger.error({ err: error }, "Worker shutdown failed");
@@ -164,6 +206,7 @@ process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
 process.on("unhandledRejection", (reason) => {
   logger.fatal({ err: reason }, "Unhandled promise rejection");
+  reportError(reason);
   void shutdown(1);
 });
 

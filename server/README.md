@@ -54,6 +54,10 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `AI_MAX_HISTORY_MESSAGES` | Recent conversation window sent to Mistral. |
 | `REDIS_URL` | Redis connection. Required by the worker; enables shared rate limits and the availability cache in the API. |
 | `OUTBOX_RELAY_INTERVAL_MS` | How often the worker polls the outbox (default 1000). |
+| `METRICS_PORT`, `WORKER_METRICS_PORT` | Optional ports serving Prometheus metrics for the API and the worker. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Optional OTLP/HTTP collector URL; traces are exported when set. |
+| `OTEL_TRACES_SAMPLE_RATIO` | Share of new traces kept (default 1). |
+| `SENTRY_DSN`, `APP_RELEASE` | Optional error reporting and the release name attached to errors and traces. |
 | `AVAILABILITY_CACHE_TTL_SECONDS` | Lifetime of cached public availability; `0` turns the cache off (default 60). |
 
 ## Main APIs
@@ -154,6 +158,28 @@ Sign-in returns a 15-minute access token in the body and sets a refresh token in
 Hold expiry does not depend on the worker: placing a booking also expires the provider's lapsed holds inside its transaction.
 
 Public availability is cached per business in Redis for `AVAILABILITY_CACHE_TTL_SECONDS`. Each business has a version key; bumping it orphans all of that business's entries. Staff-side writes under `/api/businesses/{businessId}` bump it as soon as they succeed, and booking events bump it through the worker. Holding a slot always rechecks the database, so a stale entry can only offer a time that then fails with a clear conflict. Any Redis error falls back to computing availability.
+
+## Observability
+
+`src/instrumentation.ts` is loaded with `--import` by every start script, so OpenTelemetry can patch modules before the app imports them. Nothing starts unless `OTEL_EXPORTER_OTLP_ENDPOINT` or a metrics port is set.
+
+- **Traces** cover HTTP and Express routes, Prisma and PostgreSQL queries, Redis calls inside a request or job, booking placement (`booking.place`), each Mistral call and each background job. Every HTTP span carries `http.request_id`, which is also the `x-request-id` response header. Booking events store the request id and trace context in the outbox, so the worker's job continues the trace of the request that caused it.
+- **Logs** (Pino) add `requestId`, `traceId` and `spanId` to every line, in the API and the worker.
+- **Metrics** (Prometheus, from the API on `METRICS_PORT` and the worker on `WORKER_METRICS_PORT`):
+
+  | Metric | Meaning |
+  | --- | --- |
+  | `bookwise_booking_attempts_total{source,mode,outcome}` | Holds and bookings by outcome (`held`, `confirmed`, `pending`, `conflict`, `rejected`, `error`); gives the booking success rate. |
+  | `bookwise_booking_slot_conflicts_total{source}` | Attempts that lost the slot to someone else. |
+  | `bookwise_booking_hold_to_confirm_seconds` | Time from holding a slot to confirming it. |
+  | `bookwise_booking_events_total{type}` | Committed booking changes (worker; exact because consumers are idempotent). Held vs. expired gives the hold-to-confirm rate. |
+  | `bookwise_llm_requests_total`, `bookwise_llm_request_duration_seconds`, `bookwise_llm_tokens_total{direction}`, `bookwise_llm_cost_usd_total` | Mistral calls, latency, tokens and estimated spend, by model and `business_id`. Prices live in `OBSERVABILITY_CONSTANTS.LLM_PRICING_USD_PER_MILLION`. |
+  | `bookwise_job_runs_total`, `bookwise_job_duration_seconds` | Worker jobs by queue, job and outcome. |
+  | `bookwise_outbox_published_total`, `bookwise_outbox_publish_failures_total`, `bookwise_outbox_oldest_unpublished_seconds` | Relay throughput and backlog age. |
+  | `http_server_request_duration_*` | Standard HTTP server metrics by route and status. |
+
+- **Errors**: with `SENTRY_DSN`, unexpected 5xx errors, crashes and jobs failing their last attempt go to Sentry, tagged with the request and trace ids. Sentry does not install its own tracer.
+- **Alerts**: [`../ops/prometheus/alerts.yml`](../ops/prometheus/alerts.yml) holds Prometheus rules for downtime, 5xx rate, latency, booking success rate and errors, slot-conflict spikes, expiring holds, outbox backlog, failing jobs, and LLM errors, latency and daily spend per business. [`../ops/prometheus/prometheus.yml`](../ops/prometheus/prometheus.yml) is an example scrape config.
 
 ## Tests
 

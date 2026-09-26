@@ -1,0 +1,16 @@
+# Example scrape config: the API and worker each serve metrics on their own port
+# (METRICS_PORT and WORKER_METRICS_PORT). Adjust targets to your deployment.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  - job_name: bookwise-api
+    static_configs:
+      - targets: ["localhost:9464"]
+  - job_name: bookwise-worker
+    static_configs:
+      - targets: ["localhost:9465"]

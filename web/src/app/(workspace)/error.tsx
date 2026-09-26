@@ -2,13 +2,17 @@
 
 import { Button } from "@/components/ui/button";
 import { AlertIcon, RefreshIcon } from "@/components/ui/icons";
+import { useReportError } from "@/lib/observability/use-report-error";
 
 export default function WorkspaceError({
+  error,
   retry,
 }: {
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  useReportError(error);
+
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-10">
       <div className="max-w-sm text-center">

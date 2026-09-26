@@ -1,0 +1,126 @@
+# Alerting rules for BookWise. Metric names match the OpenTelemetry
+# Prometheus exporter output of the API (9464) and worker (9465).
+groups:
+  - name: bookwise-availability
+    rules:
+      - alert: BookWiseTargetDown
+        expr: up{job=~"bookwise-api|bookwise-worker"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not reporting metrics"
+          description: "Prometheus cannot scrape {{ $labels.instance }}; the process may be down."
+
+      - alert: BookWiseHighServerErrorRate
+        expr: |
+          sum(rate(http_server_request_duration_count{job="bookwise-api", http_response_status_code=~"5.."}[5m]))
+            / sum(rate(http_server_request_duration_count{job="bookwise-api"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of API requests are failing"
+          description: "Check Sentry and the logs; requests carry an x-request-id to follow."
+
+      - alert: BookWiseSlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{job="bookwise-api"}[10m]))) > 2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 API latency is above 2s"
+
+  - name: bookwise-bookings
+    rules:
+      - alert: BookingSuccessRateLow
+        expr: |
+          (
+            sum(rate(bookwise_booking_attempts_total{outcome=~"held|confirmed|pending"}[15m]))
+              / sum(rate(bookwise_booking_attempts_total[15m]))
+          ) < 0.8
+          and sum(rate(bookwise_booking_attempts_total[15m])) > 0.01
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fewer than 80% of booking attempts succeed"
+          description: "Split by outcome to see whether conflicts, policy rejections or errors are rising."
+
+      - alert: BookingErrorsDetected
+        expr: sum(increase(bookwise_booking_attempts_total{outcome="error"}[10m])) > 3
+        labels:
+          severity: critical
+        annotations:
+          summary: "Booking attempts are failing with server errors"
+
+      - alert: SlotConflictSpike
+        expr: |
+          sum(rate(bookwise_booking_slot_conflicts_total[10m]))
+            / sum(rate(bookwise_booking_attempts_total[10m])) > 0.25
+          and sum(rate(bookwise_booking_attempts_total[10m])) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over a quarter of booking attempts hit a taken slot"
+          description: "Availability may be stale (cache or worker lag) or demand is outrunning supply."
+
+      - alert: HoldsExpiringUnconfirmed
+        expr: |
+          sum(increase(bookwise_booking_events_total{type="booking.expired"}[1h]))
+            / sum(increase(bookwise_booking_events_total{type="booking.held"}[1h])) > 0.5
+          and sum(increase(bookwise_booking_events_total{type="booking.held"}[1h])) > 10
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than half of held slots expire without being confirmed"
+
+  - name: bookwise-worker
+    rules:
+      - alert: OutboxBacklog
+        expr: bookwise_outbox_oldest_unpublished_seconds > 60
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Outbox events have waited over a minute to publish"
+          description: "The worker's relay is stuck or Redis is unreachable; side effects and cache invalidation are delayed."
+
+      - alert: BackgroundJobsFailing
+        expr: sum by (queue, job) (increase(bookwise_job_runs_total{outcome="error"}[15m])) > 5
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.queue }}/{{ $labels.job }} failed repeatedly in 15 minutes"
+
+  - name: bookwise-llm
+    rules:
+      - alert: LlmErrorRateHigh
+        expr: |
+          sum(rate(bookwise_llm_requests_total{outcome="error"}[10m]))
+            / sum(rate(bookwise_llm_requests_total[10m])) > 0.2
+          and sum(rate(bookwise_llm_requests_total[10m])) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 20% of Mistral calls are failing"
+          description: "Customers can still book with the form; check provider status and the API key."
+
+      - alert: LlmLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(bookwise_llm_request_duration_seconds_bucket[10m]))) > 8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 Mistral latency is above 8s"
+
+      - alert: LlmSpendHighForBusiness
+        expr: sum by (business_id) (increase(bookwise_llm_cost_usd_total[1d])) > 5
+        labels:
+          severity: info
+        annotations:
+          summary: "Business {{ $labels.business_id }} used over $5 of LLM calls in a day"

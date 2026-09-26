@@ -36,6 +36,7 @@ import {
   buildAppointmentExtractionPrompt,
   buildFallbackClarificationQuestion,
 } from "./prompts/appointment-extraction.prompt.js";
+import { InstrumentedAiProvider } from "./providers/instrumented.provider.js";
 import { MistralProvider } from "./providers/mistral.provider.js";
 
 export class AiService {
@@ -102,6 +103,7 @@ export class AiService {
           ],
           maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
           temperature: AI_CONSTANTS.TEMPERATURE,
+          ...(request.businessId ? { businessId: request.businessId } : {}),
         });
         const result = this.parseExtraction(
           completion.content,
@@ -546,12 +548,14 @@ export class AiService {
 }
 
 const mistralProvider = env.MISTRAL_API_KEY
-  ? new MistralProvider({
-      apiKey: env.MISTRAL_API_KEY,
-      model: env.MISTRAL_MODEL,
-      apiUrl: env.MISTRAL_API_URL,
-      timeoutMs: env.AI_REQUEST_TIMEOUT_MS,
-    })
+  ? new InstrumentedAiProvider(
+      new MistralProvider({
+        apiKey: env.MISTRAL_API_KEY,
+        model: env.MISTRAL_MODEL,
+        apiUrl: env.MISTRAL_API_URL,
+        timeoutMs: env.AI_REQUEST_TIMEOUT_MS,
+      }),
+    )
   : null;
 
 export const aiService = new AiService(

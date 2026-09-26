@@ -7,6 +7,7 @@ import {
   type DbClient,
   type TransactionClient,
 } from "../../../infrastructure/database/prisma.js";
+import { currentOutboxMeta } from "../../outbox/outbox-meta.js";
 import { BOOKING_TRANSITIONS, nextStatus } from "../booking-state.js";
 import type {
   BookingActor,
@@ -436,6 +437,7 @@ export class BookingDal {
           scheduledAt: booking.scheduledAt.toISOString(),
           endsAt: booking.endsAt.toISOString(),
           timeZone: booking.timeZone,
+          meta: { ...currentOutboxMeta() },
         },
       },
     });
