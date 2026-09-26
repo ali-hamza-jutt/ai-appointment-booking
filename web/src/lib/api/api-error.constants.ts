@@ -25,6 +25,10 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SERVICE_CATEGORY_ALREADY_EXISTS: "A category with this name already exists.",
   SERVICE_CATEGORY_NOT_FOUND: "This category could not be found.",
   SERVICE_NOT_FOUND: "This service could not be found.",
+  RESOURCE_ALREADY_EXISTS: "A resource with this name already exists at this location.",
+  RESOURCE_NOT_FOUND: "This resource could not be found.",
+  STAFF_ALREADY_LINKED: "This team member already has a staff profile.",
+  STAFF_NOT_FOUND: "This staff member could not be found.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "Complete the service, date, and time before confirming the booking.",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -65,6 +69,12 @@ export const API_FIELD_ERROR_MESSAGES: Readonly<
   },
   SERVICE_CATEGORY_ALREADY_EXISTS: {
     name: "A category with this name already exists.",
+  },
+  RESOURCE_ALREADY_EXISTS: {
+    name: "A resource with this name already exists at this location.",
+  },
+  STAFF_ALREADY_LINKED: {
+    userId: "This team member already has a staff profile.",
   },
   WEAK_PASSWORD: {
     password:

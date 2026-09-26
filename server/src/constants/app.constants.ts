@@ -77,10 +77,22 @@ export const CATALOG_CONSTANTS = {
   SEARCH_SIMILARITY_THRESHOLD: 0.2,
 } as const;
 
+export const STAFF_CONSTANTS = {
+  MIN_DISPLAY_NAME_LENGTH: 2,
+  MAX_DISPLAY_NAME_LENGTH: 80,
+  MAX_BIO_LENGTH: 1_000,
+  MAX_AVATAR_URL_LENGTH: 500,
+  MAX_RESOURCE_NAME_LENGTH: 80,
+  MAX_RESOURCE_CAPACITY: 500,
+  MAX_ASSIGNMENTS: 200,
+} as const;
+
 export const TENANT_SCOPE_FIELDS = {
   Location: ["businessId"],
   ServiceCategory: ["businessId"],
   Service: ["businessId"],
+  Staff: ["businessId"],
+  Resource: ["businessId"],
   Customer: ["businessId"],
   BusinessInvitation: ["businessId", "email"],
   Membership: ["businessId", "userId"],
@@ -212,6 +224,10 @@ export const ERROR_CODES = {
   MEMBER_CHANGE_NOT_ALLOWED: "MEMBER_CHANGE_NOT_ALLOWED",
   INVITATION_NOT_FOUND: "INVITATION_NOT_FOUND",
   SERVICE_NOT_FOUND: "SERVICE_NOT_FOUND",
+  STAFF_NOT_FOUND: "STAFF_NOT_FOUND",
+  STAFF_ALREADY_LINKED: "STAFF_ALREADY_LINKED",
+  RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND",
+  RESOURCE_ALREADY_EXISTS: "RESOURCE_ALREADY_EXISTS",
   SERVICE_CATEGORY_NOT_FOUND: "SERVICE_CATEGORY_NOT_FOUND",
   SERVICE_CATEGORY_ALREADY_EXISTS: "SERVICE_CATEGORY_ALREADY_EXISTS",
   APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
@@ -259,6 +275,10 @@ export const ERROR_MESSAGES = {
     "The business owner cannot be removed or changed",
   INVITATION_NOT_FOUND: "Invitation was not found",
   SERVICE_NOT_FOUND: "Service was not found",
+  STAFF_NOT_FOUND: "Staff member was not found",
+  STAFF_ALREADY_LINKED: "This team member already has a staff profile",
+  RESOURCE_NOT_FOUND: "Resource was not found",
+  RESOURCE_ALREADY_EXISTS: "A resource with this name already exists at this location",
   SERVICE_CATEGORY_NOT_FOUND: "Service category was not found",
   SERVICE_CATEGORY_ALREADY_EXISTS: "A category with this name already exists",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
@@ -321,6 +341,13 @@ export const VALIDATION_MESSAGES = {
   LOCATION_ADDRESS: "Address cannot exceed 300 characters",
   LOCATION_NAME: "Location name must contain between 2 and 120 characters",
   RESOURCE_ID: "Identifier must be a valid UUID",
+  RESOURCE_CAPACITY: "Capacity must be a whole number between 1 and 500",
+  RESOURCE_NAME: "Resource name must contain between 1 and 80 characters",
+  STAFF_AVATAR_URL: "Avatar must be an https URL of at most 500 characters",
+  STAFF_BIO: "Bio cannot exceed 1000 characters",
+  STAFF_DISPLAY_NAME: "Name must contain between 2 and 80 characters",
+  STAFF_MEMBER: "Linked user must be a member of this business",
+  UNKNOWN_REFERENCES: "One or more selected items do not belong to this business",
   SERVICE_BUFFER: "Buffers must be whole minutes between 0 and 240",
   SERVICE_CAPACITY:
     "Classes need between 1 and 500 seats; appointments always have 1",

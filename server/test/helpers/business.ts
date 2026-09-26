@@ -41,3 +41,29 @@ export async function addTestMember(
 
   return response.body.member.id;
 }
+
+export async function createTestService(
+  owner: TestUser,
+  business: TestBusiness,
+  body: Record<string, unknown> = {},
+): Promise<string> {
+  const response = await request(app)
+    .post(`/api/businesses/${business.id}/services`)
+    .set(...authHeader(owner))
+    .send({ name: "Haircut", durationMinutes: 30, priceMinor: 2_500, ...body })
+    .expect(201);
+
+  return response.body.id;
+}
+
+export async function getFirstLocationId(
+  owner: TestUser,
+  business: TestBusiness,
+): Promise<string> {
+  const response = await request(app)
+    .get(`/api/businesses/${business.id}/locations`)
+    .set(...authHeader(owner))
+    .expect(200);
+
+  return response.body.items[0].id;
+}

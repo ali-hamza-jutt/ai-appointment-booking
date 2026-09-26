@@ -23,8 +23,10 @@ import type {
 import type {
   ApiErrorResponse,
   ListPublicServicesParams,
+  ListPublicStaffParams,
   PublicBusinessResponse,
-  PublicServiceListResponse
+  PublicServiceListResponse,
+  PublicStaffListResponse
 } from '../models';
 
 import { apiFetch } from '../../../lib/api/api-fetch';
@@ -49,6 +51,118 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListPublicStaffUrl = (slug: string,
+    params?: ListPublicStaffParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/public/${slug}/staff?${stringifiedParams}` : `/public/${slug}/staff`
+}
+
+/**
+ * Lists active staff, optionally only those who offer `serviceId`.
+ */
+export const listPublicStaff = async (slug: string,
+    params?: ListPublicStaffParams, options?: Parameters<typeof apiFetch>[1]): Promise<PublicStaffListResponse> => {
+
+  return apiFetch<PublicStaffListResponse>(getListPublicStaffUrl(slug,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublicStaffQueryKey = (slug: string,
+    params?: ListPublicStaffParams,) => {
+    return [
+    `/public/${slug}/staff`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPublicStaffQueryOptions = <TData = Awaited<ReturnType<typeof listPublicStaff>>, TError = ErrorType<ApiErrorResponse>>(slug: string,
+    params?: ListPublicStaffParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublicStaffQueryKey(slug,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublicStaff>>> = ({ signal }) => listPublicStaff(slug,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPublicStaffQueryResult = NonNullable<Awaited<ReturnType<typeof listPublicStaff>>>
+export type ListPublicStaffQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useListPublicStaff<TData = Awaited<ReturnType<typeof listPublicStaff>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params: undefined |  ListPublicStaffParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPublicStaff>>,
+          TError,
+          Awaited<ReturnType<typeof listPublicStaff>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPublicStaff<TData = Awaited<ReturnType<typeof listPublicStaff>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params?: ListPublicStaffParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPublicStaff>>,
+          TError,
+          Awaited<ReturnType<typeof listPublicStaff>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPublicStaff<TData = Awaited<ReturnType<typeof listPublicStaff>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params?: ListPublicStaffParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListPublicStaff<TData = Awaited<ReturnType<typeof listPublicStaff>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params?: ListPublicStaffParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicStaff>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPublicStaffQueryOptions(slug,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
 
 export const getGetPublicBusinessUrl = (slug: string,) => {
 
