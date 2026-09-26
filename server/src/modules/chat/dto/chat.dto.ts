@@ -1,7 +1,7 @@
 import type {
-  AppointmentRecord,
   AppointmentResponse,
-} from "../../appointments/dto/appointment.dto.js";
+  BookingRecord,
+} from "../../bookings/dto/booking.dto.js";
 
 export type ChatSessionStatus = "ACTIVE" | "CLOSED" | "ABANDONED";
 
@@ -15,6 +15,23 @@ export type ClientMessageId = string;
 export interface AppointmentBookingContext {
   /** @minLength 2 @maxLength 120 */
   serviceName?: string;
+
+  /** Catalog service the request was matched to. */
+  serviceId?: string;
+
+  /** Staff member holding the slot. */
+  staffId?: string;
+
+  staffName?: string;
+
+  /** The held booking awaiting confirmation. */
+  holdBookingId?: string;
+
+  holdExpiresAt?: Date;
+
+  priceMinor?: number;
+
+  currency?: string;
 
   scheduledAt?: Date;
 
@@ -38,10 +55,19 @@ export interface ChatMessageMetadata {
   missingFields?: string[];
   confirmationRequired?: boolean;
   appointmentId?: string;
+  /** Open start times offered when the requested time was taken. */
+  suggestedTimes?: Date[];
 }
 
 export interface StoredAppointmentBookingContext {
   serviceName?: string;
+  serviceId?: string;
+  staffId?: string;
+  staffName?: string;
+  holdBookingId?: string;
+  holdExpiresAt?: string;
+  priceMinor?: number;
+  currency?: string;
   scheduledAt?: string;
   timeZone?: string;
   durationMinutes?: number;
@@ -54,11 +80,15 @@ export interface StoredChatMessageMetadata {
   missingFields?: string[];
   confirmationRequired?: boolean;
   appointmentId?: string;
+  suggestedTimes?: string[];
 }
 
 export interface CreateChatSessionRequest {
   /** @maxLength 120 */
   title?: string;
+
+  /** Booking link of the business to book with. Defaults to the demo business. @maxLength 60 */
+  businessSlug?: string;
 
   bookingContext?: AppointmentBookingContext;
 
@@ -74,21 +104,16 @@ export interface CreateChatMessageRequest {
 }
 
 export interface StructuredBookingDetails {
-  /** @minLength 2 @maxLength 120 */
-  serviceName: string;
+  serviceId: string;
+
+  /** Omit to take any available staff member. */
+  staffId?: string;
 
   /** @pattern ^\d{4}-\d{2}-\d{2}$ Must use YYYY-MM-DD */
   scheduledDate: string;
 
   /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ Must use HH:mm in 24-hour time */
   scheduledTime: string;
-
-  /**
-   * @isInt Duration must be a whole number
-   * @minimum 5
-   * @maximum 480
-   */
-  durationMinutes?: number;
 
   /** @maxLength 2000 */
   notes?: string;
@@ -102,8 +127,15 @@ export interface ProcessChatMessageRequest extends CreateChatMessageRequest {
   bookingDetails?: StructuredBookingDetails;
 }
 
+export interface ChatSessionBusiness {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface ChatSessionResponse {
   id: string;
+  business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
   bookingContext: AppointmentBookingContext | null;
@@ -158,6 +190,7 @@ export interface ListChatMessagesOptions {
 
 export interface ChatSessionRecord {
   id: string;
+  business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
   bookingContext: unknown;
@@ -177,6 +210,7 @@ export interface ChatMessageRecord {
 }
 
 export interface CreateChatSessionData {
+  businessId: string;
   userId: string;
   title: string | null;
   bookingContext: StoredAppointmentBookingContext | null;
@@ -242,39 +276,28 @@ export interface AssistantTurnPersistenceResult {
 }
 
 export interface ConfirmChatBookingData {
-  businessId: string;
   userId: string;
   sessionId: string;
-  appointmentId: string;
-  serviceName: string;
-  scheduledAt: Date;
-  timeZone: string;
-  durationMinutes: number;
-  notes: string | null;
+  bookingId: string;
   assistantContent: string;
   assistantStructuredData: StoredChatMessageMetadata;
 }
 
 export interface CompleteChatBookingRequest {
-  appointmentId: string;
-  serviceName: string;
-  scheduledAt: Date;
-  timeZone: string;
-  durationMinutes: number;
-  notes: string | null;
+  bookingId: string;
   assistantContent: string;
   assistantStructuredData: ChatMessageMetadata;
 }
 
 export interface ConfirmedChatBookingRecord extends ChatSessionRecord {
-  appointment: AppointmentRecord | null;
+  booking: BookingRecord | null;
   messages: ChatMessageRecord[];
 }
 
 export interface ChatBookingPersistenceResult {
   session: ChatSessionResponse;
   assistantMessage: ChatMessageResponse;
-  appointment: AppointmentRecord;
+  booking: BookingRecord;
 }
 
 export interface ChatMessagePageCursor {

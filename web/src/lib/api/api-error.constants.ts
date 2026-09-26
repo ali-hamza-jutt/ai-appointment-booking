@@ -9,11 +9,17 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
     "The booking assistant took too long to respond. Try again or complete the booking form.",
   APPOINTMENT_NOT_FOUND: "This appointment could not be found.",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
-    "Completed appointments cannot be cancelled.",
+    "This appointment can no longer be cancelled online. Please contact the business.",
   APPOINTMENT_RESCHEDULE_NOT_ALLOWED:
-    "Cancelled or completed appointments cannot be rescheduled.",
+    "This appointment can no longer be rescheduled online. Please contact the business.",
   APPOINTMENT_SLOT_UNAVAILABLE:
-    "The selected time overlaps with another appointment.",
+    "That time was just taken. Please choose another open time.",
+  BOOKING_HOLD_EXPIRED:
+    "Your hold on this time expired and someone else booked it. Please choose another time.",
+  BOOKING_POLICY_VIOLATION: "This isn't allowed by the business's booking policy yet.",
+  BOOKING_TRANSITION_NOT_ALLOWED: "This booking can no longer change to that status.",
+  CLASS_FULL: "This class is full.",
+  CUSTOMER_NOT_FOUND: "This customer could not be found.",
   BUSINESS_NOT_FOUND: "This business could not be found.",
   BUSINESS_SLUG_TAKEN: "This booking link is already in use. Choose another.",
   CUSTOMER_ALREADY_EXISTS: "A customer with this email already exists.",

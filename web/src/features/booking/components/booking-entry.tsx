@@ -16,12 +16,14 @@ import {
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
 interface BookingEntryProps {
+  businessSlug?: string;
   initialSessionId?: string;
   newBookingKey?: string;
   shouldStartNew: boolean;
 }
 
 export function BookingEntry({
+  businessSlug,
   initialSessionId,
   newBookingKey,
   shouldStartNew,
@@ -56,7 +58,7 @@ export function BookingEntry({
 
       requestedNewBookingRef.current = requestKey;
       createSessionMutation.mutate(
-        { data: { replaceActive: true } },
+        { data: { replaceActive: true, ...(businessSlug ? { businessSlug } : {}) } },
         {
           onSuccess: (session) => {
             void queryClient.invalidateQueries({
@@ -69,14 +71,29 @@ export function BookingEntry({
         },
       );
     },
-    [createSessionMutation, queryClient, router],
+    [businessSlug, createSessionMutation, queryClient, router],
   );
 
+  const latestActiveSession = activeSessionsQuery.data?.items[0];
+  // A booking link for a different business starts a fresh conversation there.
+  const needsBusinessSwitch =
+    Boolean(businessSlug) &&
+    activeSessionsQuery.isFetchedAfterMount &&
+    latestActiveSession !== undefined &&
+    latestActiveSession.business.slug !== businessSlug;
+
   useEffect(() => {
-    if (shouldStartNew && !initialSessionId) {
-      startNewBooking(replacementKey);
+    if ((shouldStartNew || needsBusinessSwitch) && !initialSessionId) {
+      startNewBooking(needsBusinessSwitch ? `switch-${businessSlug}` : replacementKey);
     }
-  }, [initialSessionId, replacementKey, shouldStartNew, startNewBooking]);
+  }, [
+    businessSlug,
+    initialSessionId,
+    needsBusinessSwitch,
+    replacementKey,
+    shouldStartNew,
+    startNewBooking,
+  ]);
 
   if (initialSessionId) {
     return (
@@ -87,7 +104,7 @@ export function BookingEntry({
     );
   }
 
-  if (shouldStartNew) {
+  if (shouldStartNew || needsBusinessSwitch) {
     if (createSessionMutation.isError) {
       return (
         <BookingEntryError
@@ -115,6 +132,7 @@ export function BookingEntry({
       <BookingWorkspace
         key="no-active-session"
         onSessionCreated={setLocallyCreatedSessionId}
+        {...(businessSlug ? { businessSlug } : {})}
       />
     );
   }
@@ -143,14 +161,12 @@ export function BookingEntry({
     );
   }
 
-  const activeSessions = activeSessionsQuery.data?.items ?? [];
-  const latestActiveSession = activeSessions[0];
-
   if (!latestActiveSession) {
     return (
       <BookingWorkspace
         key="no-active-session"
         onSessionCreated={setLocallyCreatedSessionId}
+        {...(businessSlug ? { businessSlug } : {})}
       />
     );
   }

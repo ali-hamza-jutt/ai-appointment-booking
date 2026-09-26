@@ -21,8 +21,28 @@ VALUES (
 )
 ON CONFLICT DO NOTHING;
 
+-- The demo business is created by the tenancy migration.
+INSERT INTO "customers" (
+  "id",
+  "business_id",
+  "user_id",
+  "name",
+  "email",
+  "updated_at"
+)
+VALUES (
+  '77777777-7777-4777-8777-777777777777',
+  '00000000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
+  'BookWise Demo User',
+  'demo@bookwise.local',
+  '2026-08-15 09:00:00+00'
+)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO "chat_sessions" (
   "id",
+  "business_id",
   "user_id",
   "title",
   "status",
@@ -32,6 +52,7 @@ INSERT INTO "chat_sessions" (
 )
 VALUES (
   '22222222-2222-4222-8222-222222222222',
+  '00000000-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111111',
   'Product discovery consultation',
   'CLOSED',
@@ -41,12 +62,18 @@ VALUES (
 )
 ON CONFLICT DO NOTHING;
 
-INSERT INTO "appointments" (
+INSERT INTO "bookings" (
   "id",
+  "business_id",
   "user_id",
+  "customer_id",
   "chat_session_id",
   "service_name",
   "scheduled_at",
+  "ends_at",
+  "occupied_from",
+  "occupied_until",
+  "session_key",
   "time_zone",
   "duration_minutes",
   "status",
@@ -57,10 +84,16 @@ INSERT INTO "appointments" (
 )
 VALUES (
   '33333333-3333-4333-8333-333333333333',
+  '00000000-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111111',
+  '77777777-7777-4777-8777-777777777777',
   '22222222-2222-4222-8222-222222222222',
   'Product discovery consultation',
   '2027-01-15 10:00:00+00',
+  '2027-01-15 11:00:00+00',
+  '2027-01-15 10:00:00+00',
+  '2027-01-15 11:00:00+00',
+  '33333333-3333-4333-8333-333333333333',
   'UTC',
   60,
   'CONFIRMED',

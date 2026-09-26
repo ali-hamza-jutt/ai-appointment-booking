@@ -26,10 +26,12 @@ import type {
 
 import type {
   ApiErrorResponse,
+  AvailabilityResponse,
   ClosureListResponse,
   ClosureResponse,
   CreateClosureRequest,
   CreateTimeOffRequest,
+  GetBusinessAvailabilityParams,
   ReplaceWorkingHoursRequest,
   TimeOffListResponse,
   TimeOffResponse,
@@ -714,3 +716,116 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getDeleteClosureMutationOptions(options), queryClient);
     }
+    export const getGetBusinessAvailabilityUrl = (businessId: string,
+    params: GetBusinessAvailabilityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/businesses/${businessId}/availability?${stringifiedParams}` : `/businesses/${businessId}/availability`
+}
+
+/**
+ * Open times for staff taking a booking. Unlike the public view it ignores
+ * minimum notice, the booking window and the online-bookable flag.
+ */
+export const getBusinessAvailability = async (businessId: string,
+    params: GetBusinessAvailabilityParams, options?: Parameters<typeof apiFetch>[1]): Promise<AvailabilityResponse> => {
+
+  return apiFetch<AvailabilityResponse>(getGetBusinessAvailabilityUrl(businessId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBusinessAvailabilityQueryKey = (businessId: string,
+    params?: GetBusinessAvailabilityParams,) => {
+    return [
+    `/businesses/${businessId}/availability`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBusinessAvailabilityQueryOptions = <TData = Awaited<ReturnType<typeof getBusinessAvailability>>, TError = ErrorType<ApiErrorResponse>>(businessId: string,
+    params: GetBusinessAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBusinessAvailabilityQueryKey(businessId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBusinessAvailability>>> = ({ signal }) => getBusinessAvailability(businessId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetBusinessAvailabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getBusinessAvailability>>>
+export type GetBusinessAvailabilityQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetBusinessAvailability<TData = Awaited<ReturnType<typeof getBusinessAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params: GetBusinessAvailabilityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBusinessAvailability>>,
+          TError,
+          Awaited<ReturnType<typeof getBusinessAvailability>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBusinessAvailability<TData = Awaited<ReturnType<typeof getBusinessAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params: GetBusinessAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBusinessAvailability>>,
+          TError,
+          Awaited<ReturnType<typeof getBusinessAvailability>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetBusinessAvailability<TData = Awaited<ReturnType<typeof getBusinessAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params: GetBusinessAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetBusinessAvailability<TData = Awaited<ReturnType<typeof getBusinessAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params: GetBusinessAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBusinessAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetBusinessAvailabilityQueryOptions(businessId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

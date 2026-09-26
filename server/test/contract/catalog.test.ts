@@ -243,3 +243,37 @@ describe("public catalog API", () => {
     await request(app).get("/api/public/no-such-business/services").expect(404);
   });
 });
+
+describe("service policy overrides", () => {
+  beforeEach(resetDatabase);
+  afterAll(disconnectTestDatabase);
+
+  it("stores overrides, rejects unknown keys and clears with an empty object", async () => {
+    const owner = await createTestUser();
+    const business = await createTestBusiness(owner);
+
+    const created = await createService(owner, business, {
+      name: "Colour",
+      policyOverrides: { minimumNoticeMinutes: 1_440, cancellationWindowHours: 48 },
+    }).expect(201);
+
+    expect(created.body.policyOverrides).toEqual({
+      minimumNoticeMinutes: 1_440,
+      cancellationWindowHours: 48,
+    });
+
+    await request(app)
+      .patch(`/api/businesses/${business.id}/services/${created.body.id}`)
+      .set(...authHeader(owner))
+      .send({ policyOverrides: { minimumNoticeMinutes: 99_999 } })
+      .expect(422);
+
+    const cleared = await request(app)
+      .patch(`/api/businesses/${business.id}/services/${created.body.id}`)
+      .set(...authHeader(owner))
+      .send({ policyOverrides: {} })
+      .expect(200);
+
+    expect(cleared.body.policyOverrides).toEqual({});
+  });
+});

@@ -123,6 +123,9 @@ export interface WorkingHoursWriteData {
 
 export interface AvailabilityServiceRecord {
   id: string;
+  name: string;
+  priceMinor: number;
+  currency: string;
   bookingType: "APPOINTMENT" | "CLASS";
   capacity: number;
   durationMinutes: number;
@@ -130,7 +133,12 @@ export interface AvailabilityServiceRecord {
   bufferAfterMin: number;
   locationId: string | null;
   onlineBookable: boolean;
-  providers: { staffId: string; customDurationMinutes: number | null }[];
+  policyOverrides: unknown;
+  providers: {
+    staffId: string;
+    customDurationMinutes: number | null;
+    customPriceMinor: number | null;
+  }[];
   resources: { resource: { id: string; capacity: number; isActive: boolean } }[];
 }
 
@@ -145,4 +153,23 @@ export interface AvailabilityStaffRecord {
     location: { timeZone: string } | null;
   }[];
   timeOff: { startsAt: Date; endsAt: Date }[];
+}
+
+export interface BookingLoadRecord {
+  id: string;
+  staffId: string | null;
+  serviceId: string | null;
+  sessionKey: string;
+  seats: number;
+  scheduledAt: Date;
+  endsAt: Date;
+  occupiedFrom: Date;
+  occupiedUntil: Date;
+}
+
+export interface ResourceLoadRecord {
+  sessionKey: string;
+  occupiedFrom: Date;
+  occupiedUntil: Date;
+  resourceIds: string[];
 }

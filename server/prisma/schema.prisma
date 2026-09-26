@@ -7,20 +7,34 @@ datasource db {
   provider = "postgresql"
 }
 
-enum AppointmentStatus {
+enum BookingStatus {
+  HELD
+  PENDING_PAYMENT
   PENDING
   CONFIRMED
-  CANCELLED
+  CHECKED_IN
   COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
 
-  @@map("appointment_status")
+  @@map("booking_status")
 }
 
-enum AppointmentSource {
+enum BookingSource {
   FORM
   CHAT
+  STAFF
 
-  @@map("appointment_source")
+  @@map("booking_source")
+}
+
+enum BookingActorType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+
+  @@map("booking_actor_type")
 }
 
 enum ChatSessionStatus {
@@ -81,7 +95,7 @@ model User {
   platformRole PlatformRole         @default(USER) @map("platform_role")
   createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  appointments Appointment[]
+  bookings     Booking[]
   chatSessions ChatSession[]
   memberships  Membership[]
   customers    Customer[]
@@ -105,7 +119,8 @@ model Business {
   memberships  Membership[]
   customers    Customer[]
   invitations  BusinessInvitation[]
-  appointments Appointment[]
+  bookings     Booking[]
+  chatSessions ChatSession[]
   categories   ServiceCategory[]
   services     Service[]
   staff        Staff[]
@@ -169,6 +184,8 @@ model Service {
   isActive        Boolean            @default(true) @map("is_active")
   onlineBookable  Boolean            @default(true) @map("online_bookable")
   sortOrder       Int                @default(0) @map("sort_order")
+  /// Per-service overrides of business booking policies.
+  policyOverrides Json               @default("{}") @map("policy_overrides") @db.JsonB
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   business        Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -176,6 +193,7 @@ model Service {
   location        Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
   providers       ServiceProvider[]
   resources       ServiceResource[]
+  bookings        Booking[]
 
   @@index([businessId, isActive, sortOrder], map: "services_business_id_is_active_sort_order_idx")
   @@index([categoryId], map: "services_category_id_idx")
@@ -201,6 +219,7 @@ model Staff {
   locations    StaffLocation[]
   workingHours WorkingHours[]
   timeOff      TimeOff[]
+  bookings     Booking[]
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -344,16 +363,17 @@ model BusinessInvitation {
 }
 
 model Customer {
-  id         String   @id @default(uuid()) @db.Uuid
-  businessId String   @map("business_id") @db.Uuid
-  userId     String?  @map("user_id") @db.Uuid
-  name       String   @db.VarChar(120)
-  email      String?  @db.VarChar(254)
-  phone      String?  @db.VarChar(32)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id         String    @id @default(uuid()) @db.Uuid
+  businessId String    @map("business_id") @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  name       String    @db.VarChar(120)
+  email      String?   @db.VarChar(254)
+  phone      String?   @db.VarChar(32)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  bookings   Booking[]
 
   @@unique([businessId, userId], map: "customers_business_id_user_id_key")
   @@unique([businessId, email], map: "customers_business_id_email_key")
@@ -361,42 +381,110 @@ model Customer {
   @@map("customers")
 }
 
-model Appointment {
+/// A provider-side booking. Customers still see these as "appointments".
+model Booking {
   id              String            @id @default(uuid()) @db.Uuid
   businessId      String            @map("business_id") @db.Uuid
-  userId          String            @map("user_id") @db.Uuid
+  /// The booking customer's account, when they have one.
+  userId          String?           @map("user_id") @db.Uuid
+  customerId      String            @map("customer_id") @db.Uuid
+  serviceId       String?           @map("service_id") @db.Uuid
+  staffId         String?           @map("staff_id") @db.Uuid
   chatSessionId   String?           @unique(map: "appointments_chat_session_id_key") @map("chat_session_id") @db.Uuid
+  /// Snapshot so later catalog edits never rewrite history.
   serviceName     String            @map("service_name") @db.VarChar(120)
   scheduledAt     DateTime          @map("scheduled_at") @db.Timestamptz(3)
+  endsAt          DateTime          @map("ends_at") @db.Timestamptz(3)
   timeZone        String            @default("UTC") @map("time_zone") @db.VarChar(100)
   durationMinutes Int               @default(30) @map("duration_minutes") @db.SmallInt
-  status          AppointmentStatus @default(PENDING)
-  source          AppointmentSource @default(FORM)
+  bufferBeforeMin Int               @default(0) @map("buffer_before_min") @db.SmallInt
+  bufferAfterMin  Int               @default(0) @map("buffer_after_min") @db.SmallInt
+  /// Start minus buffer before; the provider is unavailable from here.
+  occupiedFrom    DateTime          @map("occupied_from") @db.Timestamptz(3)
+  /// End plus buffer after.
+  occupiedUntil   DateTime          @map("occupied_until") @db.Timestamptz(3)
+  /// Bookings sharing a key share the provider's time (seats in one class).
+  sessionKey      String            @map("session_key") @db.VarChar(120)
+  seats           Int               @default(1) @db.SmallInt
+  priceMinor      Int?              @map("price_minor")
+  currency        String?           @db.Char(3)
+  status          BookingStatus     @default(CONFIRMED)
+  source          BookingSource     @default(FORM)
   notes           String?           @db.Text
+  holdExpiresAt   DateTime?         @map("hold_expires_at") @db.Timestamptz(3)
+  rescheduleCount Int               @default(0) @map("reschedule_count") @db.SmallInt
+  cancelledBy     BookingActorType? @map("cancelled_by")
+  cancelReason    String?           @map("cancel_reason") @db.VarChar(500)
+  cancelledAt     DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  checkedInAt     DateTime?         @map("checked_in_at") @db.Timestamptz(3)
+  completedAt     DateTime?         @map("completed_at") @db.Timestamptz(3)
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   business        Business          @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  service         Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  staff           Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
   chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
+  events          BookingEvent[]
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")
   @@index([userId, status, createdAt, id], map: "appointments_user_id_status_created_at_id_idx")
   @@index([userId, status, scheduledAt], map: "appointments_user_id_status_scheduled_at_idx")
-  @@map("appointments")
+  @@index([staffId, status, occupiedFrom], map: "bookings_staff_id_status_occupied_from_idx")
+  @@index([status, holdExpiresAt], map: "bookings_status_hold_expires_at_idx")
+  @@index([customerId, scheduledAt], map: "bookings_customer_id_scheduled_at_idx")
+  @@map("bookings")
+}
+
+/// Append-only audit trail of every booking state change.
+model BookingEvent {
+  id          String           @id @default(uuid()) @db.Uuid
+  bookingId   String           @map("booking_id") @db.Uuid
+  businessId  String           @map("business_id") @db.Uuid
+  type        String           @db.VarChar(40)
+  fromStatus  BookingStatus?   @map("from_status")
+  toStatus    BookingStatus?   @map("to_status")
+  actorType   BookingActorType @map("actor_type")
+  actorUserId String?          @map("actor_user_id") @db.Uuid
+  payload     Json?            @db.JsonB
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  booking     Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt], map: "booking_events_booking_id_created_at_idx")
+  @@map("booking_events")
+}
+
+/// Side effects written in the same transaction as the change and delivered by a worker.
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  businessId    String?   @map("business_id") @db.Uuid
+  type          String    @db.VarChar(80)
+  aggregateType String    @map("aggregate_type") @db.VarChar(40)
+  aggregateId   String    @map("aggregate_id") @db.Uuid
+  payload       Json      @db.JsonB
+  attempts      Int       @default(0)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(3)
+
+  @@index([publishedAt, createdAt], map: "outbox_events_published_at_created_at_idx")
+  @@map("outbox_events")
 }
 
 model ChatSession {
   id             String            @id @default(uuid()) @db.Uuid
+  businessId     String            @map("business_id") @db.Uuid
   userId         String            @map("user_id") @db.Uuid
   title          String?           @db.VarChar(120)
   status         ChatSessionStatus @default(ACTIVE)
   bookingContext Json?             @map("booking_context") @db.JsonB
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business       Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages       ChatMessage[]
-  appointment    Appointment?
+  booking        Booking?
 
   @@index([userId, updatedAt, id], map: "chat_sessions_user_id_updated_at_id_idx")
   @@map("chat_sessions")

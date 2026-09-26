@@ -7,12 +7,13 @@ export const metadata: Metadata = { title: "Book an appointment" };
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string; sessionId?: string }>;
+  searchParams: Promise<{ business?: string; new?: string; sessionId?: string }>;
 }) {
-  const { new: newBookingKey, sessionId } = await searchParams;
+  const { business, new: newBookingKey, sessionId } = await searchParams;
 
   return (
     <BookingEntry
+      businessSlug={business}
       initialSessionId={sessionId}
       newBookingKey={newBookingKey}
       shouldStartNew={newBookingKey !== undefined}

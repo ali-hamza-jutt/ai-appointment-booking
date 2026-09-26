@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 
 export interface CreateServiceRequest {
   /**
@@ -51,4 +52,5 @@ export interface CreateServiceRequest {
   bufferAfterMin?: number;
   onlineBookable?: boolean;
   sortOrder?: number;
+  policyOverrides?: ServicePolicyOverrides;
 }

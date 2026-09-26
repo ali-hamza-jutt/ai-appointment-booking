@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 import type { ServiceReference } from './serviceReference';
 
 export interface ServiceResponse {
@@ -29,6 +30,7 @@ export interface ServiceResponse {
   isActive: boolean;
   onlineBookable: boolean;
   sortOrder: number;
+  policyOverrides: ServicePolicyOverrides;
   createdAt: string;
   updatedAt: string;
 }

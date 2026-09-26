@@ -4,10 +4,11 @@ import type {
 } from "../../../integrations/ai/dto/ai.dto.js";
 import type {
   AppointmentResponse,
-  CreateAppointmentRequest,
-  PreparedAppointment,
-} from "../../appointments/dto/appointment.dto.js";
+  BookingActor,
+  BookingRecord,
+} from "../../bookings/dto/booking.dto.js";
 import type {
+  AppointmentBookingContext,
   AssistantTurnPersistenceResult,
   ChatBookingPersistenceResult,
   ChatMessageCreationResult,
@@ -63,9 +64,50 @@ export interface ChatOrchestrationChatPort {
   ): Promise<ChatBookingPersistenceResult>;
 }
 
-export interface ChatOrchestrationAppointmentPort {
-  prepareAppointment(request: CreateAppointmentRequest): PreparedAppointment;
-  toResponse(
-    appointment: ChatBookingPersistenceResult["appointment"],
-  ): AppointmentResponse;
+export interface ChatOrchestrationBookingPort {
+  holdForUser(input: {
+    businessId: string;
+    serviceId: string;
+    staffId?: string;
+    startsAt: Date;
+    userId: string;
+    chatSessionId: string | null;
+    notes: string | null;
+    source: "FORM" | "CHAT";
+  }): Promise<BookingRecord>;
+  confirmHold(
+    booking: BookingRecord,
+    actor: BookingActor,
+    extraPatch?: { chatSessionId?: string },
+  ): Promise<BookingRecord>;
+  releaseHold(booking: BookingRecord, actor: BookingActor): Promise<void>;
+  findHeldForUser(userId: string, bookingId: string): Promise<BookingRecord | null>;
+  suggestStartTimes(
+    businessId: string,
+    serviceId: string,
+    from: Date,
+    count: number,
+  ): Promise<Date[]>;
+  toAppointmentResponse(booking: BookingRecord): AppointmentResponse;
+}
+
+export interface ChatOrchestrationCatalogPort {
+  findBookableService(
+    businessId: string,
+    serviceId: string,
+  ): Promise<{ id: string; name: string } | null>;
+  matchServiceByName(
+    businessId: string,
+    name: string,
+  ): Promise<{ id: string; name: string } | null>;
+  listBookableServiceNames(businessId: string, limit: number): Promise<string[]>;
+}
+
+/** Result of turning a complete request into a held slot, or explaining why not. */
+export interface PreparedChatBooking {
+  context: AppointmentBookingContext;
+  content: string;
+  missingFields: string[];
+  confirmationRequired: boolean;
+  suggestedTimes?: Date[];
 }

@@ -5,11 +5,9 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { BookingSource } from './bookingSource';
 
-export type AppointmentSource = typeof AppointmentSource[keyof typeof AppointmentSource];
-
-
-export const AppointmentSource = {
-  FORM: 'FORM',
-  CHAT: 'CHAT',
-} as const;
+/**
+ * Kept for the customer-facing API.
+ */
+export type AppointmentSource = BookingSource;

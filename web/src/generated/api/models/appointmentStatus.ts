@@ -5,13 +5,9 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { BookingStatus } from './bookingStatus';
 
-export type AppointmentStatus = typeof AppointmentStatus[keyof typeof AppointmentStatus];
-
-
-export const AppointmentStatus = {
-  PENDING: 'PENDING',
-  CONFIRMED: 'CONFIRMED',
-  CANCELLED: 'CANCELLED',
-  COMPLETED: 'COMPLETED',
-} as const;
+/**
+ * Kept for the customer-facing API, which still calls bookings appointments.
+ */
+export type AppointmentStatus = BookingStatus;

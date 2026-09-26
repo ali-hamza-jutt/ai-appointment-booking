@@ -55,3 +55,29 @@ describe("slugify", () => {
     expect(slugify("abc def", 4)).toBe("abc");
   });
 });
+
+describe("booking policy resolution", () => {
+  it("keeps business settings when a service has no overrides", async () => {
+    const { resolveBookingPolicy } = await import("../../src/modules/bookings/booking-policy.js");
+    const policy = resolveBookingPolicy(
+      { cancellationWindowHours: 720, rescheduleLimit: 1, minimumNoticeMinutes: 0 },
+      {},
+    );
+
+    expect(policy).toMatchObject({
+      cancellationWindowHours: 720,
+      rescheduleLimit: 1,
+      minimumNoticeMinutes: 0,
+    });
+  });
+
+  it("applies per-service overrides and ignores unknown keys", async () => {
+    const { resolveBookingPolicy } = await import("../../src/modules/bookings/booking-policy.js");
+
+    expect(
+      resolveBookingPolicy({ minimumNoticeMinutes: 0 }, { minimumNoticeMinutes: 1_440 })
+        .minimumNoticeMinutes,
+    ).toBe(1_440);
+    expect(resolveBookingPolicy({}, { holdMinutes: 1 }).holdMinutes).toBe(10);
+  });
+});

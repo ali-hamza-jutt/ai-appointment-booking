@@ -14,4 +14,6 @@ export interface ChatMessageMetadata {
   missingFields?: string[];
   confirmationRequired?: boolean;
   appointmentId?: string;
+  /** Open start times offered when the requested time was taken. */
+  suggestedTimes?: string[];
 }

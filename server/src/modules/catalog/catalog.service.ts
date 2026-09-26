@@ -3,6 +3,7 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
+  VALIDATION_PATTERNS,
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import {
@@ -12,6 +13,11 @@ import {
 import { assertUuid } from "../../utils/identifiers.js";
 import { normalizeWhitespace, toCompactSearchText } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import {
+  compactPolicyOverrides,
+  parseServicePolicyOverrides,
+  servicePolicyOverridesSchema,
+} from "../bookings/booking-policy.js";
 import { businessService } from "../businesses/business.service.js";
 import { catalogDal } from "./dal/catalog.dal.js";
 import type {
@@ -117,6 +123,7 @@ export class CatalogService {
       isActive: true,
       onlineBookable: request.onlineBookable ?? true,
       sortOrder: request.sortOrder ?? 0,
+      policyOverrides: request.policyOverrides ?? {},
     });
 
     const service = await catalogDal.createService({
@@ -161,6 +168,8 @@ export class CatalogService {
       isActive: request.isActive ?? current.isActive,
       onlineBookable: request.onlineBookable ?? current.onlineBookable,
       sortOrder: request.sortOrder ?? current.sortOrder,
+      policyOverrides:
+        request.policyOverrides ?? parseServicePolicyOverrides(current.policyOverrides),
     });
 
     try {
@@ -191,6 +200,44 @@ export class CatalogService {
     return { items: services };
   }
 
+  /** Best online-bookable match for a service a customer described in words. */
+  public async matchServiceByName(
+    businessId: string,
+    name: string,
+  ): Promise<{ id: string; name: string } | null> {
+    const search = normalizeWhitespace(name).slice(0, CATALOG_CONSTANTS.MAX_SEARCH_LENGTH);
+
+    if (!search) return null;
+
+    const [best] = await catalogDal.searchPublicServices(
+      businessId,
+      search,
+      toCompactSearchText(search),
+    );
+
+    return best ? { id: best.id, name: best.name } : null;
+  }
+
+  /** An active, online-bookable service of this business, or null. */
+  public async findBookableService(
+    businessId: string,
+    serviceId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    if (!VALIDATION_PATTERNS.UUID.test(serviceId)) return null;
+
+    const service = await catalogDal.findService(businessId, serviceId);
+
+    return service?.isActive && service.onlineBookable
+      ? { id: service.id, name: service.name }
+      : null;
+  }
+
+  public async listBookableServiceNames(businessId: string, limit: number): Promise<string[]> {
+    const services = await catalogDal.listPublicServices(businessId);
+
+    return services.slice(0, limit).map((service) => service.name);
+  }
+
   public toResponse(service: ServiceRecord): ServiceResponse {
     return {
       id: service.id,
@@ -209,6 +256,7 @@ export class CatalogService {
       isActive: service.isActive,
       onlineBookable: service.onlineBookable,
       sortOrder: service.sortOrder,
+      policyOverrides: parseServicePolicyOverrides(service.policyOverrides),
       createdAt: service.createdAt,
       updatedAt: service.updatedAt,
     };
@@ -295,7 +343,18 @@ export class CatalogService {
       }
     }
 
-    return { ...input, name, description };
+    const overrides = servicePolicyOverridesSchema.safeParse(input.policyOverrides);
+
+    if (!overrides.success) {
+      throwRequestValidationError("policyOverrides", VALIDATION_MESSAGES.BUSINESS_SETTINGS);
+    }
+
+    return {
+      ...input,
+      name,
+      description,
+      policyOverrides: compactPolicyOverrides(overrides.data),
+    };
   }
 
   private assertIntegerInRange(

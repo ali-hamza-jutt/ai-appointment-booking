@@ -1,14 +1,13 @@
 import type {
-  AppointmentBookingContext,
-  AppointmentResponse,
-} from "@/generated/api/models";
-import type {
   BookingDraftViewModel,
   StructuredBookingFormValues,
 } from "@/features/booking/types/booking-ui";
+import type {
+  AppointmentBookingContext,
+  AppointmentResponse,
+} from "@/generated/api/models";
 import { getLocalDateTimeInputValues } from "@/lib/utils/date-time";
-
-const DEFAULT_APPOINTMENT_DURATION_MINUTES = 30;
+import { formatMoney } from "@/lib/utils/money";
 
 export function getBrowserTimeZone(): string {
   try {
@@ -26,25 +25,41 @@ export function toBookingDraft(
     return null;
   }
 
-  return formatDraft(
-    context.serviceName,
-    context.scheduledAt,
-    context.durationMinutes,
-    context.notes,
+  const hasActiveHold =
+    Boolean(context.holdExpiresAt) &&
+    new Date(context.holdExpiresAt as string).getTime() > Date.now();
+
+  return formatDraft({
+    serviceName: context.serviceName,
+    scheduledAt: context.scheduledAt,
+    durationMinutes: context.durationMinutes,
+    notes: context.notes,
+    staffName: context.staffName,
+    price:
+      context.priceMinor !== undefined && context.currency
+        ? formatMoney(context.priceMinor, context.currency)
+        : null,
+    heldUntil: hasActiveHold ? (context.holdExpiresAt as string) : undefined,
     timeZone,
-  );
+  });
 }
 
 export function toConfirmedBookingDraft(
   appointment: AppointmentResponse,
 ): BookingDraftViewModel {
-  return formatDraft(
-    appointment.serviceName,
-    appointment.scheduledAt,
-    appointment.durationMinutes,
-    appointment.notes ?? undefined,
-    appointment.timeZone,
-  );
+  return formatDraft({
+    serviceName: appointment.serviceName,
+    scheduledAt: appointment.scheduledAt,
+    durationMinutes: appointment.durationMinutes,
+    notes: appointment.notes ?? undefined,
+    staffName: appointment.staff?.name,
+    price:
+      appointment.priceMinor !== null && appointment.currency
+        ? formatMoney(appointment.priceMinor, appointment.currency)
+        : null,
+    heldUntil: undefined,
+    timeZone: appointment.timeZone,
+  });
 }
 
 export function toStructuredBookingFormValues(
@@ -56,41 +71,46 @@ export function toStructuredBookingFormValues(
     : null;
 
   return {
-    durationMinutes:
-      context?.durationMinutes ?? DEFAULT_APPOINTMENT_DURATION_MINUTES,
     ...(context?.notes ? { notes: context.notes } : {}),
     scheduledDate: localDateTime?.date ?? "",
     scheduledTime: localDateTime?.time ?? "",
-    serviceName: context?.serviceName ?? "",
+    serviceId: context?.serviceId ?? "",
+    ...(context?.staffId ? { staffId: context.staffId } : {}),
   };
 }
 
-function formatDraft(
-  serviceName: string | undefined,
-  scheduledAtValue: string | undefined,
-  durationMinutes: number | undefined,
-  notes: string | undefined,
-  timeZone: string,
-): BookingDraftViewModel {
-  const scheduledAt = scheduledAtValue ? new Date(scheduledAtValue) : null;
+function formatDraft(input: {
+  durationMinutes: number | undefined;
+  heldUntil: string | undefined;
+  notes: string | undefined;
+  price: string | null;
+  scheduledAt: string | undefined;
+  serviceName: string | undefined;
+  staffName: string | undefined;
+  timeZone: string;
+}): BookingDraftViewModel {
+  const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
   const hasValidDate = scheduledAt !== null && !Number.isNaN(scheduledAt.getTime());
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeStyle: "short",
+    timeZone: input.timeZone,
+  });
 
   return {
     date: hasValidDate
       ? new Intl.DateTimeFormat("en-US", {
           dateStyle: "full",
-          timeZone,
+          timeZone: input.timeZone,
         }).format(scheduledAt)
       : "Date not provided",
-    duration: `${durationMinutes ?? DEFAULT_APPOINTMENT_DURATION_MINUTES} minutes`,
-    notes: notes || "No notes added.",
-    time: hasValidDate
-      ? new Intl.DateTimeFormat("en-US", {
-          timeStyle: "short",
-          timeZone,
-        }).format(scheduledAt)
-      : "Time not provided",
-    timezone: timeZone,
-    title: serviceName || "Service not provided",
+    duration:
+      input.durationMinutes !== undefined ? `${input.durationMinutes} minutes` : "Set by service",
+    heldUntil: input.heldUntil ? timeFormatter.format(new Date(input.heldUntil)) : null,
+    notes: input.notes || "No notes added.",
+    price: input.price,
+    staff: input.staffName ?? null,
+    time: hasValidDate ? timeFormatter.format(scheduledAt) : "Time not provided",
+    timezone: input.timeZone,
+    title: input.serviceName || "Service not provided",
   };
 }

@@ -9,20 +9,31 @@ import type {
   UpdateBusinessSettingsRequest,
 } from "./dto/business.dto.js";
 
+/** Validators shared by business settings and per-service overrides. */
+export const bookingPolicyFields = {
+  bookingWindowDays: z.number().int().min(1).max(365),
+  minimumNoticeMinutes: z.number().int().min(0).max(10_080),
+  slotStepMinutes: z.number().int().min(5).max(120),
+  cancellationWindowHours: z.number().int().min(0).max(720),
+  rescheduleLimit: z.number().int().min(0).max(10),
+  holdMinutes: z.number().int().min(2).max(60),
+  noShowGraceMinutes: z.number().int().min(0).max(240),
+  reminderOffsetsMinutes: z.array(z.number().int().min(5).max(20_160)).max(5),
+  allowGuestBooking: z.boolean(),
+  autoConfirmBookings: z.boolean(),
+} as const;
+
 export const businessSettingsSchema = z.object({
-  bookingWindowDays: z.number().int().min(1).max(365).default(60),
-  minimumNoticeMinutes: z.number().int().min(0).max(10_080).default(120),
-  slotStepMinutes: z.number().int().min(5).max(120).default(15),
-  cancellationWindowHours: z.number().int().min(0).max(720).default(24),
-  rescheduleLimit: z.number().int().min(0).max(10).default(2),
-  holdMinutes: z.number().int().min(2).max(60).default(10),
-  noShowGraceMinutes: z.number().int().min(0).max(240).default(15),
-  reminderOffsetsMinutes: z
-    .array(z.number().int().min(5).max(20_160))
-    .max(5)
-    .default([1_440, 120]),
-  allowGuestBooking: z.boolean().default(true),
-  autoConfirmBookings: z.boolean().default(true),
+  bookingWindowDays: bookingPolicyFields.bookingWindowDays.default(60),
+  minimumNoticeMinutes: bookingPolicyFields.minimumNoticeMinutes.default(120),
+  slotStepMinutes: bookingPolicyFields.slotStepMinutes.default(15),
+  cancellationWindowHours: bookingPolicyFields.cancellationWindowHours.default(24),
+  rescheduleLimit: bookingPolicyFields.rescheduleLimit.default(2),
+  holdMinutes: bookingPolicyFields.holdMinutes.default(10),
+  noShowGraceMinutes: bookingPolicyFields.noShowGraceMinutes.default(15),
+  reminderOffsetsMinutes: bookingPolicyFields.reminderOffsetsMinutes.default([1_440, 120]),
+  allowGuestBooking: bookingPolicyFields.allowGuestBooking.default(true),
+  autoConfirmBookings: bookingPolicyFields.autoConfirmBookings.default(true),
 });
 
 export function parseStoredBusinessSettings(value: unknown): BusinessSettings {

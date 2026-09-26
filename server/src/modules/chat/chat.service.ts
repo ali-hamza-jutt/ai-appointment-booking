@@ -19,7 +19,7 @@ import {
 import { normalizeWhitespace } from "../../utils/text.js";
 import { normalizeIanaTimeZone } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
-import { AppointmentSlotConflictError } from "../appointments/appointment-slot-conflict.error.js";
+import { businessService } from "../businesses/business.service.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
@@ -36,7 +36,6 @@ import type {
   ChatSessionResponse,
   ChatSessionWithMessagesRecord,
   CompleteChatBookingRequest,
-  ConfirmChatBookingData,
   ConfirmedChatBookingRecord,
   CreateChatMessageData,
   CreateChatMessageRequest,
@@ -56,9 +55,29 @@ export class ChatService {
     const title = request.title
       ? normalizeWhitespace(request.title) || null
       : null;
+    // Clients may seed only what a customer could type; hold details are server-owned.
     const bookingContext = request.bookingContext
-      ? this.normalizeBookingContext(request.bookingContext)
+      ? this.normalizeBookingContext({
+          ...(request.bookingContext.serviceName !== undefined
+            ? { serviceName: request.bookingContext.serviceName }
+            : {}),
+          ...(request.bookingContext.scheduledAt !== undefined
+            ? { scheduledAt: request.bookingContext.scheduledAt }
+            : {}),
+          ...(request.bookingContext.timeZone !== undefined
+            ? { timeZone: request.bookingContext.timeZone }
+            : {}),
+          ...(request.bookingContext.durationMinutes !== undefined
+            ? { durationMinutes: request.bookingContext.durationMinutes }
+            : {}),
+          ...(request.bookingContext.notes !== undefined
+            ? { notes: request.bookingContext.notes }
+            : {}),
+        })
       : null;
+    const businessId = request.businessSlug
+      ? (await businessService.getPublicBusiness(request.businessSlug)).id
+      : BUSINESS_CONSTANTS.DEMO_BUSINESS_ID;
 
     if (title && title.length > CHAT_CONSTANTS.MAX_SESSION_TITLE_LENGTH) {
       throwRequestValidationError(
@@ -71,6 +90,7 @@ export class ChatService {
 
     try {
       session = await chatDal.createSession({
+        businessId,
         userId,
         title,
         bookingContext: bookingContext
@@ -82,7 +102,7 @@ export class ChatService {
       if (isUniqueConstraintError(error)) {
         const activeSession = await chatDal.findActiveSessionForUser(userId);
 
-        if (activeSession) {
+        if (activeSession?.business.id === businessId) {
           return this.toSessionResponse(activeSession);
         }
       }
@@ -407,6 +427,7 @@ export class ChatService {
     }
   }
 
+  /** The finished booking for a session, once its confirmation message exists. */
   public async findConfirmedBooking(
     userId: string,
     sessionId: string,
@@ -414,7 +435,9 @@ export class ChatService {
     this.validateSessionId(sessionId);
     const record = await chatBookingDal.findConfirmedBooking(userId, sessionId);
 
-    return record ? this.toChatBookingPersistence(record) : null;
+    return record?.booking && record.messages.length > 0
+      ? this.toChatBookingPersistence(record)
+      : null;
   }
 
   public async completeBooking(
@@ -424,63 +447,35 @@ export class ChatService {
   ): Promise<ChatBookingPersistenceResult> {
     this.validateSessionId(sessionId);
 
-    const data: ConfirmChatBookingData = {
-      businessId: BUSINESS_CONSTANTS.DEMO_BUSINESS_ID,
-      userId,
-      sessionId,
-      appointmentId: request.appointmentId,
-      serviceName: request.serviceName,
-      scheduledAt: request.scheduledAt,
-      timeZone: request.timeZone,
-      durationMinutes: request.durationMinutes,
-      notes: request.notes,
-      assistantContent: this.normalizeMessageContent(request.assistantContent),
-      assistantStructuredData: this.serializeMessageMetadata(
-        request.assistantStructuredData,
-      ),
-    };
-
     try {
-      const record = await chatBookingDal.confirmBooking(data);
+      const record = await chatBookingDal.completeBooking({
+        userId,
+        sessionId,
+        bookingId: request.bookingId,
+        assistantContent: this.normalizeMessageContent(request.assistantContent),
+        assistantStructuredData: this.serializeMessageMetadata(
+          request.assistantStructuredData,
+        ),
+      });
+
       return this.toChatBookingPersistence(record);
     } catch (error) {
-      if (
-        error instanceof AppointmentSlotConflictError ||
-        isUniqueConstraintError(error) ||
-        isRecordNotFoundError(error)
-      ) {
-        const confirmedBooking = await chatBookingDal.findConfirmedBooking(
-          userId,
-          sessionId,
-        );
+      if (!isRecordNotFoundError(error)) throw error;
 
-        if (confirmedBooking) {
-          return this.toChatBookingPersistence(confirmedBooking);
-        }
+      // A concurrent confirmation may already have closed the session.
+      const confirmedBooking = await chatBookingDal.findConfirmedBooking(userId, sessionId);
+
+      if (confirmedBooking) {
+        return this.toChatBookingPersistence(confirmedBooking);
       }
 
-      if (
-        error instanceof AppointmentSlotConflictError ||
-        isUniqueConstraintError(error)
-      ) {
-        throw new AppError(
-          409,
-          ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE,
-          ERROR_MESSAGES.APPOINTMENT_SLOT_UNAVAILABLE,
-        );
+      const session = await chatDal.findSessionForUser(sessionId, userId);
+
+      if (!session) {
+        this.throwSessionNotFound();
       }
 
-      if (isRecordNotFoundError(error)) {
-        const session = await chatDal.findSessionForUser(sessionId, userId);
-
-        if (!session) {
-          this.throwSessionNotFound();
-        }
-
-        this.throwSessionNotActive();
-      }
-
-      throw error;
+      this.throwSessionNotActive();
     }
   }
 
@@ -626,6 +621,10 @@ export class ChatService {
 
     return {
       ...(serviceName !== undefined ? { serviceName } : {}),
+      ...this.pickHoldFields(context),
+      ...(context.holdExpiresAt !== undefined
+        ? { holdExpiresAt: context.holdExpiresAt }
+        : {}),
       ...(context.scheduledAt !== undefined
         ? { scheduledAt: context.scheduledAt }
         : {}),
@@ -653,12 +652,29 @@ export class ChatService {
     return normalized;
   }
 
+  private pickHoldFields(context: AppointmentBookingContext) {
+    return {
+      ...(context.serviceId !== undefined ? { serviceId: context.serviceId } : {}),
+      ...(context.staffId !== undefined ? { staffId: context.staffId } : {}),
+      ...(context.staffName !== undefined ? { staffName: context.staffName } : {}),
+      ...(context.holdBookingId !== undefined
+        ? { holdBookingId: context.holdBookingId }
+        : {}),
+      ...(context.priceMinor !== undefined ? { priceMinor: context.priceMinor } : {}),
+      ...(context.currency !== undefined ? { currency: context.currency } : {}),
+    };
+  }
+
   private serializeBookingContext(
     context: AppointmentBookingContext,
   ): StoredAppointmentBookingContext {
     return {
       ...(context.serviceName !== undefined
         ? { serviceName: context.serviceName }
+        : {}),
+      ...this.pickHoldFields(context),
+      ...(context.holdExpiresAt !== undefined
+        ? { holdExpiresAt: context.holdExpiresAt.toISOString() }
         : {}),
       ...(context.scheduledAt !== undefined
         ? { scheduledAt: context.scheduledAt.toISOString() }
@@ -682,11 +698,23 @@ export class ChatService {
     const scheduledAt = context.scheduledAt
       ? new Date(context.scheduledAt)
       : undefined;
+    const holdExpiresAt = context.holdExpiresAt
+      ? new Date(context.holdExpiresAt)
+      : undefined;
+    const stringField = (key: keyof StoredAppointmentBookingContext) =>
+      typeof context[key] === "string" ? { [key]: context[key] as string } : {};
 
     return {
       ...(typeof context.serviceName === "string"
         ? { serviceName: context.serviceName }
         : {}),
+      ...stringField("serviceId"),
+      ...stringField("staffId"),
+      ...stringField("staffName"),
+      ...stringField("holdBookingId"),
+      ...stringField("currency"),
+      ...(typeof context.priceMinor === "number" ? { priceMinor: context.priceMinor } : {}),
+      ...(holdExpiresAt && !Number.isNaN(holdExpiresAt.getTime()) ? { holdExpiresAt } : {}),
       ...(scheduledAt && !Number.isNaN(scheduledAt.getTime())
         ? { scheduledAt }
         : {}),
@@ -721,6 +749,9 @@ export class ChatService {
       ...(metadata.appointmentId !== undefined
         ? { appointmentId: metadata.appointmentId }
         : {}),
+      ...(metadata.suggestedTimes !== undefined
+        ? { suggestedTimes: metadata.suggestedTimes.map((time) => time.toISOString()) }
+        : {}),
     };
   }
 
@@ -753,6 +784,14 @@ export class ChatService {
         : {}),
       ...(typeof metadata.appointmentId === "string"
         ? { appointmentId: metadata.appointmentId }
+        : {}),
+      ...(Array.isArray(metadata.suggestedTimes)
+        ? {
+            suggestedTimes: metadata.suggestedTimes
+              .filter((time): time is string => typeof time === "string")
+              .map((time) => new Date(time))
+              .filter((time) => !Number.isNaN(time.getTime())),
+          }
         : {}),
     };
   }
@@ -817,20 +856,21 @@ export class ChatService {
   ): ChatBookingPersistenceResult {
     const assistantMessage = record.messages[0];
 
-    if (!record.appointment || !assistantMessage) {
+    if (!record.booking || !assistantMessage) {
       throw new Error("Completed chat booking was not returned");
     }
 
     return {
       session: this.toSessionResponse(record),
       assistantMessage: this.toMessageResponse(assistantMessage),
-      appointment: record.appointment,
+      booking: record.booking,
     };
   }
 
   private toSessionResponse(session: ChatSessionRecord): ChatSessionResponse {
     return {
       id: session.id,
+      business: session.business,
       title: session.title,
       status: session.status,
       bookingContext: this.deserializeBookingContext(session.bookingContext),

@@ -17,66 +17,79 @@ import {
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
 import { getAuthenticatedUser } from "../../../utils/request.js";
-import { appointmentService } from "../appointment.service.js";
+import { bookingService } from "../booking.service.js";
 import type {
   AppointmentListResponse,
   AppointmentResponse,
   AppointmentStatus,
-  CreateAppointmentRequest,
+  CancelAppointmentRequest,
+  CreateHoldRequest,
   RescheduleAppointmentRequest,
-} from "../dto/appointment.dto.js";
+} from "../dto/booking.dto.js";
 
 @Route("appointments")
 @Tags("Appointments")
 @Security("jwt")
-export class AppointmentController extends Controller {
-  /** Creates an appointment for the authenticated user. */
-  @Post()
-  @SuccessResponse("201", "Appointment created")
-  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
+export class CustomerBookingController extends Controller {
+  /**
+   * Holds a slot for a few minutes while the customer confirms, so nobody
+   * else can take it in the meantime.
+   */
+  @Post("holds")
+  @SuccessResponse("201", "Slot held")
+  @Response<ApiErrorResponse>(404, "Business or service was not found")
   @Response<ApiErrorResponse>(409, "The selected time is unavailable")
   @Response<ApiErrorResponse>(422, "Request validation failed")
-  public async createAppointment(
+  public async createHold(
     @Request() request: ExpressRequest,
-    @Body() body: CreateAppointmentRequest,
+    @Body() body: CreateHoldRequest,
   ): Promise<AppointmentResponse> {
     this.setStatus(201);
-    return appointmentService.createAppointment(
-      getAuthenticatedUser(request).id,
-      body,
-    );
+    return bookingService.createHold(getAuthenticatedUser(request).id, body);
   }
 
-  /** Cancels an appointment and releases its reserved time range. */
+  /** Confirms a held slot. Returns PENDING when the business approves bookings manually. */
+  @Post("{appointmentId}/confirm")
+  @SuccessResponse("200", "Appointment confirmed")
+  @Response<ApiErrorResponse>(404, "Appointment was not found")
+  @Response<ApiErrorResponse>(409, "The hold expired and the slot was taken")
+  public confirmAppointment(
+    @Request() request: ExpressRequest,
+    @Path() appointmentId: string,
+  ): Promise<AppointmentResponse> {
+    return bookingService.confirmForCustomer(getAuthenticatedUser(request).id, appointmentId);
+  }
+
+  /** Cancels an appointment within the business's cancellation window. */
   @Patch("{appointmentId}/cancel")
   @SuccessResponse("200", "Appointment cancelled")
-  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "Appointment was not found")
-  @Response<ApiErrorResponse>(409, "Appointment cannot be cancelled")
+  @Response<ApiErrorResponse>(409, "Appointment can no longer be cancelled")
   @Response<ApiErrorResponse>(422, "Appointment ID is invalid")
   public cancelAppointment(
     @Request() request: ExpressRequest,
     @Path() appointmentId: string,
+    @Body() body?: CancelAppointmentRequest,
   ): Promise<AppointmentResponse> {
-    return appointmentService.cancelAppointment(
+    return bookingService.cancelForCustomer(
       getAuthenticatedUser(request).id,
       appointmentId,
+      body?.reason,
     );
   }
 
-  /** Reschedules an appointment in its original IANA time zone. */
+  /** Moves an appointment to a new open slot, in its original time zone. */
   @Patch("{appointmentId}/reschedule")
   @SuccessResponse("200", "Appointment rescheduled")
-  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "Appointment was not found")
-  @Response<ApiErrorResponse>(409, "Appointment cannot be rescheduled or the selected time is unavailable")
+  @Response<ApiErrorResponse>(409, "Not reschedulable or the new time is unavailable")
   @Response<ApiErrorResponse>(422, "Request validation failed")
   public rescheduleAppointment(
     @Request() request: ExpressRequest,
     @Path() appointmentId: string,
     @Body() body: RescheduleAppointmentRequest,
   ): Promise<AppointmentResponse> {
-    return appointmentService.rescheduleAppointment(
+    return bookingService.rescheduleForCustomer(
       getAuthenticatedUser(request).id,
       appointmentId,
       body,
@@ -84,14 +97,13 @@ export class AppointmentController extends Controller {
   }
 
   /**
-   * Lists the user's most recently created appointments using cursor pagination.
+   * Lists the customer's appointments at every business, newest first.
    * @isInt limit Limit must be a whole number
    * @minimum limit 1
    * @maximum limit 50
    */
   @Get()
   @SuccessResponse("200", "Appointments retrieved")
-  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(422, "Pagination parameters are invalid")
   public listAppointments(
     @Request() request: ExpressRequest,
@@ -99,29 +111,22 @@ export class AppointmentController extends Controller {
     @Query() cursor?: string,
     @Query() limit?: number,
   ): Promise<AppointmentListResponse> {
-    return appointmentService.listAppointments(
-      getAuthenticatedUser(request).id,
-      {
-        ...(status ? { status } : {}),
-        ...(cursor ? { cursor } : {}),
-        ...(limit !== undefined ? { limit } : {}),
-      },
-    );
+    return bookingService.listForCustomer(getAuthenticatedUser(request).id, {
+      ...(status ? { status } : {}),
+      ...(cursor ? { cursor } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+    });
   }
 
-  /** Returns one appointment owned by the authenticated user. */
+  /** Returns one of the customer's appointments. */
   @Get("{appointmentId}")
   @SuccessResponse("200", "Appointment retrieved")
-  @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "Appointment was not found")
   @Response<ApiErrorResponse>(422, "Appointment ID is invalid")
   public getAppointment(
     @Request() request: ExpressRequest,
     @Path() appointmentId: string,
   ): Promise<AppointmentResponse> {
-    return appointmentService.getAppointment(
-      getAuthenticatedUser(request).id,
-      appointmentId,
-    );
+    return bookingService.getForCustomer(getAuthenticatedUser(request).id, appointmentId);
   }
 }

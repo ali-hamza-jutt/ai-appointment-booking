@@ -50,7 +50,8 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 ## Main APIs
 
 - `/api/auth`: signup, sign-in, and current-user retrieval.
-- `/api/appointments`: authenticated creation, retrieval, cancellation, and conflict-safe rescheduling.
+- `/api/appointments`: the signed-in customer's bookings at every business: `POST /holds` reserves an open slot for a few minutes, `POST /{id}/confirm` books it, and cancel/reschedule follow the business's policies (`canCancel` and `canReschedule` say what is still allowed).
+- `/api/businesses/{businessId}/bookings`: the business view: bookings by date, manual bookings for walk-in or phone customers, approve/decline, check-in, complete, no-show, cancel, reschedule (including to another staff member) and each booking's audit trail. `/api/businesses/{businessId}/availability` shows staff the open times without online-only limits.
 - `/api/chat/sessions`: active-session retrieval or replacement, history, AI-assisted turns, and booking confirmation.
 - `/api/businesses`: create a business (caller becomes owner), list your businesses, profile and booking-policy settings, and locations.
 - `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
@@ -96,6 +97,30 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 
 `modules/availability/slot-generator.ts` is a pure function with no Prisma import. It expands each staff member's weekly rules into dated windows in the rule's time zone (so DST days keep their wall-clock hours; a spring-forward gap moves forward and an autumn fold resolves to the first occurrence), removes closures, time off and busy intervals, then walks each free window in policy steps from the shift start while the service duration and its buffers still fit. Minimum notice and the booking window come from business settings. "Any provider" is the union of providers, remembering who owns each slot; class services report seats left, and every resource a service requires must have spare capacity. The service layer loads inputs through `dal/availability.dal.ts` and passes them in, and `test/unit/slot-generator.test.ts` covers DST start and end, overnight shifts, touching buffers, breaks, closures, classes and resources.
 
+## Booking lifecycle
+
+Appointments became provider-side bookings (`bookings` table). `modules/bookings/booking-state.ts` is the single table of allowed transitions:
+
+| From | Event | To |
+| --- | --- | --- |
+| (new) | customer picks a slot | `HELD` (expires after `holdMinutes`) |
+| `HELD` | deposit required | `PENDING_PAYMENT` |
+| `HELD`, `PENDING_PAYMENT` | confirmed | `CONFIRMED`, or `PENDING` when the business approves manually |
+| `PENDING` | approve / decline | `CONFIRMED` / `CANCELLED` |
+| `HELD`, `PENDING_PAYMENT` | timer runs out | `EXPIRED` |
+| `CONFIRMED` | customer arrives | `CHECKED_IN` |
+| `CHECKED_IN` | visit ends | `COMPLETED` |
+| `CONFIRMED` | grace period passes without check-in | `NO_SHOW` |
+| `HELD`, `PENDING_PAYMENT`, `PENDING`, `CONFIRMED` | cancel | `CANCELLED` |
+
+Every change goes through `BookingDal.transition`, a status-guarded update that also writes a `booking_events` audit row and an `outbox_events` row in the same transaction; side effects are delivered from the outbox, never inside the booking transaction.
+
+Double booking is prevented in three layers. Placing or moving a booking locks the provider's `staff` row (and any required `resources` rows, in id order), expires that provider's lapsed holds, and recomputes the slot from the database inside the transaction. A PostgreSQL exclusion constraint (`btree_gist`) is the final guard: `EXCLUDE USING gist (staff_id WITH =, tstzrange(occupied_from, occupied_until) WITH &&, session_key WITH <>)` for active statuses. The occupied range includes the service buffers, and seats in one class share a `session_key` so a class can fill up to its capacity while any other overlap is rejected. Service name, price and duration are snapshotted onto the booking so catalog edits never rewrite history.
+
+Policies (minimum notice, booking window, cancellation window, reschedule limit, hold length, no-show grace, auto-confirm) come from business settings, with optional per-service overrides for notice, window, cancellation and reschedule limit.
+
+The chat assistant books with one business per session: when the customer's request is complete it fuzzy-matches the service against the catalog, checks real availability and holds the slot, or answers with the closest open times. Confirming the chat turns the hold into a booking.
+
 ## Tests
 
 Tests live in `test/` and run with Vitest:
@@ -113,7 +138,7 @@ Integration and contract tests migrate and truncate the database in `TEST_DATABA
 - Ownership is included in appointment and chat database queries.
 - AI output is runtime-validated before it becomes booking context.
 - Message and confirmation retries are idempotent through client IDs, reply links, and database constraints.
-- Appointment creation, cancellation, and rescheduling serialize schedule writes per user; cancelled appointments release their intervals.
+- Booking writes serialize per provider and resource, and an exclusion constraint rejects any overlapping active booking for the same provider.
 - A partial unique index and transactional replacement enforce one active chat per user, including under concurrent requests.
 - Provider secrets and conversation content are excluded from AI operational logs.
 - HTTP shutdown closes the listener and PostgreSQL connection cleanly.
@@ -122,7 +147,6 @@ Integration and contract tests migrate and truncate the database in `TEST_DATABA
 
 - Rate limiting uses the process-local memory store; a distributed deployment should use a shared store and configure trusted proxies deliberately.
 - Chat updates use polling rather than WebSockets.
-- Overlapping appointment time ranges are rejected during creation and rescheduling; directly adjacent appointments remain valid.
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - Mistral extraction is limited to two provider attempts and retries only timeouts, network failures, invalid responses, HTTP 408 responses, and HTTP 5xx responses. Client retries remain safe through message idempotency.

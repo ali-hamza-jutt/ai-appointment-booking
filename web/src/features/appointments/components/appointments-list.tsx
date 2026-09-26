@@ -84,6 +84,9 @@ export function AppointmentsList() {
                   <h3 className="mt-4 text-base font-semibold text-ink group-hover:text-brand">
                     {appointment.title}
                   </h3>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {appointment.businessName} · {appointment.staffName}
+                  </p>
                   <div className="mt-3 flex items-center gap-2 text-sm text-muted">
                     <ClockIcon className="size-4" />
                     {appointment.dateTimeLabel} · {appointment.duration}

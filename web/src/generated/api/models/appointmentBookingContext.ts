@@ -12,6 +12,16 @@ export interface AppointmentBookingContext {
      * @maxLength 120
      */
   serviceName?: string;
+  /** Catalog service the request was matched to. */
+  serviceId?: string;
+  /** Staff member holding the slot. */
+  staffId?: string;
+  staffName?: string;
+  /** The held booking awaiting confirmation. */
+  holdBookingId?: string;
+  holdExpiresAt?: string;
+  priceMinor?: number;
+  currency?: string;
   scheduledAt?: string;
   /**
      * IANA time zone used to interpret the scheduled date and time.

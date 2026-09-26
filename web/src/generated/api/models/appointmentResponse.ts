@@ -5,19 +5,45 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
-import type { AppointmentSource } from './appointmentSource';
-import type { AppointmentStatus } from './appointmentStatus';
+import type { BookingBusinessReference } from './bookingBusinessReference';
+import type { BookingReference } from './bookingReference';
+import type { BookingSource } from './bookingSource';
+import type { BookingStatus } from './bookingStatus';
 
+/**
+ * A booking as its customer sees it.
+ */
 export interface AppointmentResponse {
   id: string;
+  business: BookingBusinessReference;
+  /** @nullable */
+  serviceId: string | null;
   serviceName: string;
+  staff: BookingReference | null;
   scheduledAt: string;
+  endsAt: string;
   timeZone: string;
   durationMinutes: number;
-  status: AppointmentStatus;
-  source: AppointmentSource;
+  status: BookingStatus;
+  source: BookingSource;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  priceMinor: number | null;
+  /** @nullable */
+  currency: string | null;
+  /**
+     * Set while the time is held for confirmation.
+     * @nullable
+     */
+  holdExpiresAt: string | null;
+  /** @nullable */
+  cancelReason: string | null;
+  rescheduleCount: number;
+  /** Whether the business's policy still lets the customer cancel. */
+  canCancel: boolean;
+  /** Whether the business's policy still lets the customer reschedule. */
+  canReschedule: boolean;
   createdAt: string;
   updatedAt: string;
 }
