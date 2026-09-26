@@ -3,6 +3,7 @@ import { prisma } from "../../../infrastructure/database/prisma.js";
 import type {
   AuthorizationMembershipRecord,
   BusinessRecord,
+  PublicBusinessRecord,
   CreateBusinessData,
   MembershipBusinessRecord,
   UpdateBusinessData,
@@ -45,6 +46,21 @@ export class BusinessDal {
     return prisma.business.findUnique({
       where: { id: businessId },
       select: businessSelect,
+    });
+  }
+
+  public findPublicBusinessBySlug(slug: string): Promise<PublicBusinessRecord | null> {
+    return prisma.business.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        vertical: true,
+        timeZone: true,
+        currency: true,
+        settings: true,
+      },
     });
   }
 

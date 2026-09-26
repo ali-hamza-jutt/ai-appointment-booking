@@ -39,6 +39,14 @@
       {
         "name": "Customers",
         "description": "Customers of a business"
+      },
+      {
+        "name": "Catalog",
+        "description": "Service categories and bookable services"
+      },
+      {
+        "name": "Public booking",
+        "description": "Unauthenticated endpoints behind a business booking link"
       }
     ],
     "securityDefinitions": {

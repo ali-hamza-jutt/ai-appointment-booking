@@ -20,3 +20,13 @@ export function slugify(value: string, maxLength: number): string {
     .slice(0, maxLength)
     .replace(/-+$/g, "");
 }
+
+/** Escapes LIKE wildcards so user input matches literally. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+/** Lowercases and drops spaces and punctuation for spacing-insensitive matching. */
+export function toCompactSearchText(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}

@@ -109,6 +109,16 @@ export interface BusinessResponse {
   updatedAt: Date;
 }
 
+export interface PublicBusinessResponse {
+  id: string;
+  slug: string;
+  name: string;
+  vertical: BusinessVertical;
+  timeZone: string;
+  currency: string;
+  allowGuestBooking: boolean;
+}
+
 export interface BusinessSummaryResponse {
   id: string;
   slug: string;
@@ -216,6 +226,16 @@ export interface BusinessRecord {
   settings: unknown;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PublicBusinessRecord {
+  id: string;
+  slug: string;
+  name: string;
+  vertical: BusinessVertical;
+  timeZone: string;
+  currency: string;
+  settings: unknown;
 }
 
 export interface MembershipBusinessRecord {

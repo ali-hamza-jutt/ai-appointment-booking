@@ -22,6 +22,9 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MEMBER_ALREADY_EXISTS: "This person is already on your team.",
   MEMBER_CHANGE_NOT_ALLOWED: "The business owner cannot be removed or changed.",
   MEMBER_NOT_FOUND: "This team member could not be found.",
+  SERVICE_CATEGORY_ALREADY_EXISTS: "A category with this name already exists.",
+  SERVICE_CATEGORY_NOT_FOUND: "This category could not be found.",
+  SERVICE_NOT_FOUND: "This service could not be found.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "Complete the service, date, and time before confirming the booking.",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -59,6 +62,9 @@ export const API_FIELD_ERROR_MESSAGES: Readonly<
   },
   CUSTOMER_ALREADY_EXISTS: {
     email: "A customer with this email already exists.",
+  },
+  SERVICE_CATEGORY_ALREADY_EXISTS: {
+    name: "A category with this name already exists.",
   },
   WEAK_PASSWORD: {
     password:

@@ -352,3 +352,20 @@ export function ContactIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function TagIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" />
+      <circle cx="7.5" cy="7.5" r="1.5" />
+    </svg>
+  );
+}
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </svg>
+  );
+}
