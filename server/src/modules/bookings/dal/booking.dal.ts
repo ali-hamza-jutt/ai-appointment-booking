@@ -65,6 +65,11 @@ export class BookingTransitionError extends Error {
   }
 }
 
+export interface BookingReference {
+  id: string;
+  businessId: string;
+}
+
 export type BookingPatch = Omit<
   Prisma.BookingUncheckedUpdateManyInput,
   "id" | "businessId" | "status"
@@ -199,6 +204,52 @@ export class BookingDal {
     );
 
     return updated;
+  }
+
+  /** Holds and unpaid bookings past their expiry, across all businesses. */
+  public findLapsedHolds(now: Date, limit: number): Promise<BookingReference[]> {
+    return prisma.$queryRaw<BookingReference[]>`
+      SELECT "id", "business_id" AS "businessId"
+      FROM "bookings"
+      WHERE "status" IN ('HELD', 'PENDING_PAYMENT') AND "hold_expires_at" <= ${now}
+      ORDER BY "hold_expires_at"
+      LIMIT ${limit}
+    `;
+  }
+
+  /**
+   * Confirmed bookings past their business's no-show grace period, for
+   * businesses that opted in to automatic no-shows.
+   */
+  public findNoShowCandidates(
+    now: Date,
+    defaultGraceMinutes: number,
+    limit: number,
+  ): Promise<BookingReference[]> {
+    return prisma.$queryRaw<BookingReference[]>`
+      SELECT b."id", b."business_id" AS "businessId"
+      FROM "bookings" b
+      JOIN "businesses" biz ON biz."id" = b."business_id"
+      WHERE b."status" = 'CONFIRMED'
+        AND b."scheduled_at" <= ${now}
+        AND COALESCE((biz."settings" ->> 'autoMarkNoShows')::boolean, false)
+        AND b."scheduled_at" + make_interval(
+          mins => COALESCE((biz."settings" ->> 'noShowGraceMinutes')::int, ${defaultGraceMinutes})
+        ) <= ${now}
+      ORDER BY b."scheduled_at"
+      LIMIT ${limit}
+    `;
+  }
+
+  /** Checked-in visits that ended before `endedBefore`, across all businesses. */
+  public findFinishedVisits(endedBefore: Date, limit: number): Promise<BookingReference[]> {
+    return prisma.$queryRaw<BookingReference[]>`
+      SELECT "id", "business_id" AS "businessId"
+      FROM "bookings"
+      WHERE "status" = 'CHECKED_IN' AND "ends_at" <= ${endedBefore}
+      ORDER BY "ends_at"
+      LIMIT ${limit}
+    `;
   }
 
   public findForBusiness(

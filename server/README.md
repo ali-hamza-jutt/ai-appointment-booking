@@ -17,6 +17,7 @@ The chat flow stores each frontend-generated `clientMessageId` once, links at mo
 
 - Node.js 22 or newer
 - PostgreSQL
+- Redis 7 (for the worker, shared rate limits and caching; optional for the API alone)
 - A Mistral API key for AI chat processing
 
 ## Local setup
@@ -25,6 +26,7 @@ The chat flow stores each frontend-generated `clientMessageId` once, links at mo
 2. Install dependencies with `npm install`.
 3. Apply migrations with `npm run db:migrate` against the intended development database.
 4. Start the API with `npm run dev`.
+5. With `REDIS_URL` set, start the background worker in a second terminal with `npm run dev:worker`.
 
 The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`, and health status is available at `/api/health`.
 
@@ -46,6 +48,9 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `MISTRAL_API_URL` | Mistral API base URL. |
 | `AI_REQUEST_TIMEOUT_MS` | Maximum duration of one Mistral request. |
 | `AI_MAX_HISTORY_MESSAGES` | Recent conversation window sent to Mistral. |
+| `REDIS_URL` | Redis connection. Required by the worker; enables shared rate limits and the availability cache in the API. |
+| `OUTBOX_RELAY_INTERVAL_MS` | How often the worker polls the outbox (default 1000). |
+| `AVAILABILITY_CACHE_TTL_SECONDS` | Lifetime of cached public availability; `0` turns the cache off (default 60). |
 
 ## Main APIs
 
@@ -83,6 +88,8 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Generate Prisma/tsoa output and run the development server. |
+| `npm run dev:worker` | Run the background worker with reload. |
+| `npm run start:worker` | Run the compiled worker. |
 | `npm run build` | Generate artifacts and compile TypeScript. |
 | `npm run typecheck` | Generate artifacts and check TypeScript without emitting output. |
 | `npm run lint` | Run ESLint. |
@@ -121,6 +128,18 @@ Policies (minimum notice, booking window, cancellation window, reschedule limit,
 
 The chat assistant books with one business per session: when the customer's request is complete it fuzzy-matches the service against the catalog, checks real availability and holds the slot, or answers with the closest open times. Confirming the chat turns the hold into a booking.
 
+## Background jobs and outbox
+
+`src/worker.ts` is a separate process from the API. It needs PostgreSQL and Redis and runs:
+
+- **Outbox relay.** Every `OUTBOX_RELAY_INTERVAL_MS` it claims unpublished `outbox_events` rows with `FOR UPDATE SKIP LOCKED` (so several workers can run), adds each to the `outbox-events` BullMQ queue with the event id as job id, and marks them published in the same transaction. A failed publish increments `attempts`; an event is retried until `OUTBOX_MAX_ATTEMPTS`.
+- **Idempotent consumers.** `modules/outbox/outbox-consumers.ts` lists the consumers. Each claims an event in Redis before handling it and records it as done afterwards, so a redelivered event is skipped and a failed consumer is retried without re-running the ones that succeeded. Today the only consumer drops cached availability on any `booking.*` event.
+- **Scheduled maintenance** on the `booking-maintenance` queue: expire lapsed holds (every minute), mark no-shows for businesses with `autoMarkNoShows` once `noShowGraceMinutes` has passed (every 5 minutes), and complete checked-in visits an hour after they end (every 5 minutes). Each booking changes in its own transaction through the state machine as the `SYSTEM` actor, so a booking that staff changed in the meantime is skipped.
+
+Hold expiry does not depend on the worker: placing a booking also expires the provider's lapsed holds inside its transaction.
+
+Public availability is cached per business in Redis for `AVAILABILITY_CACHE_TTL_SECONDS`. Each business has a version key; bumping it orphans all of that business's entries. Staff-side writes under `/api/businesses/{businessId}` bump it as soon as they succeed, and booking events bump it through the worker. Holding a slot always rechecks the database, so a stale entry can only offer a time that then fails with a clear conflict. Any Redis error falls back to computing availability.
+
 ## Tests
 
 Tests live in `test/` and run with Vitest:
@@ -129,7 +148,7 @@ Tests live in `test/` and run with Vitest:
 - `test/integration` exercises DALs and database constraints on a real PostgreSQL.
 - `test/contract` drives the tsoa app through Supertest (auth scopes, ownership isolation).
 
-Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. GitHub Actions runs lint, typecheck and all tests on every pull request against a PostgreSQL 16 service container.
+Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_REDIS_URL` (default `redis://localhost:6379/15`) and flush it. GitHub Actions runs lint, typecheck and all tests on every pull request against PostgreSQL 16 and Redis 7 service containers.
 
 ## Security and reliability decisions
 
@@ -141,11 +160,11 @@ Integration and contract tests migrate and truncate the database in `TEST_DATABA
 - Booking writes serialize per provider and resource, and an exclusion constraint rejects any overlapping active booking for the same provider.
 - A partial unique index and transactional replacement enforce one active chat per user, including under concurrent requests.
 - Provider secrets and conversation content are excluded from AI operational logs.
-- HTTP shutdown closes the listener and PostgreSQL connection cleanly.
+- HTTP and worker shutdown close listeners, queue workers, Redis and PostgreSQL connections cleanly.
 
 ## Known prototype limitations
 
-- Rate limiting uses the process-local memory store; a distributed deployment should use a shared store and configure trusted proxies deliberately.
+- Rate limits are shared through Redis when `REDIS_URL` is set and fall back to per-process memory otherwise; trusted proxies still need deliberate configuration behind a load balancer.
 - Chat updates use polling rather than WebSockets.
 - JWT access tokens are not refreshed or revoked.
 - The health endpoint reports process availability and does not perform a database readiness query.

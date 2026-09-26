@@ -41,6 +41,7 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
   const [autoConfirmBookings, setAutoConfirmBookings] = useState(
     business.settings.autoConfirmBookings,
   );
+  const [autoMarkNoShows, setAutoMarkNoShows] = useState(business.settings.autoMarkNoShows);
   const [fieldErrors, setFieldErrors] = useState<Partial<PolicyValues>>({});
   const [saved, setSaved] = useState(false);
 
@@ -67,7 +68,7 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
     updateMutation.mutate(
       {
         businessId: business.id,
-        data: { ...numbers, allowGuestBooking, autoConfirmBookings },
+        data: { ...numbers, allowGuestBooking, autoConfirmBookings, autoMarkNoShows },
       },
       {
         onSuccess: (response) => {
@@ -137,6 +138,14 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
               id="policy-auto-confirm"
               label="Confirm bookings automatically"
               onChange={(event) => setAutoConfirmBookings(event.target.checked)}
+            />
+            <CheckboxField
+              checked={autoMarkNoShows}
+              disabled={!canEdit}
+              hint="Confirmed bookings that are not checked in become no-shows after the grace period."
+              id="policy-auto-no-show"
+              label="Mark no-shows automatically"
+              onChange={(event) => setAutoMarkNoShows(event.target.checked)}
             />
           </div>
         </div>

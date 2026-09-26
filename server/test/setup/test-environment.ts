@@ -5,4 +5,8 @@ export const TEST_ENVIRONMENT = {
   DATABASE_URL:
     process.env.TEST_DATABASE_URL ??
     "postgresql://bookwise:bookwise@localhost:5432/bookwise_test?schema=public",
+  // A separate logical database keeps test keys away from local development.
+  REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/15",
+  // Tests read their own writes immediately; cache behaviour is tested directly.
+  AVAILABILITY_CACHE_TTL_SECONDS: "0",
 } as const;

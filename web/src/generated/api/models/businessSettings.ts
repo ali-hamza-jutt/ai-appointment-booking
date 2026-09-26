@@ -25,4 +25,6 @@ export interface BusinessSettings {
   reminderOffsetsMinutes: number[];
   allowGuestBooking: boolean;
   autoConfirmBookings: boolean;
+  /** Mark confirmed bookings without a check-in as no-shows once the grace period passes. */
+  autoMarkNoShows: boolean;
 }

@@ -26,6 +26,7 @@ import {
 } from "../../infrastructure/database/prisma.js";
 import { resolveBookingPolicy } from "../bookings/booking-policy.js";
 import { businessService } from "../businesses/business.service.js";
+import { availabilityCache } from "./availability-cache.js";
 import { availabilityDal } from "./dal/availability.dal.js";
 import type {
   AvailabilityDay,
@@ -271,7 +272,11 @@ export class AvailabilityService {
 
     if (!service?.onlineBookable) this.throwServiceNotFound();
 
-    return this.respondWithSlots(business, service, query, "CUSTOMER");
+    return availabilityCache.getOrCompute(
+      business.id,
+      { ...query, mode: "CUSTOMER" },
+      () => this.respondWithSlots(business, service, query, "CUSTOMER"),
+    );
   }
 
   /**
