@@ -7,6 +7,7 @@ import {
   connectDatabase,
   disconnectDatabase,
 } from "./infrastructure/database/prisma.js";
+import { closeRedis } from "./infrastructure/redis/redis.js";
 
 let httpServer: Server | undefined;
 let isShuttingDown = false;
@@ -81,6 +82,7 @@ async function shutdown(reason: ShutdownReason, exitCode = 0): Promise<void> {
 
   try {
     await closeHttpServer();
+    await closeRedis();
     await disconnectDatabase();
     logger.info("BookWise server stopped");
   } catch (error) {

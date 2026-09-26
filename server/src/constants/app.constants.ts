@@ -110,6 +110,40 @@ export const BOOKING_CONSTANTS = {
   AGGREGATE_TYPE: "booking",
 } as const;
 
+export const JOB_CONSTANTS = {
+  QUEUES: {
+    OUTBOX: "outbox-events",
+    MAINTENANCE: "booking-maintenance",
+  },
+  MAINTENANCE_JOBS: {
+    EXPIRE_HOLDS: "expire-holds",
+    MARK_NO_SHOWS: "mark-no-shows",
+    COMPLETE_VISITS: "complete-visits",
+  },
+  EXPIRE_HOLDS_EVERY_MS: 60_000,
+  MARK_NO_SHOWS_EVERY_MS: 5 * 60_000,
+  COMPLETE_VISITS_EVERY_MS: 5 * 60_000,
+  /** A checked-in visit is completed automatically this long after it ends. */
+  AUTO_COMPLETE_AFTER_MINUTES: 60,
+  MAINTENANCE_BATCH_SIZE: 200,
+  DEFAULT_OUTBOX_RELAY_INTERVAL_MS: 1_000,
+  OUTBOX_BATCH_SIZE: 100,
+  OUTBOX_MAX_ATTEMPTS: 10,
+  PROCESSED_EVENT_TTL_SECONDS: 7 * 24 * 60 * 60,
+  /** How long a consumer may hold an event before another delivery may retry it. */
+  CONSUMER_CLAIM_TTL_SECONDS: 5 * 60,
+  JOB_ATTEMPTS: 5,
+  JOB_BACKOFF_MS: 2_000,
+  KEEP_COMPLETED_JOBS: 1_000,
+  KEEP_FAILED_JOBS: 5_000,
+  DEFAULT_AVAILABILITY_CACHE_TTL_SECONDS: 60,
+  /** Outlives every cached entry, so an expired version never resurrects stale data. */
+  CACHE_VERSION_TTL_SECONDS: 24 * 60 * 60,
+  REDIS_KEY_PREFIX: "bookwise",
+  REDIS_REQUEST_RETRIES: 2,
+  REDIS_COMMAND_TIMEOUT_MS: 500,
+} as const;
+
 export const TENANT_SCOPE_FIELDS = {
   Location: ["businessId"],
   ServiceCategory: ["businessId"],

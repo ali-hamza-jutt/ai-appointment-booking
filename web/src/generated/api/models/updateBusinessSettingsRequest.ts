@@ -46,4 +46,5 @@ export interface UpdateBusinessSettingsRequest {
   reminderOffsetsMinutes?: number[];
   allowGuestBooking?: boolean;
   autoConfirmBookings?: boolean;
+  autoMarkNoShows?: boolean;
 }

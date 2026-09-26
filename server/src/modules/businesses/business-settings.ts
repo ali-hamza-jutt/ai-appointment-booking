@@ -21,6 +21,7 @@ export const bookingPolicyFields = {
   reminderOffsetsMinutes: z.array(z.number().int().min(5).max(20_160)).max(5),
   allowGuestBooking: z.boolean(),
   autoConfirmBookings: z.boolean(),
+  autoMarkNoShows: z.boolean(),
 } as const;
 
 export const businessSettingsSchema = z.object({
@@ -34,7 +35,10 @@ export const businessSettingsSchema = z.object({
   reminderOffsetsMinutes: bookingPolicyFields.reminderOffsetsMinutes.default([1_440, 120]),
   allowGuestBooking: bookingPolicyFields.allowGuestBooking.default(true),
   autoConfirmBookings: bookingPolicyFields.autoConfirmBookings.default(true),
+  autoMarkNoShows: bookingPolicyFields.autoMarkNoShows.default(false),
 });
+
+export const DEFAULT_BUSINESS_SETTINGS = businessSettingsSchema.parse({});
 
 export function parseStoredBusinessSettings(value: unknown): BusinessSettings {
   const stored =

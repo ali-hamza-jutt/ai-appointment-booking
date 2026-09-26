@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   AI_CONSTANTS,
   AUTH_CONSTANTS,
+  JOB_CONSTANTS,
 } from "../constants/app.constants.js";
 
 const optionalNonEmptyString = z.preprocess(
@@ -47,6 +48,20 @@ const environmentSchema = z.object({
     .min(AI_CONSTANTS.MIN_REQUEST_TIMEOUT_MS)
     .max(AI_CONSTANTS.MAX_REQUEST_TIMEOUT_MS)
     .default(AI_CONSTANTS.DEFAULT_REQUEST_TIMEOUT_MS),
+  /** Enables the job queue, shared rate limits and the availability cache. */
+  REDIS_URL: optionalNonEmptyString,
+  OUTBOX_RELAY_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(60_000)
+    .default(JOB_CONSTANTS.DEFAULT_OUTBOX_RELAY_INTERVAL_MS),
+  AVAILABILITY_CACHE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(3_600)
+    .default(JOB_CONSTANTS.DEFAULT_AVAILABILITY_CACHE_TTL_SECONDS),
   AI_MAX_HISTORY_MESSAGES: z.coerce
     .number()
     .int()
