@@ -6,6 +6,7 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
 } from "../constants/app.constants.js";
+import { env } from "../config/env.js";
 
 function createRateLimiter(windowMs: number, limit: number) {
   return rateLimit({
@@ -13,6 +14,7 @@ function createRateLimiter(windowMs: number, limit: number) {
     limit,
     standardHeaders: "draft-7",
     legacyHeaders: false,
+    skip: () => env.NODE_ENV === "test",
     handler(request, response) {
       response.status(429).json({
         error: {
