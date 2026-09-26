@@ -1944,5 +1944,125 @@
     {
       "content": "I've passed this to the team; someone will get back to you soon."
     }
+  ],
+  "kb-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "cancellation fee"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Per our Cancellation policy, you can cancel free of charge up to 24 hours before your appointment. Later cancellations are charged 50%."
+    }
+  ],
+  "kb-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "no-show missed appointment"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Per our Cancellation policy, no-shows are charged the full price of the service."
+    }
+  ],
+  "kb-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "patch test hair colouring"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Yes. Before your colour appointment, a patch test is needed at least 48 hours beforehand; you can pop in any time we're open."
+    }
+  ],
+  "kb-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "parking"
+          }
+        }
+      ]
+    },
+    {
+      "content": "From Visiting the studio: free parking is available behind the studio on Mill Lane."
+    }
+  ],
+  "kb-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "pay with cash"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Yes. From Visiting the studio: we accept card and cash, taken after your appointment."
+    }
+  ],
+  "kb-06": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "wash hair before colour"
+          }
+        }
+      ]
+    },
+    {
+      "content": "No. Before your colour appointment, please arrive with unwashed hair; natural oils protect your scalp."
+    }
+  ],
+  "kb-07": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "wheelchair access"
+          }
+        }
+      ]
+    },
+    {
+      "content": "I don't know whether the studio is wheelchair accessible. I can pass your question to the team if you like."
+    }
+  ],
+  "kb-08": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_knowledge",
+          "arguments": {
+            "query": "wifi"
+          }
+        }
+      ]
+    },
+    {
+      "content": "I don't know if there's wifi. I can pass your question to the team if you like."
+    }
   ]
 }

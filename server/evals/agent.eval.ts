@@ -11,6 +11,7 @@ import { env } from "../src/config/env.js";
 import { prisma } from "../src/infrastructure/database/prisma.js";
 import { MistralProvider } from "../src/integrations/ai/providers/mistral.provider.js";
 import { bookingService } from "../src/modules/bookings/booking.service.js";
+import { knowledgeService } from "../src/modules/knowledge/knowledge.service.js";
 import { ChatOrchestrationService } from "../src/modules/chat/chat-orchestration.service.js";
 import type { ChatMessagePart, ChatTurnResponse } from "../src/modules/chat/dto/chat.dto.js";
 import { readSlotToken } from "../src/utils/slot-token.js";
@@ -19,6 +20,7 @@ import { createTestBusiness, type TestBusiness } from "../test/helpers/business.
 import { disconnectTestDatabase, resetDatabase } from "../test/helpers/database.js";
 import {
   EVAL_CASES,
+  EVAL_KNOWLEDGE,
   EVAL_SERVICES,
   EVAL_STAFF,
   FROZEN_NOW,
@@ -118,7 +120,30 @@ async function setUpBusiness() {
       .expect(200);
   }
 
+  for (const source of EVAL_KNOWLEDGE) {
+    const created = await request(app)
+      .post(`/api/businesses/${business.id}/knowledge-sources`)
+      .set(...authHeader(owner))
+      .send(source)
+      .expect(201);
+    const { contentHash } = await prisma.knowledgeSource.findFirstOrThrow({
+      where: { id: created.body.id, businessId: business.id },
+    });
+
+    // Live runs embed with Mistral; recorded runs search by keywords.
+    await knowledgeService.indexSource(business.id, created.body.id, contentHash);
+  }
+
   return { business, services, staff };
+}
+
+const DONT_KNOW = /don't know|do not know|not sure|no information|couldn't find|can't find|cannot find|don't have (?:any )?(?:information|details)/i;
+
+/** Passage text the model was shown by search_knowledge in the final turn. */
+function knowledgeShown(provider: RecordedProvider): string | null {
+  const results = provider.toolResults.get("search_knowledge");
+
+  return results ? results.join("\n") : null;
 }
 
 async function book(business: TestBusiness, userId: string, serviceId: string, startsAt: string): Promise<string> {
@@ -137,7 +162,13 @@ async function book(business: TestBusiness, userId: string, serviceId: string, s
   return hold.id;
 }
 
-function grade(evalCase: EvalCase, turns: ChatTurnResponse[], symbols: SymbolTable, heldAtTurn: number | null) {
+function grade(
+  evalCase: EvalCase,
+  turns: ChatTurnResponse[],
+  symbols: SymbolTable,
+  heldAtTurn: number | null,
+  provider: RecordedProvider,
+) {
   const last = turns.at(-1);
   const parts = partsOf(last);
   const hold = last?.session.draft.hold ?? null;
@@ -228,6 +259,31 @@ function grade(evalCase: EvalCase, turns: ChatTurnResponse[], symbols: SymbolTab
         detail: last?.session.handoff?.reason ?? "no handoff",
         turnsToBook: null,
       };
+    case "answered": {
+      const reply = (last?.assistantMessage.content ?? "").toLowerCase();
+      const shown = knowledgeShown(provider)?.toLowerCase() ?? "";
+      // Every fact must be in the reply and in a passage the model was shown.
+      const grounded = expected.mentions.every(
+        (fact) => reply.includes(fact.toLowerCase()) && shown.includes(fact.toLowerCase()),
+      );
+
+      return {
+        passed: !hold && confirmButtons.length === 0 && grounded,
+        wrongSlot: Boolean(hold),
+        detail: `${shown ? "searched" : "no search"}: ${last?.assistantMessage.content ?? ""}`,
+        turnsToBook: null,
+      };
+    }
+    case "unknown": {
+      const reply = last?.assistantMessage.content ?? "";
+
+      return {
+        passed: !hold && knowledgeShown(provider) !== null && DONT_KNOW.test(reply),
+        wrongSlot: Boolean(hold),
+        detail: reply,
+        turnsToBook: null,
+      };
+    }
   }
 }
 
@@ -317,7 +373,7 @@ describe(`booking agent evals (${MODE})`, () => {
 
     if (provider.captured.length > 0) captured[evalCase.id] = provider.captured;
 
-    const graded = grade(evalCase, turns, symbols, heldAtTurn);
+    const graded = grade(evalCase, turns, symbols, heldAtTurn, provider);
     const expected = evalCase.expect;
 
     return {
@@ -327,7 +383,7 @@ describe(`booking agent evals (${MODE})`, () => {
         expected.outcome === "held" ? `held ${expected.service} ${expected.startsAt}${expected.staff ? ` ${expected.staff}` : ""}` : expected.outcome,
       ...graded,
       passed: graded.passed && !error,
-      toolCalls: provider.captured.length || (recordings[evalCase.id]?.filter((step) => "toolCalls" in step).length ?? 0),
+      toolCalls: provider.calledTools.length,
       ...(error ? { error } : {}),
     };
   }

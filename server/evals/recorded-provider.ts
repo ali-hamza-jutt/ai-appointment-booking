@@ -110,6 +110,10 @@ export class RecordedProvider implements AiProvider {
   public readonly name: AiProviderName = "mistral";
   public readonly model: string;
   public readonly captured: RecordedStep[] = [];
+  /** Every tool the model called, in order. */
+  public readonly calledTools: string[] = [];
+  /** Tool results the model has been shown, by tool name (latest last). */
+  public readonly toolResults = new Map<string, string[]>();
   private cursor = 0;
 
   public constructor(
@@ -122,6 +126,19 @@ export class RecordedProvider implements AiProvider {
   }
 
   public async completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
+    this.toolResults.clear();
+    for (const message of request.messages) {
+      if (message.role === "tool") this.toolResults.set(message.name, [...(this.toolResults.get(message.name) ?? []), message.content]);
+    }
+
+    const response = await this.reply(request);
+
+    this.calledTools.push(...response.toolCalls.map((call) => call.name));
+
+    return response;
+  }
+
+  private async reply(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
     if (this.live) {
       const response = await this.live.completeWithTools(request);
 

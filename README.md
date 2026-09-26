@@ -15,6 +15,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 
 - Account signup and sign-in with short-lived JWT access tokens.
 - A Mistral tool-calling booking agent that searches services, reads real availability and proposes bookings, cancellations and reschedules as tap-to-confirm cards.
+- A per-business knowledge base (FAQs, policies, preparation notes) that the agent answers from, with pgvector and keyword search.
 - Multi-turn booking conversations with persisted context and history.
 - Structured booking form fallback when chat input is incomplete, ambiguous, or AI processing fails.
 - Deterministic IANA-time-zone conversion with UTC storage.
@@ -146,7 +147,7 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 
 - Node.js 22 or newer
 - npm
-- PostgreSQL database, local or hosted
+- PostgreSQL 16 database with the pgvector extension, local or hosted
 - Mistral API key for the booking agent
 
 ### 1. Clone the repository
@@ -210,6 +211,7 @@ Never commit `.env` files or real credentials. The repository tracks only safe `
 | `MISTRAL_API_KEY` | Mistral credential used by the booking agent |
 | `MISTRAL_MODEL` | Mistral model identifier |
 | `MISTRAL_API_URL` | Mistral API base URL |
+| `MISTRAL_EMBED_MODEL` | Mistral embeddings model for the knowledge base |
 | `AI_REQUEST_TIMEOUT_MS` | Maximum duration of one provider request |
 | `AI_MAX_HISTORY_MESSAGES` | Maximum recent conversation turns sent to Mistral |
 
@@ -298,6 +300,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Previous conversation context is labeled untrusted so stored text is not treated as system instructions.
 - The backend, not the model, converts local date/time values into UTC.
 - Invalid, past, nonexistent, or ambiguous local times are rejected.
+- Questions about the business are answered only from the owner's knowledge base (hybrid pgvector and keyword search); with no matching passage the assistant says it doesn't know and offers a handoff.
 - Structured form submissions bypass Mistral and use normal domain validation.
 - Provider timeouts, network failures, invalid responses, and unavailable configuration map to explicit API errors.
 - Operational logs contain provider, model, latency, token usage, finish reason, and error category without logging credentials or conversation content.

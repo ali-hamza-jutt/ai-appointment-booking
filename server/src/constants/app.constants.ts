@@ -190,6 +190,7 @@ export const OBSERVABILITY_CONSTANTS = {
    * family prefix. Used only for the cost metric; update when prices change.
    */
   LLM_PRICING_USD_PER_MILLION: [
+    { prefix: "mistral-embed", input: 0.1, output: 0 },
     { prefix: "mistral-large", input: 2, output: 6 },
     { prefix: "mistral-medium", input: 0.4, output: 2 },
     { prefix: "mistral-small", input: 0.1, output: 0.3 },
@@ -212,6 +213,8 @@ export const TENANT_SCOPE_FIELDS = {
   Membership: ["businessId", "userId"],
   Booking: ["businessId", "userId"],
   BookingEvent: ["businessId", "bookingId"],
+  KnowledgeSource: ["businessId"],
+  KnowledgeChunk: ["businessId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -274,6 +277,29 @@ export const AGENT_CONSTANTS = {
   },
 } as const;
 
+export const KNOWLEDGE_CONSTANTS = {
+  EMBEDDING_DIMENSIONS: 1024,
+  DEFAULT_EMBED_MODEL: "mistral-embed",
+  EMBEDDINGS_PATH: "/embeddings",
+  /** Chunks aim for about this many tokens, with a little overlap for context. */
+  CHUNK_TARGET_TOKENS: 500,
+  CHUNK_OVERLAP_TOKENS: 50,
+  /** Rough English average, good enough for sizing chunks. */
+  CHARS_PER_TOKEN: 4,
+  EMBED_BATCH_SIZE: 32,
+  MAX_TITLE_LENGTH: 200,
+  MAX_CONTENT_LENGTH: 100_000,
+  MAX_SOURCES_PER_BUSINESS: 100,
+  MAX_QUERY_LENGTH: 500,
+  SEARCH_RESULTS: 4,
+  SEARCH_CANDIDATES: 12,
+  /** Reciprocal rank fusion constant for merging vector and keyword results. */
+  RRF_K: 60,
+  SOURCE_CHANGED_EVENT: "knowledge.source_changed",
+  AGGREGATE_TYPE: "knowledge_source",
+  PREVIEW_LENGTH: 180,
+} as const;
+
 export const AI_CONSTANTS = {
   PROVIDER: "mistral",
   CHAT_COMPLETIONS_PATH: "/chat/completions",
@@ -306,6 +332,8 @@ export const VALIDATION_PATTERNS = {
 } as const;
 
 export const ERROR_CODES = {
+  KNOWLEDGE_SOURCE_NOT_FOUND: "KNOWLEDGE_SOURCE_NOT_FOUND",
+  KNOWLEDGE_LIMIT_REACHED: "KNOWLEDGE_LIMIT_REACHED",
   SESSION_EXPIRED: "SESSION_EXPIRED",
   INVALID_AUTH_LINK: "INVALID_AUTH_LINK",
   INVALID_PHONE_CODE: "INVALID_PHONE_CODE",
@@ -370,6 +398,8 @@ export const ERROR_CODES = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  KNOWLEDGE_SOURCE_NOT_FOUND: "Knowledge source was not found",
+  KNOWLEDGE_LIMIT_REACHED: "This business has reached the maximum number of knowledge sources",
   SESSION_EXPIRED: "Your session has ended. Please sign in again",
   INVALID_AUTH_LINK: "This link is invalid or has expired",
   INVALID_PHONE_CODE: "The code is incorrect or has expired",

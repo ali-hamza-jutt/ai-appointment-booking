@@ -6,6 +6,7 @@ import {
   AI_CONSTANTS,
   AUTH_CONSTANTS,
   JOB_CONSTANTS,
+  KNOWLEDGE_CONSTANTS,
 } from "../constants/app.constants.js";
 
 const optionalNonEmptyString = z.preprocess(
@@ -44,6 +45,7 @@ const environmentSchema = z.object({
   MISTRAL_API_URL: z
     .url()
     .default(AI_CONSTANTS.DEFAULT_API_URL),
+  MISTRAL_EMBED_MODEL: z.string().trim().min(1).default(KNOWLEDGE_CONSTANTS.DEFAULT_EMBED_MODEL),
   AI_REQUEST_TIMEOUT_MS: z.coerce
     .number()
     .int()

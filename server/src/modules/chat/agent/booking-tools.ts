@@ -82,6 +82,13 @@ export const bookingTools: BookingTool[] = [
     handler: (args, context) => bookingAssistantService.proposeReschedule(context, args),
   }),
   tool({
+    name: "search_knowledge",
+    description:
+      "Search this business's FAQs, policies and preparation instructions (opening hours, parking, cancellation rules, what to bring, pricing questions not about a specific service). Returns up to 4 passages with their source title.",
+    schema: z.object({ query: z.string().min(2).max(500).describe("The customer's question in a few words") }),
+    handler: (args, context) => bookingAssistantService.searchKnowledge(context, args.query),
+  }),
+  tool({
     name: "handoff_to_human",
     description:
       "Flag the chat for the business's staff when the customer asks for a person, is upset, or needs something you cannot do.",
