@@ -6,6 +6,7 @@ import {
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
 } from "../constants/app.constants.js";
+import { reportError } from "../infrastructure/observability/error-reporting.js";
 import { AppError } from "./app-error.js";
 
 function hasErrorProperty(
@@ -86,6 +87,7 @@ export const errorHandler: ErrorRequestHandler = (
         { code: error.code, statusCode: error.statusCode },
         "Request failed with a handled server error",
       );
+      reportError(error, { code: error.code, route: request.route?.path as string | undefined });
     }
 
     response.status(error.statusCode).json({
@@ -100,6 +102,7 @@ export const errorHandler: ErrorRequestHandler = (
   }
 
   request.log.error({ err: error }, "Unhandled request error");
+  reportError(error, { method: request.method, route: request.route?.path as string | undefined });
 
   response.status(500).json({
     error: {

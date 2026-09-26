@@ -7,6 +7,8 @@ import {
   connectDatabase,
   disconnectDatabase,
 } from "./infrastructure/database/prisma.js";
+import { flushErrorReporting, reportError } from "./infrastructure/observability/error-reporting.js";
+import { stopTelemetry } from "./infrastructure/observability/telemetry.js";
 import { closeRedis } from "./infrastructure/redis/redis.js";
 
 let httpServer: Server | undefined;
@@ -84,6 +86,7 @@ async function shutdown(reason: ShutdownReason, exitCode = 0): Promise<void> {
     await closeHttpServer();
     await closeRedis();
     await disconnectDatabase();
+    await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);
     logger.info("BookWise server stopped");
   } catch (error) {
     logger.error({ err: error }, "BookWise server shutdown failed");
@@ -102,12 +105,14 @@ process.on("SIGTERM", () => {
 
 process.on("unhandledRejection", (reason) => {
   logger.fatal({ err: reason }, "Unhandled promise rejection");
+  reportError(reason);
   void shutdown("UNHANDLED_REJECTION", 1);
 });
 
 process.on("uncaughtException", (error) => {
   logger.fatal({ err: error }, "Uncaught exception");
-  process.exit(1);
+  reportError(error);
+  void flushErrorReporting().finally(() => process.exit(1));
 });
 
 void startServer();

@@ -57,6 +57,17 @@ const environmentSchema = z.object({
   MAIL_FROM: z.string().trim().min(3).default("BookWise <no-reply@bookwise.local>"),
   GOOGLE_CLIENT_ID: optionalNonEmptyString,
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString,
+  /** Exposes Prometheus metrics for the API on this port (e.g. 9464). */
+  METRICS_PORT: z.coerce.number().int().min(1).max(65_535).optional(),
+  /** Exposes Prometheus metrics for the worker on this port (e.g. 9465). */
+  WORKER_METRICS_PORT: z.coerce.number().int().min(1).max(65_535).optional(),
+  /** OTLP/HTTP collector base URL; traces are exported when set. */
+  OTEL_EXPORTER_OTLP_ENDPOINT: optionalNonEmptyString,
+  /** Share of new traces to keep, from 0 to 1. */
+  OTEL_TRACES_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(1),
+  SENTRY_DSN: optionalNonEmptyString,
+  /** Release name reported with traces and errors, e.g. a git SHA. */
+  APP_RELEASE: optionalNonEmptyString,
   /** Enables the job queue, shared rate limits and the availability cache. */
   REDIS_URL: optionalNonEmptyString,
   OUTBOX_RELAY_INTERVAL_MS: z.coerce

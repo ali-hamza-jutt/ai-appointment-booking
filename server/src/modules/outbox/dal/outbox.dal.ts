@@ -1,5 +1,5 @@
 import { JOB_CONSTANTS } from "../../../constants/app.constants.js";
-import type { TransactionClient } from "../../../infrastructure/database/prisma.js";
+import { prisma, type TransactionClient } from "../../../infrastructure/database/prisma.js";
 import type { OutboxMessage } from "../dto/outbox.dto.js";
 
 interface OutboxRow {
@@ -13,6 +13,17 @@ interface OutboxRow {
 }
 
 export class OutboxDal {
+  /** Creation time of the oldest event still waiting to be published. */
+  public async oldestUnpublishedAt(): Promise<Date | null> {
+    const oldest = await prisma.outboxEvent.findFirst({
+      where: { publishedAt: null, attempts: { lt: JOB_CONSTANTS.OUTBOX_MAX_ATTEMPTS } },
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    });
+
+    return oldest?.createdAt ?? null;
+  }
+
   /**
    * Locks the oldest unpublished events. SKIP LOCKED lets several relays run
    * side by side without handing out the same event twice.

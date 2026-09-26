@@ -120,6 +120,7 @@ export class ChatOrchestrationService {
         ? { appointmentContext: this.toAiAppointmentContext(session.bookingContext) }
         : {}),
       timeZone,
+      businessId: session.business.id,
     });
 
     if (extraction.intent !== "BOOK_APPOINTMENT") {

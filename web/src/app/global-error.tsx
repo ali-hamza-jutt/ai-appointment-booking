@@ -1,11 +1,16 @@
 "use client";
 
+import { useReportError } from "@/lib/observability/use-report-error";
+
 export default function GlobalError({
+  error,
   retry,
 }: {
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  useReportError(error);
+
   return (
     <html lang="en">
       <body

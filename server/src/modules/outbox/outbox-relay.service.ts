@@ -1,6 +1,7 @@
 import { logger } from "../../config/logger.js";
 import { JOB_CONSTANTS } from "../../constants/app.constants.js";
 import { prisma } from "../../infrastructure/database/prisma.js";
+import { jobMetrics } from "../../infrastructure/observability/metrics.js";
 import { outboxDal } from "./dal/outbox.dal.js";
 import type { OutboxPublisher, RelayBatchResult } from "./dto/outbox.dto.js";
 
@@ -15,6 +16,15 @@ export class OutboxRelayService {
   public async relayBatch(
     limit: number = JOB_CONSTANTS.OUTBOX_BATCH_SIZE,
   ): Promise<RelayBatchResult> {
+    const result = await this.relayInTransaction(limit);
+
+    jobMetrics.outboxPublished(result.published);
+    jobMetrics.outboxPublishFailed(result.failed);
+
+    return result;
+  }
+
+  private relayInTransaction(limit: number): Promise<RelayBatchResult> {
     return prisma.$transaction(async (transaction) => {
       const messages = await outboxDal.claimBatch(transaction, limit);
 
@@ -37,7 +47,7 @@ export class OutboxRelayService {
     });
   }
 
-  /** Relays until the backlog is empty or a batch fails. */
+  /** Relays until the backlog is empty or a batch fails, then reports what is left. */
   public async drain(): Promise<number> {
     let total = 0;
 
@@ -46,9 +56,13 @@ export class OutboxRelayService {
 
       total += result.published;
 
-      if (result.failed > 0 || result.published < JOB_CONSTANTS.OUTBOX_BATCH_SIZE) {
-        return total;
-      }
+      if (result.failed > 0 || result.published < JOB_CONSTANTS.OUTBOX_BATCH_SIZE) break;
     }
+
+    const oldest = await outboxDal.oldestUnpublishedAt();
+
+    jobMetrics.outboxOldestUnpublished(oldest ? (Date.now() - oldest.getTime()) / 1_000 : 0);
+
+    return total;
   }
 }

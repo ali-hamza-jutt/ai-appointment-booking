@@ -13,6 +13,8 @@ The primary project documentation, including the complete architecture, booking 
 - Feature folders contain booking, authentication, appointment, conversation, and profile UI.
 - Shared components and CSS design tokens provide consistent colors, typography, loading states, and interactions.
 
+Set `NEXT_PUBLIC_SENTRY_DSN` to report browser errors to Sentry (started from `src/instrumentation-client.ts`); errors from failed API calls are tagged with the API's request id so they can be matched to server logs and traces.
+
 The application uses the Inter font through `next/font` and reusable design tokens defined in `src/app/globals.css`.
 
 ## Local setup
