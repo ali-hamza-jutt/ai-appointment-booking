@@ -62,8 +62,25 @@ export const BUSINESS_CONSTANTS = {
   PHONE_PATTERN: /^\+?[0-9 ()-]{6,32}$/,
 } as const;
 
+export const CATALOG_CONSTANTS = {
+  MAX_CATEGORY_NAME_LENGTH: 80,
+  MIN_SERVICE_NAME_LENGTH: 2,
+  MAX_SERVICE_NAME_LENGTH: 120,
+  MAX_DESCRIPTION_LENGTH: 2_000,
+  MIN_DURATION_MINUTES: 5,
+  MAX_DURATION_MINUTES: 720,
+  MAX_BUFFER_MINUTES: 240,
+  MAX_PRICE_MINOR: 100_000_000,
+  MAX_CLASS_CAPACITY: 500,
+  MAX_SEARCH_LENGTH: 100,
+  MAX_SEARCH_RESULTS: 10,
+  SEARCH_SIMILARITY_THRESHOLD: 0.2,
+} as const;
+
 export const TENANT_SCOPE_FIELDS = {
   Location: ["businessId"],
+  ServiceCategory: ["businessId"],
+  Service: ["businessId"],
   Customer: ["businessId"],
   BusinessInvitation: ["businessId", "email"],
   Membership: ["businessId", "userId"],
@@ -194,6 +211,9 @@ export const ERROR_CODES = {
   MEMBER_NOT_FOUND: "MEMBER_NOT_FOUND",
   MEMBER_CHANGE_NOT_ALLOWED: "MEMBER_CHANGE_NOT_ALLOWED",
   INVITATION_NOT_FOUND: "INVITATION_NOT_FOUND",
+  SERVICE_NOT_FOUND: "SERVICE_NOT_FOUND",
+  SERVICE_CATEGORY_NOT_FOUND: "SERVICE_CATEGORY_NOT_FOUND",
+  SERVICE_CATEGORY_ALREADY_EXISTS: "SERVICE_CATEGORY_ALREADY_EXISTS",
   APPOINTMENT_NOT_FOUND: "APPOINTMENT_NOT_FOUND",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
     "APPOINTMENT_CANCELLATION_NOT_ALLOWED",
@@ -238,6 +258,9 @@ export const ERROR_MESSAGES = {
   MEMBER_CHANGE_NOT_ALLOWED:
     "The business owner cannot be removed or changed",
   INVITATION_NOT_FOUND: "Invitation was not found",
+  SERVICE_NOT_FOUND: "Service was not found",
+  SERVICE_CATEGORY_NOT_FOUND: "Service category was not found",
+  SERVICE_CATEGORY_ALREADY_EXISTS: "A category with this name already exists",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
     "Completed appointments cannot be cancelled",
@@ -298,6 +321,15 @@ export const VALIDATION_MESSAGES = {
   LOCATION_ADDRESS: "Address cannot exceed 300 characters",
   LOCATION_NAME: "Location name must contain between 2 and 120 characters",
   RESOURCE_ID: "Identifier must be a valid UUID",
+  SERVICE_BUFFER: "Buffers must be whole minutes between 0 and 240",
+  SERVICE_CAPACITY:
+    "Classes need between 1 and 500 seats; appointments always have 1",
+  SERVICE_CATEGORY_NAME: "Category name must contain between 1 and 80 characters",
+  SERVICE_DEPOSIT: "Deposit cannot be negative or exceed the price",
+  SERVICE_DESCRIPTION: "Description cannot exceed 2000 characters",
+  SERVICE_DURATION: "Duration must be whole minutes between 5 and 720",
+  SERVICE_NAME: "Service name must contain between 2 and 120 characters",
+  SERVICE_PRICE: "Price must be a whole number of minor units, 0 or more",
   BOOKING_CONTEXT_DURATION:
     "Booking duration must be an integer between 5 and 480 minutes",
   BOOKING_CONTEXT_TIME: "Booking time must be a valid future date and time",

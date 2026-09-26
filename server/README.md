@@ -55,6 +55,8 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses`: create a business (caller becomes owner), list your businesses, profile and booking-policy settings, and locations.
 - `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
+- `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
+- `/api/public/{slug}` and `/api/public/{slug}/services`: unauthenticated booking-link profile and online-bookable services; `?search=` fuzzy-matches names with `pg_trgm` (spacing and punctuation insensitive).
 - `/api/business-verticals`: supported business types (salon, clinic, consultant, spa and wellness, fitness studio, tutoring, pet grooming).
 - `/api/health`: process availability.
 

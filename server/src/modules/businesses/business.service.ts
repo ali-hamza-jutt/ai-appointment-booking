@@ -31,6 +31,8 @@ import type {
   BusinessVertical,
   BusinessVerticalListResponse,
   CreateBusinessRequest,
+  PublicBusinessRecord,
+  PublicBusinessResponse,
   CreateLocationRequest,
   LocationListResponse,
   LocationRecord,
@@ -118,6 +120,30 @@ export class BusinessService {
         ...membership.business,
         role: membership.role,
       })),
+    };
+  }
+
+  /** Resolves a public booking link; used by customer-facing routes. */
+  public async getPublicBusiness(slug: string): Promise<PublicBusinessRecord> {
+    const business = await businessDal.findPublicBusinessBySlug(
+      slug.trim().toLowerCase(),
+    );
+
+    if (!business) this.throwBusinessNotFound();
+
+    return business;
+  }
+
+  public toPublicResponse(business: PublicBusinessRecord): PublicBusinessResponse {
+    return {
+      id: business.id,
+      slug: business.slug,
+      name: business.name,
+      vertical: business.vertical,
+      timeZone: business.timeZone,
+      currency: business.currency,
+      allowGuestBooking: parseStoredBusinessSettings(business.settings)
+        .allowGuestBooking,
     };
   }
 
