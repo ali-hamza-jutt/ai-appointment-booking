@@ -1,0 +1,34 @@
+{
+  "explicit-date": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "relative-tomorrow": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"14:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "weekday-name": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"beard trim\", \"scheduledDate\": \"2026-11-06\", \"scheduledTime\": \"11:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "fuzzy-service": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"hair color\", \"scheduledDate\": \"2026-11-05\", \"scheduledTime\": \"09:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "clarify-then-book": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": \"What day and time would you like your haircut?\", \"assistantReply\": null, \"confidence\": 0.9}",
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-04\", \"scheduledTime\": \"15:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "correct-time": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}",
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"11:30\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "missing-time": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"beard trim\", \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": \"What day and time would suit you for the beard trim?\", \"assistantReply\": null, \"confidence\": 0.9}"
+  ],
+  "closed-day": [
+    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-08\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  ],
+  "out-of-scope-weather": [
+    "{\"intent\": \"OUT_OF_SCOPE\", \"serviceName\": null, \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": \"I can only help with booking appointments. What would you like to book?\", \"confidence\": 0.97}"
+  ],
+  "out-of-scope-poem": [
+    "{\"intent\": \"OUT_OF_SCOPE\", \"serviceName\": null, \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": \"I'm here to help you book appointments. Is there something you'd like to schedule?\", \"confidence\": 0.97}"
+  ]
+}

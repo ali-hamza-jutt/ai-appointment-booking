@@ -113,11 +113,15 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 |   |-- src/
 |   |   |-- config/              Validated environment and logger
 |   |   |-- constants/           Shared backend constants and messages
-|   |   |-- infrastructure/      Prisma and PostgreSQL connection
+|   |   |-- infrastructure/      Database, Redis, queues, messaging, observability
 |   |   |-- integrations/ai/     AI service, prompt, provider, DTOs, errors
 |   |   |-- middleware/           Authentication, logging, limits, errors
-|   |   |-- modules/              Auth, appointments, chat, and health
-|   |   `-- utils/                Shared validation, JWT, time, and pagination
+|   |   |-- modules/              Auth, businesses, catalog, staff, availability, bookings, chat, outbox
+|   |   |-- utils/                Shared validation, JWT, time, and pagination
+|   |   |-- server.ts             API entry point
+|   |   `-- worker.ts             Background worker (outbox relay, scheduled jobs)
+|   |-- test/                     Unit, integration and API contract tests (Vitest)
+|   |-- evals/                    Scripted agent evals, recorded or live
 |   `-- README.md                 Backend-specific operational notes
 |-- web/
 |   |-- src/
@@ -129,6 +133,8 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 |   |   |-- lib/                  API, auth, config, and utility layers
 |   |   `-- providers/            Application providers
 |   `-- orval.config.ts           OpenAPI client generation configuration
+|-- e2e/                          Playwright end-to-end tests with a fake Mistral server
+|-- ops/prometheus/               Alert rules and an example scrape config
 |-- .gitignore
 |-- LICENSE
 `-- README.md
@@ -355,6 +361,16 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - Mistral extraction is limited to two provider attempts and retries only eligible transient failures; client retries remain safe through message idempotency.
 - The prototype has no automated test suite; linting, strict type checks, production builds, and manual workflow verification are used currently.
 - Free backend hosting can introduce cold-start delays after inactivity.
+
+## Automated tests
+
+| Layer | Command | Covers |
+| --- | --- | --- |
+| Unit, integration, contract | `cd server && npm test` | Slot generation, state machine, policies, time zones, DALs and constraints on real PostgreSQL, the outbox and Redis, API scopes and tenant isolation. Recorded agent evals run here too. |
+| Agent evals | `cd server && npm run eval` / `npm run eval:live` / `npm run eval:record` | Scripted conversations with a frozen clock: booking success, wrong-slot rate and out-of-scope refusals. `eval` replays recorded model replies; `eval:live` calls Mistral and grades against targets; `eval:record` refreshes the recordings. |
+| End to end | `cd e2e && npm test` | Sign up, book through chat, confirm and cancel in a real browser against the real API and web app, with a fake Mistral server. Set `E2E_CHROMIUM_PATH` to use a preinstalled Chromium. |
+
+GitHub Actions runs the server, web and end-to-end jobs on every pull request. Live agent evals run nightly and when the AI integration changes (`.github/workflows/agent-evals.yml`, needs the `MISTRAL_API_KEY` secret).
 
 ## Verification commands
 
