@@ -5,7 +5,6 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
-import type { AppointmentBookingContext } from './appointmentBookingContext';
 
 export interface CreateChatSessionRequest {
   /** @maxLength 120 */
@@ -15,7 +14,6 @@ export interface CreateChatSessionRequest {
      * @maxLength 60
      */
   businessSlug?: string;
-  bookingContext?: AppointmentBookingContext;
   /** Abandons the current active chat before creating this session. */
   replaceActive?: boolean;
 }

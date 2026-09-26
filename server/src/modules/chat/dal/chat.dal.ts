@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
 import type {
+  ChatDraftPatch,
   ChatMessageRecord,
   ChatSessionRecord,
   ChatSessionWithMessagesRecord,
@@ -12,7 +13,7 @@ import type {
   ListRecentChatMessagesData,
   ListChatSessionsData,
   SaveAssistantTurnData,
-  UpdateBookingContextData,
+  UpdateChatDraftData,
 } from "../dto/chat.dto.js";
 
 export const chatSessionSelect = {
@@ -20,10 +21,46 @@ export const chatSessionSelect = {
   business: { select: { id: true, name: true, slug: true } },
   title: true,
   status: true,
-  bookingContext: true,
+  draftService: {
+    select: { id: true, name: true, durationMinutes: true, priceMinor: true, currency: true },
+  },
+  draftStaff: { select: { id: true, displayName: true } },
+  draftHold: {
+    select: {
+      id: true,
+      serviceName: true,
+      scheduledAt: true,
+      endsAt: true,
+      durationMinutes: true,
+      priceMinor: true,
+      currency: true,
+      status: true,
+      holdExpiresAt: true,
+      timeZone: true,
+      staff: { select: { displayName: true } },
+    },
+  },
+  draftTimeZone: true,
+  draftNotes: true,
+  handoffRequestedAt: true,
+  handoffReason: true,
+  handoffResolvedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
+
+/** Column updates for a draft patch; undefined fields are left as they are. */
+function draftColumns(draft: ChatDraftPatch | undefined): Prisma.ChatSessionUncheckedUpdateInput {
+  if (!draft) return {};
+
+  return {
+    ...(draft.serviceId !== undefined ? { draftServiceId: draft.serviceId } : {}),
+    ...(draft.staffId !== undefined ? { draftStaffId: draft.staffId } : {}),
+    ...(draft.holdId !== undefined ? { draftHoldId: draft.holdId } : {}),
+    ...(draft.timeZone !== undefined ? { draftTimeZone: draft.timeZone } : {}),
+    ...(draft.notes !== undefined ? { draftNotes: draft.notes } : {}),
+  };
+}
 
 export const chatMessageSelect = {
   id: true,
@@ -69,12 +106,6 @@ export class ChatDal {
           businessId: data.businessId,
           userId: data.userId,
           title: data.title,
-          ...(data.bookingContext
-            ? {
-                bookingContext:
-                  data.bookingContext as unknown as Prisma.InputJsonObject,
-              }
-            : {}),
         },
         select: chatSessionSelect,
       });
@@ -266,12 +297,7 @@ export class ChatDal {
       },
       data: {
         updatedAt: new Date(),
-        ...(data.bookingContext
-          ? {
-              bookingContext:
-                data.bookingContext as unknown as Prisma.InputJsonObject,
-            }
-          : {}),
+        ...draftColumns(data.draft),
         messages: {
           create: {
             id: assistantMessageId,
@@ -294,18 +320,19 @@ export class ChatDal {
     });
   }
 
-  public updateBookingContext(
-    data: UpdateBookingContextData,
-  ): Promise<ChatSessionRecord> {
+  public updateDraft(data: UpdateChatDraftData): Promise<ChatSessionRecord> {
     return prisma.chatSession.update({
-      where: {
-        id: data.sessionId,
-        userId: data.userId,
-      },
-      data: {
-        bookingContext:
-          data.bookingContext as unknown as Prisma.InputJsonObject,
-      },
+      where: { id: data.sessionId, userId: data.userId },
+      data: draftColumns(data.draft),
+      select: chatSessionSelect,
+    });
+  }
+
+  /** Flags a chat for staff; asking again only updates the reason. */
+  public requestHandoff(userId: string, sessionId: string, reason: string | null): Promise<ChatSessionRecord> {
+    return prisma.chatSession.update({
+      where: { id: sessionId, userId },
+      data: { handoffRequestedAt: new Date(), handoffReason: reason, handoffResolvedAt: null },
       select: chatSessionSelect,
     });
   }

@@ -1,75 +1,36 @@
 import { z } from "zod";
 
-import {
-  AI_CONSTANTS,
-  APPOINTMENT_CONSTANTS,
-  CHAT_CONSTANTS,
-  VALIDATION_PATTERNS,
-} from "../../../constants/app.constants.js";
-
-export type AiAppointmentIntent = (typeof AI_CONSTANTS.INTENTS)[number];
-
-export type AiConversationRole =
-  (typeof AI_CONSTANTS.CONVERSATION_ROLES)[number];
-
-export type AiBookingField = (typeof AI_CONSTANTS.BOOKING_FIELDS)[number];
-
-export type AiBookingIssue = "PAST_TIME" | "INVALID_TIME";
+import type { AI_CONSTANTS } from "../../../constants/app.constants.js";
 
 export type AiProviderName = typeof AI_CONSTANTS.PROVIDER;
 
-export type AiProviderErrorCode =
-  (typeof AI_CONSTANTS.PROVIDER_ERROR_CODES)[number];
+export type AiProviderErrorCode = (typeof AI_CONSTANTS.PROVIDER_ERROR_CODES)[number];
 
-export interface AiConversationMessage {
-  role: AiConversationRole;
-  content: string;
+/** A function the model may call; parameters are a JSON Schema object. */
+export interface AiToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
 }
 
-export interface AiAppointmentContext {
-  serviceName?: string;
-  scheduledAt?: Date;
-  durationMinutes?: number;
-  notes?: string;
+export interface AiToolCall {
+  id: string;
+  name: string;
+  /** Raw JSON text as the model produced it; validated before use. */
+  arguments: string;
 }
 
-export interface ExtractAppointmentRequest {
-  userMessage: string;
+export type AiAgentMessage =
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: AiToolCall[] }
+  | { role: "tool"; toolCallId: string; name: string; content: string };
 
-  /** Prior conversation turns; the service keeps only the configured recent window. */
-  conversationHistory?: AiConversationMessage[];
-
-  appointmentContext?: AiAppointmentContext;
-
-  /** IANA time zone used to resolve relative dates, for example Asia/Karachi. */
-  timeZone: string;
-
-  /** Injectable reference time for deterministic internal callers; defaults to now. */
-  currentDateTime?: Date;
-
-  /** Business the conversation is with, for per-business usage and cost metrics. */
-  businessId?: string;
-}
-
-export interface AppointmentExtractionResult {
-  intent: AiAppointmentIntent;
-  appointmentContext: AiAppointmentContext;
-  missingFields: AiBookingField[];
-  confirmationRequired: boolean;
-  clarificationQuestion?: string;
-  assistantReply?: string;
-  bookingIssue?: AiBookingIssue;
-  confidence: number;
-}
-
-export interface AiProviderMessage {
-  role: AiConversationRole;
-  content: string;
-}
-
-export interface AiProviderCompletionRequest {
+export interface AiToolCompletionRequest {
   systemPrompt: string;
-  messages: AiProviderMessage[];
+  messages: AiAgentMessage[];
+  tools: AiToolDefinition[];
+  /** "none" forces a text answer, for example after the last tool round. */
+  toolChoice: "auto" | "none";
   maxOutputTokens: number;
   temperature: number;
   /** Attributes usage to a business; never sent to the provider. */
@@ -82,8 +43,9 @@ export interface AiTokenUsage {
   totalTokens: number;
 }
 
-export interface AiProviderCompletionResponse {
+export interface AiToolCompletionResponse {
   content: string;
+  toolCalls: AiToolCall[];
   provider: AiProviderName;
   model: string;
   usage?: AiTokenUsage;
@@ -94,9 +56,7 @@ export interface AiProvider {
   readonly name: AiProviderName;
   readonly model: string;
 
-  completeJson(
-    request: AiProviderCompletionRequest,
-  ): Promise<AiProviderCompletionResponse>;
+  completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse>;
 }
 
 export interface MistralProviderConfig {
@@ -106,26 +66,13 @@ export interface MistralProviderConfig {
   timeoutMs: number;
 }
 
-export interface MistralContentChunk {
-  text?: string | undefined;
-}
-
-export type MistralAssistantContent = string | MistralContentChunk[];
-
-export interface MistralChatCompletionResponse {
-  model: string;
-  choices: Array<{
-    message: {
-      content: MistralAssistantContent;
-    };
-    finish_reason?: string | null;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+const mistralContentSchema = z
+  .union([
+    z.string(),
+    z.array(z.object({ text: z.string().optional() }).passthrough()),
+  ])
+  .nullable()
+  .optional();
 
 export const mistralChatCompletionResponseSchema = z.object({
   model: z.string().min(1),
@@ -133,16 +80,19 @@ export const mistralChatCompletionResponseSchema = z.object({
     .array(
       z.object({
         message: z.object({
-          content: z.union([
-            z.string(),
-            z.array(
-              z
-                .object({
-                  text: z.string().optional(),
-                })
-                .passthrough(),
-            ),
-          ]),
+          content: mistralContentSchema,
+          tool_calls: z
+            .array(
+              z.object({
+                id: z.string().optional(),
+                function: z.object({
+                  name: z.string().min(1),
+                  arguments: z.union([z.string(), z.record(z.string(), z.unknown())]),
+                }),
+              }),
+            )
+            .nullable()
+            .optional(),
         }),
         finish_reason: z.string().nullable().optional(),
       }),
@@ -157,84 +107,4 @@ export const mistralChatCompletionResponseSchema = z.object({
     .optional(),
 });
 
-export const appointmentExtractionOutputSchema = z
-  .object({
-    intent: z.enum(AI_CONSTANTS.INTENTS),
-    serviceName: z
-      .string()
-      .trim()
-      .min(APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH)
-      .max(APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH)
-      .nullable(),
-    scheduledDate: z
-      .string()
-      .trim()
-      .regex(VALIDATION_PATTERNS.LOCAL_DATE)
-      .nullable(),
-    scheduledTime: z
-      .string()
-      .trim()
-      .regex(VALIDATION_PATTERNS.LOCAL_TIME)
-      .nullable(),
-    durationMinutes: z
-      .number()
-      .int()
-      .min(APPOINTMENT_CONSTANTS.MIN_DURATION_MINUTES)
-      .max(APPOINTMENT_CONSTANTS.MAX_DURATION_MINUTES)
-      .nullable(),
-    notes: z
-      .string()
-      .trim()
-      .max(APPOINTMENT_CONSTANTS.MAX_NOTES_LENGTH)
-      .nullable(),
-    clarificationQuestion: z
-      .string()
-      .trim()
-      .min(1)
-      .max(AI_CONSTANTS.MAX_CLARIFICATION_QUESTION_LENGTH)
-      .nullable(),
-    assistantReply: z
-      .string()
-      .trim()
-      .min(1)
-      .max(AI_CONSTANTS.MAX_ASSISTANT_REPLY_LENGTH)
-      .nullable()
-      .optional(),
-    confidence: z.number().min(0).max(1),
-  })
-  .strict();
-
-export const aiConversationMessageSchema = z.object({
-  role: z.enum(AI_CONSTANTS.CONVERSATION_ROLES),
-  content: z
-    .string()
-    .trim()
-    .min(CHAT_CONSTANTS.MIN_MESSAGE_LENGTH)
-    .max(CHAT_CONSTANTS.MAX_MESSAGE_LENGTH),
-});
-
-export const aiAppointmentContextSchema = z
-  .object({
-    serviceName: z
-      .string()
-      .trim()
-      .min(APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH)
-      .max(APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH)
-      .optional(),
-    scheduledAt: z
-      .date()
-      .refine((value) => !Number.isNaN(value.getTime()))
-      .optional(),
-    durationMinutes: z
-      .number()
-      .int()
-      .min(APPOINTMENT_CONSTANTS.MIN_DURATION_MINUTES)
-      .max(APPOINTMENT_CONSTANTS.MAX_DURATION_MINUTES)
-      .optional(),
-    notes: z
-      .string()
-      .trim()
-      .max(APPOINTMENT_CONSTANTS.MAX_NOTES_LENGTH)
-      .optional(),
-  })
-  .strict();
+export type MistralAssistantContent = z.infer<typeof mistralContentSchema>;

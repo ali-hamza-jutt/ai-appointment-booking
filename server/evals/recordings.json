@@ -1,34 +1,1948 @@
 {
-  "explicit-date": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-03",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "relative-tomorrow": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"14:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-03",
+            "time": "14:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T14:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "weekday-name": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"beard trim\", \"scheduledDate\": \"2026-11-06\", \"scheduledTime\": \"11:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-06",
+            "time": "11:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T11:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "fuzzy-service": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"hair color\", \"scheduledDate\": \"2026-11-05\", \"scheduledTime\": \"09:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair colouring"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-05",
+            "time": "09:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T09:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "clarify-then-book": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": \"What day and time would you like your haircut?\", \"assistantReply\": null, \"confidence\": 0.9}",
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-04\", \"scheduledTime\": \"15:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-04",
+            "time": "15:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T15:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "correct-time": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}",
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-03\", \"scheduledTime\": \"11:30\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-06": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-03",
+            "time": "09:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T09:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "missing-time": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"beard trim\", \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": \"What day and time would suit you for the beard trim?\", \"assistantReply\": null, \"confidence\": 0.9}"
+  "direct-07": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-07",
+            "time": "12:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-07T12:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "closed-day": [
-    "{\"intent\": \"BOOK_APPOINTMENT\", \"serviceName\": \"haircut\", \"scheduledDate\": \"2026-11-08\", \"scheduledTime\": \"10:00\", \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": null, \"confidence\": 0.95}"
+  "direct-08": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair colour"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-09",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-09T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "out-of-scope-weather": [
-    "{\"intent\": \"OUT_OF_SCOPE\", \"serviceName\": null, \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": \"I can only help with booking appointments. What would you like to book?\", \"confidence\": 0.97}"
+  "direct-09": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "time": "16:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T16:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
   ],
-  "out-of-scope-poem": [
-    "{\"intent\": \"OUT_OF_SCOPE\", \"serviceName\": null, \"scheduledDate\": null, \"scheduledTime\": null, \"durationMinutes\": null, \"notes\": null, \"clarificationQuestion\": null, \"assistantReply\": \"I'm here to help you book appointments. Is there something you'd like to schedule?\", \"confidence\": 0.97}"
+  "direct-10": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-06",
+            "time": "13:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T13:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-11": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-04",
+            "time": "10:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T10:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-12": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-07",
+            "time": "11:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-07T11:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-13": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair color"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-03",
+            "time": "13:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T13:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-14": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-06",
+            "time": "19:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T19:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-15": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-05",
+            "time": "18:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T18:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-16": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-06",
+            "time": "09:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T09:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-17": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair cut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-04",
+            "time": "12:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T12:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-18": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids cut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-03",
+            "time": "16:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T16:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-19": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-07",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-07T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "direct-20": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "time": "11:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T11:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "staff-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-04",
+            "staffId": "{{staff:Omar}}",
+            "time": "18:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T18:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "staff-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-03",
+            "staffId": "{{staff:Sana}}",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "staff-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "staffId": "{{staff:Omar}}",
+            "time": "14:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T14:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "staff-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-06",
+            "staffId": "{{staff:Sana}}",
+            "time": "09:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T09:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "staff-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-07",
+            "staffId": "{{staff:Omar}}",
+            "time": "19:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-07T19:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "offer-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "partOfDay": "afternoon"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    }
+  ],
+  "offer-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-03",
+            "partOfDay": "morning"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    }
+  ],
+  "offer-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair colouring"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-04"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    }
+  ],
+  "offer-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-06",
+            "partOfDay": "evening"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    }
+  ],
+  "offer-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-07"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    }
+  ],
+  "clarify-01": [
+    {
+      "content": "Sure \u2014 what day and time would you like your haircut?"
+    }
+  ],
+  "clarify-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "Which service would you like on Friday at 10?"
+    }
+  ],
+  "clarify-03": [
+    {
+      "content": "Happy to help \u2014 which day and time suit you for the beard trim?"
+    }
+  ],
+  "clarify-04": [
+    {
+      "content": "Of course. What would you like to book, and when?"
+    }
+  ],
+  "clarify-05": [
+    {
+      "content": "Which day would you like your hair colouring?"
+    }
+  ],
+  "multi-01": [
+    {
+      "content": "What day and time would you like?"
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-04",
+            "time": "15:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T15:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-03",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-03",
+            "time": "11:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T11:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-05",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-06",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-06",
+            "time": "14:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T14:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair colouring"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-06",
+            "time": "14:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-06T14:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-04",
+            "partOfDay": "afternoon"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Here are the open times \u2014 tap one to hold it."
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-04T13:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-06": [
+    {
+      "content": "Which service would you like on Saturday?"
+    },
+    {
+      "content": "What time on Saturday?"
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-07",
+            "time": "10:30"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-07T10:30:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-07": [
+    {
+      "content": "When would you like to bring them in?"
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "kids haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Kids haircut}}",
+            "date": "2026-11-03",
+            "time": "09:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-03T09:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "multi-08": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "time": "09:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T09:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-05",
+            "staffId": "{{staff:Omar}}",
+            "time": "12:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_booking",
+          "arguments": {
+            "slotToken": "{{slot:2026-11-05T12:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "It's held for you. Press Confirm booking to book it."
+    }
+  ],
+  "unavail-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-08",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-09",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "content": "We're closed on Sundays. Here are Monday's times."
+    }
+  ],
+  "unavail-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "hair colouring"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-03",
+            "time": "19:00"
+          }
+        }
+      ]
+    },
+    {
+      "content": "7pm isn't available for colouring. Here are tomorrow's open times."
+    }
+  ],
+  "unavail-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-03",
+            "time": "10:00"
+          }
+        }
+      ]
+    },
+    {
+      "content": "10:00 is taken. Here are the other times tomorrow."
+    }
+  ],
+  "unavail-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "beard trim"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-02",
+            "time": "08:30"
+          }
+        }
+      ]
+    },
+    {
+      "content": "8:30 is before we open. Here are today's times."
+    }
+  ],
+  "unavail-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "search_services",
+          "arguments": {
+            "query": "haircut"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-09",
+            "time": "06:00"
+          }
+        }
+      ]
+    },
+    {
+      "content": "We open at 9. Here are Monday's times."
+    }
+  ],
+  "manage-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "Here are your upcoming bookings."
+    }
+  ],
+  "manage-07": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "content": "Your next appointment is shown below."
+    }
+  ],
+  "manage-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_cancel",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-05T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Cancel booking to confirm."
+    }
+  ],
+  "manage-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_cancel",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-06T11:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Cancel booking to confirm."
+    }
+  ],
+  "manage-06": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_cancel",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-07T10:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Cancel booking to confirm."
+    }
+  ],
+  "manage-04": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Haircut}}",
+            "date": "2026-11-06",
+            "rescheduleBookingId": "{{booking:2026-11-05T10:00:00.000Z}}",
+            "time": "14:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_reschedule",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-05T10:00:00.000Z}}",
+            "slotToken": "{{slot:2026-11-06T14:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Move booking to confirm."
+    }
+  ],
+  "manage-05": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Hair colouring}}",
+            "date": "2026-11-04",
+            "rescheduleBookingId": "{{booking:2026-11-04T10:00:00.000Z}}",
+            "time": "11:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_reschedule",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-04T10:00:00.000Z}}",
+            "slotToken": "{{slot:2026-11-04T11:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Move booking to confirm."
+    }
+  ],
+  "manage-08": [
+    {
+      "toolCalls": [
+        {
+          "name": "list_my_bookings",
+          "arguments": {}
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "get_availability",
+          "arguments": {
+            "serviceId": "{{service:Beard trim}}",
+            "date": "2026-11-07",
+            "rescheduleBookingId": "{{booking:2026-11-06T11:00:00.000Z}}",
+            "time": "12:00"
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "propose_reschedule",
+          "arguments": {
+            "bookingId": "{{booking:2026-11-06T11:00:00.000Z}}",
+            "slotToken": "{{slot:2026-11-07T12:00:00.000Z}}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "Press Move booking to confirm."
+    }
+  ],
+  "refuse-01": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "refuse-02": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "refuse-03": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "refuse-04": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "refuse-05": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "refuse-06": [
+    {
+      "content": "I can only help with appointments at Eval Studio. Would you like to book something?"
+    }
+  ],
+  "handoff-01": [
+    {
+      "toolCalls": [
+        {
+          "name": "handoff_to_human",
+          "arguments": {
+            "reason": "Customer asked to speak to a person"
+          }
+        }
+      ]
+    },
+    {
+      "content": "I've passed this to the team; someone will get back to you soon."
+    }
+  ],
+  "handoff-02": [
+    {
+      "toolCalls": [
+        {
+          "name": "handoff_to_human",
+          "arguments": {
+            "reason": "Complaint about a previous haircut; asking for a refund"
+          }
+        }
+      ]
+    },
+    {
+      "content": "I've passed this to the team; someone will get back to you soon."
+    }
+  ],
+  "handoff-03": [
+    {
+      "toolCalls": [
+        {
+          "name": "handoff_to_human",
+          "arguments": {
+            "reason": "Group booking for a wedding party of 8"
+          }
+        }
+      ]
+    },
+    {
+      "content": "I've passed this to the team; someone will get back to you soon."
+    }
   ]
 }

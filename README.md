@@ -14,7 +14,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 ## Features
 
 - Account signup and sign-in with short-lived JWT access tokens.
-- AI-assisted appointment extraction using Mistral.
+- A Mistral tool-calling booking agent that searches services, reads real availability and proposes bookings, cancellations and reschedules as tap-to-confirm cards.
 - Multi-turn booking conversations with persisted context and history.
 - Structured booking form fallback when chat input is incomplete, ambiguous, or AI processing fails.
 - Deterministic IANA-time-zone conversion with UTC storage.
@@ -67,7 +67,7 @@ The backend follows a controller/service/DAL structure:
 1. **Middleware** handles request IDs, structured logging, security headers, CORS, rate limiting, JSON limits, authentication, and common errors.
 2. **tsoa controllers** define the REST contract and translate authenticated HTTP requests into service calls.
 3. **Services** own validation, normalization, response mapping, and domain rules.
-4. **`ChatOrchestrationService`** coordinates chat persistence, AI extraction, structured form data, and appointment confirmation through narrow service ports.
+4. **`ChatOrchestrationService`** routes each chat turn: taps and the structured form go straight to booking core, free text goes to the booking agent, and confirmation turns the held slot into a booking.
 5. **DAL classes** contain Prisma queries and explicit field projections.
 6. **PostgreSQL constraints** protect uniqueness, relationships, and retry idempotency.
 
@@ -90,10 +90,10 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 4. Selecting **New booking** atomically marks the current chat `ABANDONED` and creates its `ACTIVE` replacement. Abandoned chats remain read-only in conversation history.
 5. Each user message includes a frontend-generated `clientMessageId` and browser IANA time zone.
 6. The backend stores the user message once and checks for an existing assistant reply during retries.
-7. Mistral extracts the service, local date, local time, duration, and notes from conversational input.
-8. The backend validates the AI JSON and converts local wall-clock values to a UTC instant.
-9. If details are incomplete or AI processing fails, the user can enter them in a structured form. Structured values are validated by the server and bypass Mistral.
-10. The evolving booking context and assistant response are persisted on the chat session.
+7. The booking agent calls tools to find the service, read real availability and hold a slot the customer chose; replies carry cards (services, open times, the held booking) that the customer can tap.
+8. Taps post typed actions handled by booking core without the model. Only times offered through signed slot tokens can be held.
+9. If the assistant is unavailable, the reply offers service cards to book by tapping, and the structured form always works. Structured values are validated by the server and bypass Mistral.
+10. The draft (service, provider and held slot as real row references) and the assistant reply are persisted on the chat session.
 11. Active clients poll from the latest message cursor every three seconds and merge only newly received messages.
 12. The user reviews the final details and confirms the booking.
 13. During confirmation, the backend locks that user's appointment schedule and rejects any overlapping time range.
@@ -147,7 +147,7 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 - Node.js 22 or newer
 - npm
 - PostgreSQL database, local or hosted
-- Mistral API key for conversational AI extraction
+- Mistral API key for the booking agent
 
 ### 1. Clone the repository
 
@@ -207,7 +207,7 @@ Never commit `.env` files or real credentials. The repository tracks only safe `
 | `JWT_ISSUER` | Expected token issuer |
 | `JWT_AUDIENCE` | Expected token audience |
 | `JWT_ACCESS_TOKEN_TTL_SECONDS` | Access-token lifetime in seconds |
-| `MISTRAL_API_KEY` | Mistral credential used for conversational extraction |
+| `MISTRAL_API_KEY` | Mistral credential used by the booking agent |
 | `MISTRAL_MODEL` | Mistral model identifier |
 | `MISTRAL_API_URL` | Mistral API base URL |
 | `AI_REQUEST_TIMEOUT_MS` | Maximum duration of one provider request |
@@ -292,8 +292,8 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 ## AI integration and guardrails
 
 - Mistral is isolated behind an AI provider interface.
-- The system prompt requests one strict JSON object rather than free-form booking data.
-- Provider responses and appointment context are runtime-validated with Zod.
+- The model works through tools; every tool argument is validated with Zod and checked for ownership, and errors go back to the model as tool results.
+- The model can only hold times it was offered, through HMAC-signed slot tokens, and nothing is booked, cancelled or moved without the customer's tap.
 - Only a bounded recent-message window is sent to the provider.
 - Previous conversation context is labeled untrusted so stored text is not treated as system instructions.
 - The backend, not the model, converts local date/time values into UTC.
@@ -358,7 +358,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 - JWT access tokens are not refreshed, revoked, or stored in HttpOnly cookies.
 - Rate limiting uses process memory and is not shared across multiple server instances.
 - The health endpoint checks process availability but not database readiness.
-- Mistral extraction is limited to two provider attempts and retries only eligible transient failures; client retries remain safe through message idempotency.
+- Each Mistral call is retried once on transient failures; client retries remain safe through message idempotency.
 - The prototype has no automated test suite; linting, strict type checks, production builds, and manual workflow verification are used currently.
 - Free backend hosting can introduce cold-start delays after inactivity.
 

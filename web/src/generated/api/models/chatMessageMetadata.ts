@@ -5,15 +5,15 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
-import type { AppointmentBookingContext } from './appointmentBookingContext';
 import type { ChatMessageMetadataIntent } from './chatMessageMetadataIntent';
+import type { ChatMessagePart } from './chatMessagePart';
 
 export interface ChatMessageMetadata {
   intent?: ChatMessageMetadataIntent;
-  bookingContext?: AppointmentBookingContext;
+  parts?: ChatMessagePart[];
+  /** Fields the structured form still needs. */
   missingFields?: string[];
+  /** True while a held slot is waiting for the customer to confirm. */
   confirmationRequired?: boolean;
   appointmentId?: string;
-  /** Open start times offered when the requested time was taken. */
-  suggestedTimes?: string[];
 }

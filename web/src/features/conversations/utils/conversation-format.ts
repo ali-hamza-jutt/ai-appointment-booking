@@ -37,7 +37,8 @@ export function toConversationSessionViewModel(
     statusTone: status.tone,
     title:
       session.title?.trim() ||
-      session.bookingContext?.serviceName?.trim() ||
+      session.draft.hold?.serviceName ||
+      session.draft.service?.name ||
       "Booking conversation",
   };
 }
@@ -65,11 +66,9 @@ function formatSessionPreview(
   session: ChatSessionResponse,
   timeZone: string,
 ): string {
-  const {
-    scheduledAt,
-    serviceName,
-    timeZone: bookingTimeZone,
-  } = session.bookingContext ?? {};
+  const scheduledAt = session.draft.hold?.startsAt;
+  const serviceName = session.draft.hold?.serviceName ?? session.draft.service?.name;
+  const bookingTimeZone = session.draft.timeZone ?? undefined;
 
   if (scheduledAt) {
     const dateLabel = formatDateTime(new Date(scheduledAt), bookingTimeZone ?? timeZone, {

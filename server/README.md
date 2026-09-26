@@ -135,7 +135,26 @@ Double booking is prevented in three layers. Placing or moving a booking locks t
 
 Policies (minimum notice, booking window, cancellation window, reschedule limit, hold length, no-show grace, auto-confirm) come from business settings, with optional per-service overrides for notice, window, cancellation and reschedule limit.
 
-The chat assistant books with one business per session: when the customer's request is complete it fuzzy-matches the service against the catalog, checks real availability and holds the slot, or answers with the closest open times. Confirming the chat turns the hold into a booking.
+## Booking agent
+
+The chat assistant is a tool-calling agent (`modules/chat/agent`) running on Mistral function calling. Each turn, `integrations/ai/agent/agent-runner.ts` lets the model call tools for up to five rounds and then makes it answer in text. Every tool argument is validated with Zod; invalid arguments, unknown tools and business errors (a taken slot, a booking that isn't the customer's) go back to the model as tool results instead of failing the turn.
+
+| Tool | Does | Writes |
+| --- | --- | --- |
+| `search_services` | Fuzzy-matches the catalog, up to 5 services with price and duration | No |
+| `list_staff` | Providers for a service with their next free date | No |
+| `get_availability` | Open times for a service, day range, provider, part of day or exact time | No |
+| `propose_booking` | Holds an offered slot and shows a Confirm button | Hold only |
+| `list_my_bookings` | The customer's upcoming bookings here | No |
+| `propose_cancel` / `propose_reschedule` | Show a button for the change | No |
+| `handoff_to_human` | Flags the chat for staff (`/api/businesses/{businessId}/chat-handoffs`) | Flag only |
+
+- **The model proposes, booking core decides.** Tools run with the session's business and customer; ids the model passes are checked for ownership. Nothing is booked, cancelled or moved until the customer presses a button.
+- **Slot tokens.** `get_availability` returns each slot as an HMAC-signed token (business, service, provider, start, 30-minute expiry). `propose_booking` and `propose_reschedule` accept only a token, so the model cannot invent a time that was never offered.
+- **UI parts.** Assistant messages carry `structuredData.parts`: `service_cards`, `slot_picker`, `booking_summary`, `booking_list` and `confirm`. A tap posts a typed `action` (`select_service`, `select_slot`, `cancel_booking`, `reschedule_booking`) that booking core handles without another model call; a slot taken in the meantime returns fresh times.
+- **Typed draft.** The chat's draft is `draft_service_id`, `draft_staff_id` and `draft_hold_id` foreign keys (plus time zone and notes), so it always points at real rows. `POST /chat/sessions/{id}/confirm` turns the held slot into a booking.
+- **Fallbacks.** Bare greetings and "what can you do" are answered locally with service cards. If Mistral is unavailable, the reply offers service cards to book by tapping, and the structured form still works.
+- **Evals.** `evals/` holds 65 scripted conversations (direct requests, preferred providers, open-ended times, clarification, multi-turn changes, unavailable times, managing bookings, refusals and handoffs) on a seeded business with a frozen clock. They report booking success, wrong-slot rate, turns to book and outcome accuracy per category. Recordings use placeholders (`{{service:Haircut}}`, `{{slot:<start>}}`) so real model replies captured by `npm run eval:record` replay against a fresh database; the checked-in seed recordings are hand-written.
 
 ## Authentication
 
@@ -190,7 +209,7 @@ Tests live in `test/` and run with Vitest:
 - `test/integration` exercises DALs and database constraints on a real PostgreSQL.
 - `test/contract` drives the tsoa app through Supertest (auth scopes, ownership isolation).
 
-Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. Agent evals live in `evals/`: each case in `evals/cases.ts` is a scripted conversation run through the real AI service, catalog matching, availability and holds, with the clock frozen on a Monday so relative dates have one right answer. `npm run eval` replays `evals/recordings.json` (and runs as part of `npm test`); `npm run eval:live` calls Mistral and requires at least 80% booking success, at most 5% wrong slots and 85% correct outcomes; `npm run eval:record` re-records the replies. Results are written to `evals/results/`.
+Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. Agent evals live in `evals/` (see Booking agent): `npm run eval` replays `evals/recordings.json` and runs as part of `npm test`; `npm run eval:live` calls Mistral and requires at least 80% booking success, at most 5% wrong slots and 80% correct outcomes; `npm run eval:record` re-records the replies. Results are written to `evals/results/`.
 
 Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_REDIS_URL` (default `redis://localhost:6379/15`) and flush it. GitHub Actions runs lint, typecheck and all tests on every pull request against PostgreSQL 16 and Redis 7 service containers.
 
@@ -212,7 +231,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - Chat updates use polling rather than WebSockets.
 - Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
-- Mistral extraction is limited to two provider attempts and retries only timeouts, network failures, invalid responses, HTTP 408 responses, and HTTP 5xx responses. Client retries remain safe through message idempotency.
+- Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.
 
 ## Sample data
 

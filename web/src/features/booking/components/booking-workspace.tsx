@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
+import { ChatMessageParts } from "@/features/booking/components/chat-message-parts";
 import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
 import { BOOKING_UI_CONSTANTS } from "@/features/bookings/constants/booking-status.constants";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
@@ -44,6 +45,7 @@ import type {
 } from "@/features/booking/types/booking-ui";
 import {
   getBrowserTimeZone,
+  getMissingDraftFields,
   toBookingDraft,
   toConfirmedBookingDraft,
 } from "@/features/booking/utils/booking-format";
@@ -57,7 +59,8 @@ import {
   useCreateSession,
 } from "@/generated/api/chat/chat";
 import type {
-  AppointmentBookingContext,
+  ChatAction,
+  ChatBookingDraft,
   ChatMessageResponse,
   ChatSessionResponse,
 } from "@/generated/api/models";
@@ -68,7 +71,6 @@ import {
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
-import { getLocalDateTimeInputValues } from "@/lib/utils/date-time";
 
 const MAX_SERVICE_SUGGESTIONS = 3;
 
@@ -186,9 +188,7 @@ function BookingExperience({
   const persistedMessages = initialMessages
     .filter(isBookingMessage)
     .map(toBookingMessageViewModel);
-  const initialMissingFields = getMissingBookingFields(
-    initialSession?.bookingContext,
-  );
+  const initialMissingFields = getMissingDraftFields(initialSession?.draft);
   const businessQuery = useGetPublicBusiness(businessSlug);
   const publicServicesQuery = useListPublicServices(businessSlug);
   const businessName = businessQuery.data?.name ?? "this business";
@@ -219,21 +219,19 @@ function BookingExperience({
   );
   const [composer, setComposer] = useState("");
   const [draft, setDraft] = useState<BookingDraftViewModel | null>(() =>
-    toBookingDraft(initialSession?.bookingContext, initialTimeZone),
+    toBookingDraft(initialSession?.draft, initialTimeZone),
   );
-  const [bookingContext, setBookingContext] =
-    useState<AppointmentBookingContext | null>(
-      initialSession?.bookingContext ?? null,
-    );
+  const [sessionDraft, setSessionDraft] = useState<ChatBookingDraft | null>(
+    initialSession?.draft ?? null,
+  );
   const [timeZone, setTimeZone] = useState(initialTimeZone);
   const [missingFields, setMissingFields] = useState<string[]>(
     initialMissingFields,
   );
   const [isReadyToConfirm, setIsReadyToConfirm] = useState(
-    initialSession?.status === "ACTIVE" && initialMissingFields.length === 0,
+    initialSession?.status === "ACTIVE" && Boolean(initialSession.draft.hold),
   );
   const [isProcessingTurn, setIsProcessingTurn] = useState(false);
-  const [suggestedTimes, setSuggestedTimes] = useState<string[]>([]);
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
@@ -255,6 +253,9 @@ function BookingExperience({
       mergeBookingMessages(messages, messagePollingQuery.data?.items ?? []),
     [messagePollingQuery.data?.items, messages],
   );
+  const latestAssistantMessageId = [...visibleMessages]
+    .reverse()
+    .find((message) => message.role === "assistant")?.id;
   const contextualSuggestions = useMemo(
     () => getContextualSuggestions(missingFields, initialSuggestions, serviceSuggestions),
     [initialSuggestions, missingFields, serviceSuggestions],
@@ -347,6 +348,7 @@ function BookingExperience({
           ...(turn.bookingDetails
             ? { bookingDetails: turn.bookingDetails }
             : {}),
+          ...(turn.action ? { action: turn.action } : {}),
         },
         sessionId: activeSessionId,
       });
@@ -372,24 +374,13 @@ function BookingExperience({
 
         return [
           ...deliveredMessages,
-          {
-            id: response.assistantMessage.id,
-            role: "assistant" as const,
-            text: response.assistantMessage.content,
-          },
+          toBookingMessageViewModel({ ...response.assistantMessage, role: "ASSISTANT" }),
         ];
       });
-      setBookingContext(response.session.bookingContext);
-      setDraft(toBookingDraft(response.session.bookingContext, browserTimeZone));
-      setMissingFields(
-        response.assistantMessage.structuredData?.missingFields ?? [],
-      );
-      setSuggestedTimes(
-        (response.assistantMessage.structuredData?.suggestedTimes ?? []).map(String),
-      );
-      setIsReadyToConfirm(
-        response.assistantMessage.structuredData?.confirmationRequired === true,
-      );
+      setSessionDraft(response.session.draft);
+      setDraft(toBookingDraft(response.session.draft, browserTimeZone));
+      setMissingFields(getMissingDraftFields(response.session.draft));
+      setIsReadyToConfirm(Boolean(response.session.draft.hold));
       setConfirmationError(null);
       setPendingTurn(null);
       void Promise.all([
@@ -447,22 +438,16 @@ function BookingExperience({
     if (pendingTurn && !isSending) void processTurn(pendingTurn);
   }
 
-  function chooseSuggestedTime(startsAt: string) {
-    const local = getLocalDateTimeInputValues(startsAt, timeZone);
-    const serviceId = bookingContext?.serviceId;
+  /** A tap on a card or button in an assistant reply. */
+  function handlePartAction(action: ChatAction, label: string) {
+    if (action.type === "confirm_booking") {
+      openConfirmation();
+      return;
+    }
 
-    if (!local || !serviceId || isComposerDisabled || messageRequestLockRef.current) return;
+    if (isComposerDisabled || messageRequestLockRef.current) return;
 
-    void processTurn({
-      bookingDetails: {
-        serviceId,
-        scheduledDate: local.date,
-        scheduledTime: local.time,
-        ...(bookingContext?.notes ? { notes: bookingContext.notes } : {}),
-      },
-      clientMessageId: crypto.randomUUID(),
-      text: `Book ${formatSuggestedTime(startsAt, timeZone)} instead.`,
-    });
+    void processTurn({ action, clientMessageId: crypto.randomUUID(), text: label });
   }
 
   async function submitStructuredBookingDetails(
@@ -536,26 +521,13 @@ function BookingExperience({
               ? current
               : [
                   ...current,
-                  {
-                    id: response.assistantMessage.id,
-                    role: "assistant",
-                    text: response.assistantMessage.content,
-                  },
+                  toBookingMessageViewModel({ ...response.assistantMessage, role: "ASSISTANT" }),
                 ],
           );
           setDraft(toConfirmedBookingDraft(response.appointment));
-          setBookingContext({
-            serviceName: response.appointment.serviceName,
-            scheduledAt: response.appointment.scheduledAt,
-            timeZone: response.appointment.timeZone,
-            durationMinutes: response.appointment.durationMinutes,
-            ...(response.appointment.notes
-              ? { notes: response.appointment.notes }
-              : {}),
-          });
+          setSessionDraft(response.session.draft);
           setIsReadyToConfirm(false);
           setIsAwaitingApproval(response.appointment.status === "PENDING");
-          setSuggestedTimes([]);
           setIsConfirmed(true);
           setIsConfirmOpen(false);
           setIsStructuredFormOpen(false);
@@ -606,6 +578,7 @@ function BookingExperience({
             {visibleMessages.map((message) => {
               const isUserMessage = message.role === "user";
               const hasFailed = message.deliveryStatus === "failed";
+              const isLatestReply = message.id === latestAssistantMessageId;
 
               return (
                 <div
@@ -625,6 +598,13 @@ function BookingExperience({
                     >
                       {message.text}
                     </div>
+                    {message.parts?.length ? (
+                      <ChatMessageParts
+                        disabled={!isLatestReply || isComposerDisabled}
+                        onAction={handlePartAction}
+                        parts={message.parts}
+                      />
+                    ) : null}
                     {message.deliveryStatus === "sending" ? (
                       <p className="mt-1 text-right text-[10px] text-subtle">Sending…</p>
                     ) : hasFailed ? (
@@ -676,21 +656,6 @@ function BookingExperience({
                   </Button>
                 </div>
               </Alert>
-            ) : null}
-
-            {suggestedTimes.length > 0 && !isConfirmed && !requestError ? (
-              <BookingSuggestions
-                disabled={isComposerDisabled}
-                label="Open times"
-                onSelect={(label) => {
-                  const startsAt = suggestedTimes.find(
-                    (time) => formatSuggestedTime(time, timeZone) === label,
-                  );
-
-                  if (startsAt) chooseSuggestedTime(startsAt);
-                }}
-                suggestions={suggestedTimes.map((time) => formatSuggestedTime(time, timeZone))}
-              />
             ) : null}
 
             {visibleMessages.length === 1 && !isConfirmed && initialSuggestions.length > 0 ? (
@@ -898,7 +863,7 @@ function BookingExperience({
 
       {isStructuredFormOpen ? (
         <StructuredBookingForm
-          bookingContext={bookingContext}
+          draft={sessionDraft}
           businessSlug={businessSlug}
           initialValues={pendingTurn?.bookingDetails}
           isSubmitting={isSending}
@@ -943,6 +908,9 @@ function toBookingMessageViewModel(
       : {}),
     ...(message.role === "USER" ? { deliveryStatus: "sent" as const } : {}),
     id: message.id,
+    ...(message.role === "ASSISTANT" && message.structuredData?.parts?.length
+      ? { parts: message.structuredData.parts }
+      : {}),
     role: message.role === "USER" ? "user" : "assistant",
     text: message.content,
   };
@@ -977,17 +945,6 @@ function mergeBookingMessages(
   return mergedMessages;
 }
 
-function getMissingBookingFields(
-  context: AppointmentBookingContext | null | undefined,
-): string[] {
-  const missingFields: string[] = [];
-
-  if (!context?.serviceName?.trim()) missingFields.push("serviceName");
-  if (!context?.scheduledAt) missingFields.push("scheduledAt");
-
-  return missingFields;
-}
-
 function getContextualSuggestions(
   missingFields: string[],
   initialSuggestions: string[],
@@ -1001,17 +958,6 @@ function getContextualSuggestions(
   if (needsSchedule) return scheduleSuggestions;
 
   return [];
-}
-
-function formatSuggestedTime(value: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    timeZone,
-    weekday: "short",
-  }).format(new Date(value));
 }
 
 function BookingSuggestions({

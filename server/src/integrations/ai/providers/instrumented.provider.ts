@@ -3,9 +3,9 @@ import { llmMetrics } from "../../../infrastructure/observability/metrics.js";
 import { withSpan } from "../../../infrastructure/observability/tracing.js";
 import type {
   AiProvider,
-  AiProviderCompletionRequest,
-  AiProviderCompletionResponse,
   AiProviderName,
+  AiToolCompletionRequest,
+  AiToolCompletionResponse,
 } from "../dto/ai.dto.js";
 
 /**
@@ -23,7 +23,7 @@ export class InstrumentedAiProvider implements AiProvider {
     return this.provider.model;
   }
 
-  public completeJson(request: AiProviderCompletionRequest): Promise<AiProviderCompletionResponse> {
+  public completeWithTools(request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
     const startedAt = performance.now();
     const seconds = () => (performance.now() - startedAt) / 1_000;
 
@@ -38,10 +38,11 @@ export class InstrumentedAiProvider implements AiProvider {
       },
       async (span) => {
         try {
-          const response = await this.provider.completeJson(request);
+          const response = await this.provider.completeWithTools(request);
 
           span.setAttributes({
             "gen_ai.response.model": response.model,
+            "gen_ai.response.tool_calls": response.toolCalls.map((call) => call.name).join(","),
             ...(response.usage
               ? {
                   "gen_ai.usage.input_tokens": response.usage.promptTokens,

@@ -1,31 +1,35 @@
-import { aiService } from "../../integrations/ai/ai.service.js";
-import type {
-  AiAppointmentContext,
-  AiAppointmentIntent,
-  AiBookingField,
-  AiConversationMessage,
-} from "../../integrations/ai/dto/ai.dto.js";
+import { env } from "../../config/env.js";
+import { logger } from "../../config/logger.js";
 import {
-  AI_CONSTANTS,
-  BOOKING_CONSTANTS,
+  AGENT_CONSTANTS,
   CHAT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
+import { AgentRunner } from "../../integrations/ai/agent/agent-runner.js";
+import type { AiAgentMessage, AiProvider } from "../../integrations/ai/dto/ai.dto.js";
+import { InstrumentedAiProvider } from "../../integrations/ai/providers/instrumented.provider.js";
+import { MistralProvider } from "../../integrations/ai/providers/mistral.provider.js";
 import { AppError } from "../../middleware/app-error.js";
-import { formatMinorAmount } from "../../utils/money.js";
-import {
-  localDateTimeToUtc,
-  normalizeIanaTimeZone,
-} from "../../utils/time-zone.js";
+import { localDateTimeToUtc, normalizeIanaTimeZone } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
+import { authDal } from "../auth/dal/auth.dal.js";
 import { bookingService } from "../bookings/booking.service.js";
-import type { BookingActor } from "../bookings/dto/booking.dto.js";
+import type { BookingRecord } from "../bookings/dto/booking.dto.js";
 import { catalogService } from "../catalog/catalog.service.js";
+import {
+  AssistantActionError,
+  bookingAssistantService,
+  type AssistantContext,
+} from "./agent/booking-assistant.service.js";
+import { buildBookingAgentPrompt } from "./agent/booking-agent.prompt.js";
+import { bookingTools } from "./agent/booking-tools.js";
+import { classifyLocalIntent } from "./agent/local-intent.js";
+import { chatService } from "./chat.service.js";
 import type {
-  AppointmentBookingContext,
   ChatMessageMetadata,
+  ChatMessagePart,
   ChatMessageResponse,
   ChatSessionResponse,
   ChatTurnResponse,
@@ -33,22 +37,23 @@ import type {
   ProcessChatMessageRequest,
   StructuredBookingDetails,
 } from "./dto/chat.dto.js";
-import type {
-  ChatOrchestrationAiPort,
-  ChatOrchestrationBookingPort,
-  ChatOrchestrationCatalogPort,
-  ChatOrchestrationChatPort,
-  PreparedChatBooking,
-} from "./dto/chat-orchestration.dto.js";
-import { chatService } from "./chat.service.js";
 
+interface AssistantReply {
+  content: string;
+  parts: ChatMessagePart[];
+}
+
+/**
+ * Runs each chat turn. Typed actions (taps) and the structured form go
+ * straight to booking core; free text goes to the tool-calling agent, with
+ * greetings answered locally and a tap-to-book fallback when the AI is down.
+ */
 export class ChatOrchestrationService {
-  public constructor(
-    private readonly ai: ChatOrchestrationAiPort,
-    private readonly chat: ChatOrchestrationChatPort,
-    private readonly bookings: ChatOrchestrationBookingPort,
-    private readonly catalog: ChatOrchestrationCatalogPort,
-  ) {}
+  private readonly runner: AgentRunner | null;
+
+  public constructor(provider: AiProvider | null) {
+    this.runner = provider ? new AgentRunner(provider) : null;
+  }
 
   public async processMessage(
     userId: string,
@@ -61,145 +66,62 @@ export class ChatOrchestrationService {
       throwRequestValidationError("timeZone", VALIDATION_MESSAGES.AI_TIME_ZONE);
     }
 
-    const userMessageResult = await this.chat.createUserMessageWithStatus(
-      userId,
-      sessionId,
-      request,
-    );
+    const userMessageResult = await chatService.createUserMessageWithStatus(userId, sessionId, request);
     const userMessage = userMessageResult.message;
 
     if (!userMessageResult.created) {
-      const existingReply = await this.chat.findAssistantReply(
-        userId,
-        sessionId,
-        userMessage.id,
-      );
+      const existingReply = await chatService.findAssistantReply(userId, sessionId, userMessage.id);
 
       if (existingReply) {
         return {
-          session: await this.chat.getSession(userId, sessionId),
+          session: await chatService.getSession(userId, sessionId),
           userMessage,
           assistantMessage: existingReply,
         };
       }
     }
 
-    const session = await this.chat.getSession(userId, sessionId);
+    const session = await chatService.getSession(userId, sessionId);
 
     if (session.status !== "ACTIVE") {
       throw new AppError(
         409,
-        session.status === "CLOSED"
-          ? ERROR_CODES.CHAT_SESSION_CLOSED
-          : ERROR_CODES.CHAT_SESSION_NOT_ACTIVE,
-        session.status === "CLOSED"
-          ? ERROR_MESSAGES.CHAT_SESSION_CLOSED
-          : ERROR_MESSAGES.CHAT_SESSION_NOT_ACTIVE,
+        session.status === "CLOSED" ? ERROR_CODES.CHAT_SESSION_CLOSED : ERROR_CODES.CHAT_SESSION_NOT_ACTIVE,
+        session.status === "CLOSED" ? ERROR_MESSAGES.CHAT_SESSION_CLOSED : ERROR_MESSAGES.CHAT_SESSION_NOT_ACTIVE,
       );
     }
 
-    if (request.bookingDetails) {
-      return this.processStructuredBookingDetails(
-        userId,
-        session,
-        userMessage,
-        request.bookingDetails,
-        timeZone,
-      );
-    }
-
-    const recentMessages = await this.chat.listRecentMessages(
+    const context: AssistantContext = {
       userId,
       sessionId,
-      AI_CONSTANTS.HISTORY_QUERY_LIMIT,
-    );
-    const extraction = await this.ai.extractAppointmentDetails({
-      userMessage: userMessage.content,
-      conversationHistory: this.toConversationHistory(recentMessages, userMessage.id),
-      ...(session.bookingContext
-        ? { appointmentContext: this.toAiAppointmentContext(session.bookingContext) }
-        : {}),
+      business: session.business,
       timeZone,
-      businessId: session.business.id,
-    });
+      now: new Date(),
+      draftHoldId: session.draft.hold?.bookingId,
+    };
+    const reply = request.action
+      ? await this.handleAction(context, request.action)
+      : request.bookingDetails
+        ? await this.handleStructuredDetails(context, request.bookingDetails)
+        : await this.handleText(context, session, userMessage);
 
-    if (extraction.intent !== "BOOK_APPOINTMENT") {
-      const hasHold = this.hasActiveHold(session.bookingContext);
-
-      return this.saveTurn(userId, session, userMessage, {
-        content: this.buildNonBookingResponse(extraction.intent, extraction.assistantReply),
-        metadata: {
-          intent: "UNKNOWN",
-          missingFields: this.getMissingBookingFields(session.bookingContext),
-          confirmationRequired: hasHold,
-        },
-      });
-    }
-
-    const requestedContext = this.toBookingContext(extraction.appointmentContext, timeZone);
-    const isComplete =
-      !extraction.clarificationQuestion &&
-      extraction.missingFields.length === 0 &&
-      Boolean(requestedContext.serviceName) &&
-      Boolean(requestedContext.scheduledAt);
-
-    if (!isComplete) {
-      await this.releaseChangedHold(userId, session.bookingContext, null);
-
-      return this.saveTurn(userId, session, userMessage, {
-        content:
-          extraction.clarificationQuestion ??
-          AI_CONSTANTS.CLARIFICATION_QUESTIONS.serviceNameAndScheduledAt,
-        bookingContext: requestedContext,
-        metadata: {
-          intent: "BOOK_APPOINTMENT",
-          bookingContext: requestedContext,
-          missingFields: extraction.missingFields,
-          confirmationRequired: false,
-        },
-      });
-    }
-
-    const service = await this.catalog.matchServiceByName(
-      session.business.id,
-      requestedContext.serviceName ?? "",
-    );
-    const prepared = service
-      ? await this.prepareBooking(userId, session, requestedContext, service, undefined)
-      : await this.explainUnknownService(userId, session, requestedContext);
-
-    return this.saveTurn(userId, session, userMessage, {
-      content: prepared.content,
-      bookingContext: prepared.context,
-      metadata: {
-        intent: "BOOK_APPOINTMENT",
-        bookingContext: prepared.context,
-        missingFields: prepared.missingFields,
-        confirmationRequired: prepared.confirmationRequired,
-        ...(prepared.suggestedTimes ? { suggestedTimes: prepared.suggestedTimes } : {}),
-      },
-    });
+    return this.saveTurn(userId, sessionId, userMessage, reply);
   }
 
-  public async confirmBooking(
-    userId: string,
-    sessionId: string,
-  ): Promise<ConfirmChatBookingResponse> {
-    const existingBooking = await this.chat.findConfirmedBooking(userId, sessionId);
+  public async confirmBooking(userId: string, sessionId: string): Promise<ConfirmChatBookingResponse> {
+    const existingBooking = await chatService.findConfirmedBooking(userId, sessionId);
 
     if (existingBooking) {
       return {
         session: existingBooking.session,
         assistantMessage: existingBooking.assistantMessage,
-        appointment: this.bookings.toAppointmentResponse(existingBooking.booking),
+        appointment: bookingService.toAppointmentResponse(existingBooking.booking),
       };
     }
 
-    const session = await this.chat.getSession(userId, sessionId);
-    const holdBookingId = session.bookingContext?.holdBookingId;
-    const hold = holdBookingId
-      ? await this.bookings.findHeldForUser(userId, holdBookingId)
-      : null;
+    const session = await chatService.getSession(userId, sessionId);
+    const holdId = session.draft.hold?.bookingId;
+    const hold = holdId ? await bookingService.findHeldForUser(userId, holdId) : null;
 
     if (!hold) {
       throw new AppError(
@@ -209,379 +131,277 @@ export class ChatOrchestrationService {
       );
     }
 
-    const booking = await this.bookings.confirmHold(hold, this.customer(userId), {
-      chatSessionId: sessionId,
-    });
-    const timeZone = session.bookingContext?.timeZone ?? booking.timeZone;
-    const when = this.formatDateTime(booking.scheduledAt, timeZone);
-    const content =
-      booking.status === "PENDING"
-        ? `${CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_PENDING_PREFIX}: ${booking.serviceName} on ${when} at ${booking.business.name}. You'll see it confirmed in My appointments.`
-        : `${CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_SUCCESS_PREFIX}: ${booking.serviceName}${booking.staff ? ` with ${booking.staff.displayName}` : ""} on ${when} at ${booking.business.name}.`;
-    const completed = await this.chat.completeBooking(userId, sessionId, {
+    const booking = await bookingService.confirmHold(hold, { type: "CUSTOMER", userId }, { chatSessionId: sessionId });
+    const timeZone = session.draft.timeZone ?? booking.timeZone;
+    const completed = await chatService.completeBooking(userId, sessionId, {
       bookingId: booking.id,
-      assistantContent: content,
+      assistantContent: this.confirmationMessage(booking, timeZone),
       assistantStructuredData: {
         intent: "BOOK_APPOINTMENT",
-        ...(session.bookingContext ? { bookingContext: session.bookingContext } : {}),
-        missingFields: [],
         confirmationRequired: false,
         appointmentId: booking.id,
+        parts: [{ type: "booking_summary", booking: bookingAssistantService.toSummary(booking, timeZone) }],
       },
     });
 
     return {
       session: completed.session,
       assistantMessage: completed.assistantMessage,
-      appointment: this.bookings.toAppointmentResponse(completed.booking),
+      appointment: bookingService.toAppointmentResponse(completed.booking),
     };
   }
 
-  private async processStructuredBookingDetails(
-    userId: string,
-    session: ChatSessionResponse,
-    userMessage: ChatMessageResponse,
-    details: StructuredBookingDetails,
-    timeZone: string,
-  ): Promise<ChatTurnResponse> {
-    const scheduledAt = localDateTimeToUtc(
-      details.scheduledDate,
-      details.scheduledTime,
-      timeZone,
-    );
+  private async handleAction(
+    context: AssistantContext,
+    action: NonNullable<ProcessChatMessageRequest["action"]>,
+  ): Promise<AssistantReply> {
+    try {
+      return await bookingAssistantService.handleAction(context, action);
+    } catch (error) {
+      // A slot taken (or expired) between offer and tap gets fresh times rather than an error.
+      if (error instanceof AssistantActionError && action.type === "select_slot") {
+        const slot = bookingAssistantService.peekToken(context, action.slotToken);
 
-    if (!scheduledAt || scheduledAt.getTime() <= Date.now()) {
-      throwRequestValidationError(
-        "bookingDetails.scheduledDate",
-        VALIDATION_MESSAGES.BOOKING_CONTEXT_TIME,
-      );
+        if (slot) {
+          return bookingAssistantService.offerAlternatives(
+            context,
+            slot.serviceId,
+            slot.staffId ?? undefined,
+            bookingAssistantService.describeInstant(slot.startsAt, context.timeZone).date,
+          );
+        }
+
+        return this.withServiceCards(context, "That time is no longer on offer. Pick a service to see current times.");
+      }
+
+      throw error;
+    }
+  }
+
+  private async handleStructuredDetails(
+    context: AssistantContext,
+    details: StructuredBookingDetails,
+  ): Promise<AssistantReply> {
+    const startsAt = localDateTimeToUtc(details.scheduledDate, details.scheduledTime, context.timeZone);
+
+    if (!startsAt || startsAt.getTime() <= Date.now()) {
+      throwRequestValidationError("bookingDetails.scheduledDate", VALIDATION_MESSAGES.BOOKING_CONTEXT_TIME);
     }
 
-    const service = await this.catalog.findBookableService(
-      session.business.id,
-      details.serviceId,
-    );
+    const service = await catalogService.findBookableService(context.business.id, details.serviceId);
 
     if (!service) {
       throw new AppError(404, ERROR_CODES.SERVICE_NOT_FOUND, ERROR_MESSAGES.SERVICE_NOT_FOUND);
     }
 
-    const notes = details.notes?.trim();
-    const prepared = await this.prepareBooking(
-      userId,
-      session,
-      {
-        serviceName: service.name,
-        scheduledAt,
-        timeZone,
-        ...(notes ? { notes } : {}),
-      },
-      service,
-      details.staffId,
-    );
+    const session = await chatService.getSession(context.userId, context.sessionId);
+    let hold: BookingRecord;
 
-    return this.saveTurn(userId, session, userMessage, {
-      content: prepared.content,
-      bookingContext: prepared.context,
-      metadata: {
-        intent: "BOOK_APPOINTMENT",
-        bookingContext: prepared.context,
-        missingFields: prepared.missingFields,
-        confirmationRequired: prepared.confirmationRequired,
-        ...(prepared.suggestedTimes ? { suggestedTimes: prepared.suggestedTimes } : {}),
-      },
+    try {
+      hold = await bookingService.holdForUser({
+        businessId: context.business.id,
+        serviceId: service.id,
+        startsAt,
+        userId: context.userId,
+        chatSessionId: null,
+        notes: details.notes?.trim() || null,
+        source: "FORM",
+        ...(details.staffId ? { staffId: details.staffId } : {}),
+      });
+    } catch (error) {
+      if (!(error instanceof AppError) || error.statusCode !== 409) throw error;
+
+      return bookingAssistantService.offerAlternatives(
+        context,
+        service.id,
+        details.staffId,
+        details.scheduledDate,
+      );
+    }
+
+    const previousHold = session.draft.hold?.bookingId;
+
+    if (previousHold && previousHold !== hold.id) {
+      const previous = await bookingService.findHeldForUser(context.userId, previousHold);
+
+      if (previous) await bookingService.releaseHold(previous, { type: "CUSTOMER", userId: context.userId });
+    }
+
+    await chatService.updateDraft(context.userId, context.sessionId, {
+      serviceId: service.id,
+      staffId: hold.staff?.id ?? null,
+      holdId: hold.id,
+      timeZone: context.timeZone,
+      notes: hold.notes,
     });
+
+    const summary = bookingAssistantService.toSummary(hold, context.timeZone);
+
+    return {
+      content: bookingAssistantService.holdMessage(summary),
+      parts: [
+        { type: "booking_summary", booking: summary },
+        { type: "confirm", label: "Confirm booking", description: "Book this time.", tone: "primary", action: { type: "confirm_booking" } },
+      ],
+    };
+  }
+
+  private async handleText(
+    context: AssistantContext,
+    session: ChatSessionResponse,
+    userMessage: ChatMessageResponse,
+  ): Promise<AssistantReply> {
+    const localIntent = classifyLocalIntent(userMessage.content);
+
+    if (localIntent) {
+      return this.withServiceCards(
+        context,
+        localIntent === "GREETING"
+          ? CHAT_CONSTANTS.ASSISTANT_MESSAGES.GREETING
+          : CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_HELP,
+      );
+    }
+
+    if (!this.runner) {
+      return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_UNAVAILABLE);
+    }
+
+    const [recentMessages, user] = await Promise.all([
+      chatService.listRecentMessages(context.userId, context.sessionId, env.AI_MAX_HISTORY_MESSAGES + 1),
+      authDal.findUserById(context.userId),
+    ]);
+
+    try {
+      const result = await this.runner.run({
+        systemPrompt: buildBookingAgentPrompt({
+          businessName: context.business.name,
+          customerName: user?.fullName.split(/\s+/)[0] ?? "the customer",
+          timeZone: context.timeZone,
+          now: context.now,
+          draft: session.draft,
+        }),
+        history: this.toAgentHistory(recentMessages, userMessage),
+        tools: bookingTools,
+        context,
+        businessId: context.business.id,
+      });
+
+      logger.info(
+        {
+          businessId: context.business.id,
+          rounds: result.rounds,
+          tools: result.toolCalls.map((call) => `${call.name}${call.ok ? "" : `!${call.error ?? ""}`}`),
+          tokens: result.usage.totalTokens,
+        },
+        "Booking agent turn completed",
+      );
+
+      return {
+        content: result.text.trim() || CHAT_CONSTANTS.ASSISTANT_MESSAGES.EMPTY_REPLY,
+        parts: this.dedupeParts(result.parts),
+      };
+    } catch (error) {
+      if (!(error instanceof AppError) || error.statusCode < 500) throw error;
+
+      logger.warn({ code: error.code }, "Booking agent unavailable; offering tap-to-book");
+
+      return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_UNAVAILABLE);
+    }
+  }
+
+  private async withServiceCards(context: AssistantContext, content: string): Promise<AssistantReply> {
+    const result = await bookingAssistantService.searchServices(context);
+
+    return {
+      content: result.parts?.length ? content : CHAT_CONSTANTS.ASSISTANT_MESSAGES.NO_ONLINE_SERVICES,
+      parts: result.parts ?? [],
+    };
   }
 
   /**
-   * Holds the requested slot so it cannot be taken while the customer
-   * confirms. An unchanged request keeps its existing hold; a taken slot
-   * returns the nearest open times instead.
+   * Prior turns as plain text. Times offered earlier are listed with their
+   * tokens so the customer can pick one without another availability call.
    */
-  private async prepareBooking(
-    userId: string,
-    session: ChatSessionResponse,
-    requested: AppointmentBookingContext,
-    service: { id: string; name: string },
-    staffId: string | undefined,
-  ): Promise<PreparedChatBooking> {
-    const previous = session.bookingContext;
-    const scheduledAt = requested.scheduledAt as Date;
-    const timeZone = requested.timeZone ?? "UTC";
+  private toAgentHistory(messages: ChatMessageResponse[], current: ChatMessageResponse): AiAgentMessage[] {
+    const history = messages.flatMap((message): AiAgentMessage[] => {
+      if (message.id === current.id || message.role === "SYSTEM") return [];
+      if (message.role === "USER") return [{ role: "user", content: message.content }];
 
-    if (
-      previous &&
-      this.hasActiveHold(previous) &&
-      previous.serviceId === service.id &&
-      previous.scheduledAt?.getTime() === scheduledAt.getTime() &&
-      (!staffId || previous.staffId === staffId)
-    ) {
-      return this.holdPrompt({ ...previous, ...(requested.notes ? { notes: requested.notes } : {}) });
-    }
+      const offered = (message.structuredData?.parts ?? [])
+        .flatMap((part) => (part.type === "slot_picker" ? part.slots : []))
+        .slice(0, AGENT_CONSTANTS.MAX_SLOTS_SHOWN)
+        .map((slot) => `${slot.startsAt} token=${slot.token}`);
 
-    await this.releaseChangedHold(userId, previous, null);
-
-    try {
-      const booking = await this.bookings.holdForUser({
-        businessId: session.business.id,
-        serviceId: service.id,
-        startsAt: scheduledAt,
-        userId,
-        chatSessionId: null,
-        notes: requested.notes ?? null,
-        source: "CHAT",
-        ...(staffId ? { staffId } : {}),
-      });
-
-      return this.holdPrompt({
-        serviceName: booking.serviceName,
-        serviceId: service.id,
-        ...(booking.staff
-          ? { staffId: booking.staff.id, staffName: booking.staff.displayName }
-          : {}),
-        holdBookingId: booking.id,
-        ...(booking.holdExpiresAt ? { holdExpiresAt: booking.holdExpiresAt } : {}),
-        ...(booking.priceMinor !== null ? { priceMinor: booking.priceMinor } : {}),
-        ...(booking.currency ? { currency: booking.currency } : {}),
-        scheduledAt: booking.scheduledAt,
-        timeZone,
-        durationMinutes: booking.durationMinutes,
-        ...(requested.notes ? { notes: requested.notes } : {}),
-      });
-    } catch (error) {
-      if (!this.isUnavailableSlotError(error)) throw error;
-
-      const suggestedTimes = await this.bookings.suggestStartTimes(
-        session.business.id,
-        service.id,
-        scheduledAt,
-        BOOKING_CONSTANTS.ALTERNATIVE_SLOT_COUNT,
-      );
-      const requestedTime = this.formatDateTime(scheduledAt, timeZone);
-      const content =
-        suggestedTimes.length > 0
-          ? `${service.name} isn't available on ${requestedTime}. The closest open times are ${suggestedTimes
-              .map((time) => this.formatDateTime(time, timeZone))
-              .join(", ")}. Which one would you like?`
-          : CHAT_CONSTANTS.ASSISTANT_MESSAGES.NO_OPEN_TIMES;
-
-      return {
-        context: {
-          serviceName: service.name,
-          serviceId: service.id,
-          timeZone,
-          ...(requested.notes ? { notes: requested.notes } : {}),
+      return [
+        {
+          role: "assistant",
+          content: offered.length > 0 ? `${message.content}\n[Times offered: ${offered.join("; ")}]` : message.content,
         },
-        content,
-        missingFields: ["scheduledAt"],
-        confirmationRequired: false,
-        suggestedTimes,
-      };
-    }
+      ];
+    });
+
+    return [...history, { role: "user", content: current.content }];
   }
 
-  private async explainUnknownService(
-    userId: string,
-    session: ChatSessionResponse,
-    requested: AppointmentBookingContext,
-  ): Promise<PreparedChatBooking> {
-    await this.releaseChangedHold(userId, session.bookingContext, null);
+  /**
+   * Several tool calls can show the same card; keep the last of each kind.
+   * Once something is ready to confirm, the cards that led there are noise.
+   */
+  private dedupeParts(parts: ChatMessagePart[]): ChatMessagePart[] {
+    const hasProposal = parts.some((part) => part.type === "confirm");
+    const kept = hasProposal
+      ? parts.filter((part) => part.type === "booking_summary" || part.type === "confirm")
+      : parts;
+    const lastIndex = new Map(kept.map((part, index) => [part.type, index]));
 
-    const names = await this.catalog.listBookableServiceNames(
-      session.business.id,
-      CHAT_CONSTANTS.SERVICE_SUGGESTION_COUNT,
-    );
-    const { serviceName, ...rest } = requested;
-
-    return {
-      context: rest,
-      content:
-        names.length > 0
-          ? `I couldn't find “${serviceName ?? ""}” at ${session.business.name}. You can book ${names.join(", ")}. Which would you like?`
-          : CHAT_CONSTANTS.ASSISTANT_MESSAGES.NO_ONLINE_SERVICES,
-      missingFields: ["serviceName"],
-      confirmationRequired: false,
-    };
-  }
-
-  private holdPrompt(context: AppointmentBookingContext): PreparedChatBooking {
-    const timeZone = context.timeZone ?? "UTC";
-    const when = context.scheduledAt ? this.formatDateTime(context.scheduledAt, timeZone) : "";
-    const price =
-      context.priceMinor !== undefined && context.currency
-        ? `, ${formatMinorAmount(context.priceMinor, context.currency)}`
-        : "";
-    const heldUntil = context.holdExpiresAt
-      ? ` I'm holding it until ${this.formatTime(context.holdExpiresAt, timeZone)}.`
-      : "";
-
-    return {
-      context,
-      content: `${context.serviceName ?? "Your appointment"}${context.staffName ? ` with ${context.staffName}` : ""} on ${when} (${context.durationMinutes ?? ""} minutes${price}) is available.${heldUntil} ${CHAT_CONSTANTS.ASSISTANT_MESSAGES.CONFIRMATION_SUFFIX}`,
-      missingFields: [],
-      confirmationRequired: true,
-    };
-  }
-
-  /** Releases the session's previous hold unless it is the one being kept. */
-  private async releaseChangedHold(
-    userId: string,
-    previous: AppointmentBookingContext | null,
-    keepBookingId: string | null,
-  ): Promise<void> {
-    const holdId = previous?.holdBookingId;
-
-    if (!holdId || holdId === keepBookingId) return;
-
-    const hold = await this.bookings.findHeldForUser(userId, holdId);
-
-    if (hold) await this.bookings.releaseHold(hold, this.customer(userId));
+    return kept.filter((part, index) => lastIndex.get(part.type) === index);
   }
 
   private async saveTurn(
     userId: string,
-    session: ChatSessionResponse,
+    sessionId: string,
     userMessage: ChatMessageResponse,
-    turn: {
-      content: string;
-      bookingContext?: AppointmentBookingContext;
-      metadata: ChatMessageMetadata;
-    },
+    reply: AssistantReply,
   ): Promise<ChatTurnResponse> {
-    const persistedTurn = await this.chat.saveAssistantTurn(userId, session.id, {
+    const draftHasHold = reply.parts.some(
+      (part) => part.type === "confirm" && part.action.type === "confirm_booking",
+    );
+    const structuredData: ChatMessageMetadata = {
+      intent: "BOOK_APPOINTMENT",
+      confirmationRequired: draftHasHold,
+      ...(reply.parts.length > 0 ? { parts: reply.parts } : {}),
+    };
+    const persisted = await chatService.saveAssistantTurn(userId, sessionId, {
       replyToMessageId: userMessage.id,
-      content: turn.content,
-      ...(turn.bookingContext ? { bookingContext: turn.bookingContext } : {}),
-      structuredData: turn.metadata,
+      content: reply.content,
+      structuredData,
     });
 
-    return {
-      session: persistedTurn.session,
-      userMessage,
-      assistantMessage: persistedTurn.assistantMessage,
-    };
+    return { session: persisted.session, userMessage, assistantMessage: persisted.assistantMessage };
   }
 
-  private hasActiveHold(context: AppointmentBookingContext | null): boolean {
-    return Boolean(
-      context?.holdBookingId &&
-        context.holdExpiresAt &&
-        context.holdExpiresAt.getTime() > Date.now(),
-    );
-  }
-
-  private isUnavailableSlotError(error: unknown): boolean {
-    return (
-      error instanceof AppError &&
-      (error.code === ERROR_CODES.APPOINTMENT_SLOT_UNAVAILABLE ||
-        (error.statusCode === 422 && Boolean(error.fieldErrors?.startsAt)))
-    );
-  }
-
-  private customer(userId: string): BookingActor {
-    return { type: "CUSTOMER", userId };
-  }
-
-  private toConversationHistory(
-    messages: ChatMessageResponse[],
-    currentUserMessageId: string,
-  ): AiConversationMessage[] {
-    return messages.flatMap((message) => {
-      if (message.id === currentUserMessageId || message.role === "SYSTEM") {
-        return [];
-      }
-
-      return [
-        {
-          role: message.role === "USER" ? "user" : "assistant",
-          content: message.content,
-        } as const,
-      ];
-    });
-  }
-
-  private toBookingContext(
-    context: AiAppointmentContext,
-    timeZone: string,
-  ): AppointmentBookingContext {
-    return {
-      ...(context.serviceName ? { serviceName: context.serviceName } : {}),
-      ...(context.scheduledAt ? { scheduledAt: context.scheduledAt } : {}),
-      timeZone,
-      ...(context.durationMinutes !== undefined
-        ? { durationMinutes: context.durationMinutes }
-        : {}),
-      ...(context.notes ? { notes: context.notes } : {}),
-    };
-  }
-
-  private toAiAppointmentContext(
-    context: AppointmentBookingContext,
-  ): AiAppointmentContext {
-    return {
-      ...(context.serviceName ? { serviceName: context.serviceName } : {}),
-      ...(context.scheduledAt ? { scheduledAt: context.scheduledAt } : {}),
-      ...(context.durationMinutes !== undefined
-        ? { durationMinutes: context.durationMinutes }
-        : {}),
-      ...(context.notes ? { notes: context.notes } : {}),
-    };
-  }
-
-  private buildNonBookingResponse(
-    intent: AiAppointmentIntent,
-    assistantReply: string | undefined,
-  ): string {
-    if (intent === "GREETING") {
-      return assistantReply ?? CHAT_CONSTANTS.ASSISTANT_MESSAGES.GREETING;
-    }
-
-    if (intent === "BOOKING_HELP") {
-      return assistantReply ?? CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_HELP;
-    }
-
-    if (intent === "MANAGE_APPOINTMENT") {
-      return CHAT_CONSTANTS.ASSISTANT_MESSAGES.MANAGE_APPOINTMENT;
-    }
-
-    return CHAT_CONSTANTS.ASSISTANT_MESSAGES.UNKNOWN_INTENT;
-  }
-
-  private getMissingBookingFields(
-    context: AppointmentBookingContext | null,
-  ): AiBookingField[] {
-    const missingFields: AiBookingField[] = [];
-
-    if (!context?.serviceName?.trim()) {
-      missingFields.push("serviceName");
-    }
-
-    if (!context?.scheduledAt || context.scheduledAt.getTime() <= Date.now()) {
-      missingFields.push("scheduledAt");
-    }
-
-    return missingFields;
-  }
-
-  private formatDateTime(value: Date, timeZone: string): string {
-    return new Intl.DateTimeFormat(CHAT_CONSTANTS.RESPONSE_LOCALE, {
+  private confirmationMessage(booking: BookingRecord, timeZone: string): string {
+    const when = new Intl.DateTimeFormat(CHAT_CONSTANTS.RESPONSE_LOCALE, {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone,
-    }).format(value);
-  }
+    }).format(booking.scheduledAt);
 
-  private formatTime(value: Date, timeZone: string): string {
-    return new Intl.DateTimeFormat(CHAT_CONSTANTS.RESPONSE_LOCALE, {
-      timeStyle: "short",
-      timeZone,
-    }).format(value);
+    return booking.status === "PENDING"
+      ? `${CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_PENDING_PREFIX}: ${booking.serviceName} on ${when} at ${booking.business.name}. You'll see it confirmed in My appointments.`
+      : `${CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_SUCCESS_PREFIX}: ${booking.serviceName}${booking.staff ? ` with ${booking.staff.displayName}` : ""} on ${when} at ${booking.business.name}.`;
   }
 }
 
-export const chatOrchestrationService = new ChatOrchestrationService(
-  aiService,
-  chatService,
-  bookingService,
-  catalogService,
-);
+const mistralProvider = env.MISTRAL_API_KEY
+  ? new InstrumentedAiProvider(
+      new MistralProvider({
+        apiKey: env.MISTRAL_API_KEY,
+        model: env.MISTRAL_MODEL,
+        apiUrl: env.MISTRAL_API_URL,
+        timeoutMs: env.AI_REQUEST_TIMEOUT_MS,
+      }),
+    )
+  : null;
+
+export const chatOrchestrationService = new ChatOrchestrationService(mistralProvider);

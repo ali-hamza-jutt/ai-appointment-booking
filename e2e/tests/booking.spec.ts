@@ -25,7 +25,7 @@ test("a new customer signs up, books through chat, confirms and cancels", async 
     await composer.fill("Book a haircut tomorrow at 10:00");
     await composer.press("Enter");
 
-    const confirm = page.getByRole("button", { name: "Confirm booking" });
+    const confirm = page.getByRole("button", { name: "Confirm booking" }).first();
 
     await expect(confirm).toBeEnabled();
     await confirm.click();
@@ -65,6 +65,6 @@ test("the assistant declines requests that aren't bookings", async ({ page }) =>
   await composer.fill("What's the weather like in Paris?");
   await composer.press("Enter");
 
-  await expect(page.getByText(/focused on appointment booking/)).toBeVisible();
+  await expect(page.getByText("I can only help with booking appointments here.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirm booking" })).toHaveCount(0);
 });

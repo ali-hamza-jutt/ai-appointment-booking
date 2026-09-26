@@ -12,75 +12,161 @@ export type ChatMessageRole = "USER" | "ASSISTANT" | "SYSTEM";
  */
 export type ClientMessageId = string;
 
-export interface AppointmentBookingContext {
-  /** @minLength 2 @maxLength 120 */
-  serviceName?: string;
-
-  /** Catalog service the request was matched to. */
-  serviceId?: string;
-
-  /** Staff member holding the slot. */
-  staffId?: string;
-
-  staffName?: string;
-
-  /** The held booking awaiting confirmation. */
-  holdBookingId?: string;
-
-  holdExpiresAt?: Date;
-
-  priceMinor?: number;
-
-  currency?: string;
-
-  scheduledAt?: Date;
-
-  /** IANA time zone used to interpret the scheduled date and time. @maxLength 100 */
-  timeZone?: string;
-
-  /**
-   * @isInt Duration must be a whole number
-   * @minimum 5
-   * @maximum 480
-   */
-  durationMinutes?: number;
-
-  /** @maxLength 2000 */
-  notes?: string;
+/** A booking as shown inside the chat: a hold, a new booking or one being changed. */
+export interface ChatBookingSummary {
+  bookingId: string;
+  serviceName: string;
+  staffName: string | null;
+  /** ISO 8601 instant. */
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  priceMinor: number | null;
+  currency: string | null;
+  status: string;
+  /** ISO 8601 instant when a hold lapses; null once booked. */
+  holdExpiresAt: string | null;
+  timeZone: string;
 }
+
+export interface ChatDraftService {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  priceMinor: number;
+  currency: string;
+}
+
+export interface ChatDraftStaff {
+  id: string;
+  displayName: string;
+}
+
+/**
+ * The booking the customer is putting together. Each part references a real
+ * row, so the draft can never describe a service or slot that does not exist.
+ */
+export interface ChatBookingDraft {
+  service: ChatDraftService | null;
+  staff: ChatDraftStaff | null;
+  /** The held slot awaiting confirmation. */
+  hold: ChatBookingSummary | null;
+  timeZone: string | null;
+  notes: string | null;
+}
+
+export interface ChatServiceCard {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  priceMinor: number;
+  currency: string;
+}
+
+/** An offered start time; the token is what gets booked, so times cannot be invented. */
+export interface ChatSlotOption {
+  token: string;
+  startsAt: string;
+  endsAt: string;
+  staffName: string | null;
+  seatsLeft: number | null;
+}
+
+export interface SelectServiceAction {
+  type: "select_service";
+  serviceId: string;
+}
+
+export interface SelectSlotAction {
+  type: "select_slot";
+  slotToken: string;
+}
+
+export interface ConfirmBookingAction {
+  type: "confirm_booking";
+}
+
+export interface CancelBookingAction {
+  type: "cancel_booking";
+  bookingId: string;
+}
+
+export interface RescheduleBookingAction {
+  type: "reschedule_booking";
+  bookingId: string;
+  slotToken: string;
+}
+
+/** What a tap on a card or button asks for; handled without the AI. */
+export type ChatAction =
+  | SelectServiceAction
+  | SelectSlotAction
+  | ConfirmBookingAction
+  | CancelBookingAction
+  | RescheduleBookingAction;
+
+export interface ChatTextPart {
+  type: "text";
+  text: string;
+}
+
+export interface ChatServiceCardsPart {
+  type: "service_cards";
+  services: ChatServiceCard[];
+}
+
+export interface ChatSlotPickerPart {
+  type: "slot_picker";
+  serviceId: string;
+  serviceName: string;
+  timeZone: string;
+  slots: ChatSlotOption[];
+  /** Set when picking a slot moves this existing booking instead of making a new one. */
+  rescheduleBookingId?: string;
+}
+
+export interface ChatBookingSummaryPart {
+  type: "booking_summary";
+  booking: ChatBookingSummary;
+}
+
+export interface ChatBookingListPart {
+  type: "booking_list";
+  bookings: ChatBookingSummary[];
+}
+
+export interface ChatConfirmPart {
+  type: "confirm";
+  label: string;
+  description: string;
+  tone: "primary" | "danger";
+  action: ChatAction;
+}
+
+/** Structured pieces of an assistant reply that the web renders as components. */
+export type ChatMessagePart =
+  | ChatTextPart
+  | ChatServiceCardsPart
+  | ChatSlotPickerPart
+  | ChatBookingSummaryPart
+  | ChatBookingListPart
+  | ChatConfirmPart;
 
 export interface ChatMessageMetadata {
   intent?: "BOOK_APPOINTMENT" | "UNKNOWN";
-  bookingContext?: AppointmentBookingContext;
+  parts?: ChatMessagePart[];
+  /** Fields the structured form still needs. */
   missingFields?: string[];
+  /** True while a held slot is waiting for the customer to confirm. */
   confirmationRequired?: boolean;
   appointmentId?: string;
-  /** Open start times offered when the requested time was taken. */
-  suggestedTimes?: Date[];
 }
 
-export interface StoredAppointmentBookingContext {
-  serviceName?: string;
-  serviceId?: string;
-  staffId?: string;
-  staffName?: string;
-  holdBookingId?: string;
-  holdExpiresAt?: string;
-  priceMinor?: number;
-  currency?: string;
-  scheduledAt?: string;
-  timeZone?: string;
-  durationMinutes?: number;
-  notes?: string;
-}
-
-export interface StoredChatMessageMetadata {
-  intent?: "BOOK_APPOINTMENT" | "UNKNOWN";
-  bookingContext?: StoredAppointmentBookingContext;
-  missingFields?: string[];
-  confirmationRequired?: boolean;
-  appointmentId?: string;
-  suggestedTimes?: string[];
+export interface ChatHandoff {
+  requestedAt: Date;
+  reason: string | null;
+  resolvedAt: Date | null;
 }
 
 export interface CreateChatSessionRequest {
@@ -89,8 +175,6 @@ export interface CreateChatSessionRequest {
 
   /** Booking link of the business to book with. Defaults to the demo business. @maxLength 60 */
   businessSlug?: string;
-
-  bookingContext?: AppointmentBookingContext;
 
   /** Abandons the current active chat before creating this session. */
   replaceActive?: boolean;
@@ -123,8 +207,11 @@ export interface ProcessChatMessageRequest extends CreateChatMessageRequest {
   /** IANA time zone used to interpret relative dates such as tomorrow. @maxLength 100 */
   timeZone: string;
 
-  /** Form-provided values that bypass AI extraction and are validated by the server. */
+  /** Form-provided values that bypass the assistant and are validated by the server. */
   bookingDetails?: StructuredBookingDetails;
+
+  /** A tap on a card or button in an assistant reply; handled without the assistant. */
+  action?: ChatAction;
 }
 
 export interface ChatSessionBusiness {
@@ -138,7 +225,9 @@ export interface ChatSessionResponse {
   business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
-  bookingContext: AppointmentBookingContext | null;
+  draft: ChatBookingDraft;
+  /** Set when the assistant has asked staff to take over. */
+  handoff: ChatHandoff | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -188,14 +277,44 @@ export interface ListChatMessagesOptions {
   limit?: number;
 }
 
+export interface ChatDraftHoldRecord {
+  id: string;
+  serviceName: string;
+  scheduledAt: Date;
+  endsAt: Date;
+  durationMinutes: number;
+  priceMinor: number | null;
+  currency: string | null;
+  status: string;
+  holdExpiresAt: Date | null;
+  timeZone: string;
+  staff: { displayName: string } | null;
+}
+
 export interface ChatSessionRecord {
   id: string;
   business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
-  bookingContext: unknown;
+  draftService: ChatDraftService | null;
+  draftStaff: ChatDraftStaff | null;
+  draftHold: ChatDraftHoldRecord | null;
+  draftTimeZone: string | null;
+  draftNotes: string | null;
+  handoffRequestedAt: Date | null;
+  handoffReason: string | null;
+  handoffResolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** Changes to a chat's draft; null clears a field, undefined leaves it. */
+export interface ChatDraftPatch {
+  serviceId?: string | null;
+  staffId?: string | null;
+  holdId?: string | null;
+  timeZone?: string | null;
+  notes?: string | null;
 }
 
 export interface ChatMessageRecord {
@@ -213,7 +332,6 @@ export interface CreateChatSessionData {
   businessId: string;
   userId: string;
   title: string | null;
-  bookingContext: StoredAppointmentBookingContext | null;
   replaceActive: boolean;
 }
 
@@ -236,7 +354,7 @@ export interface CreateChatMessageData {
   replyToMessageId: string | null;
   role: ChatMessageRole;
   content: string;
-  structuredData: StoredChatMessageMetadata | null;
+  structuredData: ChatMessageMetadata | null;
 }
 
 export interface ChatMessageCreationResult {
@@ -253,7 +371,7 @@ export interface ListRecentChatMessagesData {
 export interface SaveAssistantTurnRequest {
   replyToMessageId: string;
   content: string;
-  bookingContext?: AppointmentBookingContext;
+  draft?: ChatDraftPatch;
   structuredData: ChatMessageMetadata;
 }
 
@@ -262,8 +380,8 @@ export interface SaveAssistantTurnData {
   sessionId: string;
   replyToMessageId: string;
   content: string;
-  bookingContext?: StoredAppointmentBookingContext;
-  structuredData: StoredChatMessageMetadata;
+  draft?: ChatDraftPatch;
+  structuredData: ChatMessageMetadata;
 }
 
 export interface ChatSessionWithMessagesRecord extends ChatSessionRecord {
@@ -280,7 +398,7 @@ export interface ConfirmChatBookingData {
   sessionId: string;
   bookingId: string;
   assistantContent: string;
-  assistantStructuredData: StoredChatMessageMetadata;
+  assistantStructuredData: ChatMessageMetadata;
 }
 
 export interface CompleteChatBookingRequest {
@@ -312,8 +430,8 @@ export interface ListChatMessagesData {
   take: number;
 }
 
-export interface UpdateBookingContextData {
+export interface UpdateChatDraftData {
   userId: string;
   sessionId: string;
-  bookingContext: StoredAppointmentBookingContext;
+  draft: ChatDraftPatch;
 }

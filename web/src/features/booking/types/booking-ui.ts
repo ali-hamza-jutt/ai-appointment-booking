@@ -1,3 +1,5 @@
+import type { ChatAction, ChatMessagePart } from "@/generated/api/models";
+
 export type ChatMessageRole = "assistant" | "user";
 export type ChatMessageDeliveryStatus = "sending" | "sent" | "failed";
 
@@ -5,6 +7,8 @@ export interface ChatMessageViewModel {
   clientMessageId?: string;
   deliveryStatus?: ChatMessageDeliveryStatus;
   id: string;
+  /** Cards and buttons that come with an assistant reply. */
+  parts?: ChatMessagePart[];
   role: ChatMessageRole;
   text: string;
 }
@@ -23,6 +27,8 @@ export interface BookingDraftViewModel {
 }
 
 export interface PendingChatTurn {
+  /** A tap on a card or button, sent instead of free text. */
+  action?: ChatAction;
   bookingDetails?: StructuredBookingFormValues;
   clientMessageId: string;
   text: string;

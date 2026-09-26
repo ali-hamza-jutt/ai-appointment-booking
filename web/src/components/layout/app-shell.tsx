@@ -61,6 +61,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/settings", icon: SettingsIcon, label: "Business settings" },
   { href: "/business/team", icon: UsersIcon, label: "Team" },
   { href: "/business/customers", icon: ContactIcon, label: "Customers" },
+  { href: "/business/handoffs", icon: ChatIcon, label: "Chat handoffs" },
 ];
 
 const setupNavigation: NavigationItem[] = [
@@ -76,6 +77,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/settings", "Business settings"],
   ["/business/team", "Team"],
   ["/business/customers", "Customers"],
+  ["/business/handoffs", "Chat handoffs"],
 ];
 
 function getPageTitle(pathname: string) {

@@ -1,12 +1,13 @@
 /**
- * A stand-in for the Mistral chat-completions API so end-to-end tests are
- * deterministic and free. It reads the same prompt the real model gets and
- * extracts the service, date and time with simple rules.
+ * A stand-in for Mistral's chat-completions API with function calling, so
+ * end-to-end tests are deterministic and free. It plays a simple, correct
+ * booking agent: find the service, check the requested day and time, hold it.
  */
 import { createServer } from "node:http";
 
 const PORT = Number(process.env.FAKE_MISTRAL_PORT ?? 4010);
 const SERVICES = ["haircut", "beard trim"];
+let callSequence = 0;
 
 function addDays(date, days) {
   const next = new Date(`${date}T00:00:00Z`);
@@ -16,48 +17,63 @@ function addDays(date, days) {
   return next.toISOString().slice(0, 10);
 }
 
-function extract(systemPrompt, message) {
-  const today = systemPrompt.match(/Current local date and time: (\d{4}-\d{2}-\d{2})/)?.[1];
+function parseRequest(systemPrompt, message) {
+  const today = systemPrompt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  const todayIso = today ? `${today[3]}-${today[1]}-${today[2]}` : null;
   const text = message.toLowerCase();
-  const serviceName = SERVICES.find((service) => text.includes(service)) ?? null;
-  const explicitDate = text.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-  const scheduledDate = explicitDate ?? (text.includes("tomorrow") && today ? addDays(today, 1) : null);
+  const service = SERVICES.find((name) => text.includes(name)) ?? null;
+  const date = text.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? (text.includes("tomorrow") && todayIso ? addDays(todayIso, 1) : null);
   const time = text.match(/at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-  let scheduledTime = null;
+  let hhmm = null;
 
   if (time) {
     let hour = Number(time[1]);
 
     if (time[3] === "pm" && hour < 12) hour += 12;
     if (time[3] === "am" && hour === 12) hour = 0;
-    scheduledTime = `${String(hour).padStart(2, "0")}:${time[2] ?? "00"}`;
+    hhmm = `${String(hour).padStart(2, "0")}:${time[2] ?? "00"}`;
   }
 
-  if (!serviceName && !scheduledDate) {
-    return {
-      intent: "OUT_OF_SCOPE",
-      serviceName: null,
-      scheduledDate: null,
-      scheduledTime: null,
-      durationMinutes: null,
-      notes: null,
-      clarificationQuestion: null,
-      assistantReply: "I can only help with booking appointments.",
-      confidence: 0.9,
-    };
+  return { service, date, time: hhmm };
+}
+
+function toolCall(name, args) {
+  callSequence += 1;
+
+  return { id: `fk${String(callSequence).padStart(7, "0")}`, type: "function", function: { name, arguments: JSON.stringify(args) } };
+}
+
+/** Decides the next step from the messages since the customer's latest message. */
+function nextStep(messages) {
+  const system = messages.find((item) => item.role === "system")?.content ?? "";
+  const lastUserIndex = messages.map((item) => item.role).lastIndexOf("user");
+  const request = parseRequest(system, messages[lastUserIndex]?.content ?? "");
+  const results = Object.fromEntries(
+    messages
+      .slice(lastUserIndex + 1)
+      .filter((item) => item.role === "tool")
+      .map((item) => [item.name, JSON.parse(item.content)]),
+  );
+
+  if (!request.service) return { content: "I can only help with booking appointments here." };
+  if (!results.search_services) return { tool_calls: [toolCall("search_services", { query: request.service })] };
+  if (!request.date || !request.time) return { content: "What day and time would you like?" };
+
+  const serviceId = results.search_services.services?.[0]?.serviceId;
+
+  if (!results.get_availability) {
+    return { tool_calls: [toolCall("get_availability", { serviceId, date: request.date, time: request.time })] };
   }
 
-  return {
-    intent: "BOOK_APPOINTMENT",
-    serviceName,
-    scheduledDate,
-    scheduledTime,
-    durationMinutes: null,
-    notes: null,
-    clarificationQuestion: scheduledDate && scheduledTime ? null : "What day and time would you like?",
-    assistantReply: null,
-    confidence: 0.9,
-  };
+  const requested = results.get_availability.requested;
+
+  if (!results.propose_booking && requested?.available) {
+    return { tool_calls: [toolCall("propose_booking", { slotToken: requested.slotToken })] };
+  }
+
+  if (results.propose_booking) return { content: "It's held for you. Press Confirm booking to book it." };
+
+  return { content: "That time isn't open. Here are the nearest times." };
 }
 
 createServer((request, response) => {
@@ -70,17 +86,14 @@ createServer((request, response) => {
       return;
     }
 
-    const { messages } = JSON.parse(body);
-    const system = messages.find((item) => item.role === "system")?.content ?? "";
-    const lastUser = messages.filter((item) => item.role === "user").at(-1)?.content ?? "";
-    const content = JSON.stringify(extract(system, lastUser));
+    const step = nextStep(JSON.parse(body).messages);
 
     response.writeHead(200, { "content-type": "application/json" });
     response.end(
       JSON.stringify({
         id: "e2e",
         model: "mistral-small-e2e",
-        choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+        choices: [{ index: 0, message: { role: "assistant", content: step.content ?? "", ...(step.tool_calls ? { tool_calls: step.tool_calls } : {}) }, finish_reason: step.tool_calls ? "tool_calls" : "stop" }],
         usage: { prompt_tokens: 120, completion_tokens: 40, total_tokens: 160 },
       }),
     );

@@ -454,7 +454,47 @@ export class BookingService {
     request: RescheduleAppointmentRequest,
   ): Promise<AppointmentResponse> {
     const booking = await this.getOwnedBooking(userId, bookingId);
+    const startsAt = localDateTimeToUtc(
+      request.scheduledDate,
+      request.scheduledTime,
+      booking.timeZone,
+    );
 
+    if (!startsAt) {
+      throwRequestValidationError(
+        "scheduledDate",
+        VALIDATION_MESSAGES.APPOINTMENT_RESCHEDULE_TIME,
+      );
+    }
+
+    return this.rescheduleOwnedBooking(userId, booking, startsAt);
+  }
+
+  /** Moves a customer's own booking to an exact start time, keeping its provider. */
+  public async rescheduleForCustomerAt(
+    userId: string,
+    bookingId: string,
+    startsAt: Date,
+  ): Promise<AppointmentResponse> {
+    return this.rescheduleOwnedBooking(userId, await this.getOwnedBooking(userId, bookingId), startsAt);
+  }
+
+  /** The customer's upcoming bookings at one business, soonest first. */
+  public async listUpcomingForCustomerAt(
+    userId: string,
+    businessId: string,
+    limit: number,
+  ): Promise<AppointmentResponse[]> {
+    const records = await bookingDal.listUpcomingForUserAtBusiness(userId, businessId, new Date(), limit);
+
+    return records.map((record) => this.toAppointmentResponse(record));
+  }
+
+  private async rescheduleOwnedBooking(
+    userId: string,
+    booking: BookingRecord,
+    startsAt: Date,
+  ): Promise<AppointmentResponse> {
     if (!this.customerCanReschedule(booking, new Date())) {
       throw new AppError(
         409,
@@ -463,13 +503,7 @@ export class BookingService {
       );
     }
 
-    const startsAt = localDateTimeToUtc(
-      request.scheduledDate,
-      request.scheduledTime,
-      booking.timeZone,
-    );
-
-    if (!startsAt || startsAt.getTime() <= Date.now()) {
+    if (startsAt.getTime() <= Date.now()) {
       throwRequestValidationError(
         "scheduledDate",
         VALIDATION_MESSAGES.APPOINTMENT_RESCHEDULE_TIME,

@@ -304,6 +304,25 @@ export class BookingDal {
     });
   }
 
+  public listUpcomingForUserAtBusiness(
+    userId: string,
+    businessId: string,
+    now: Date,
+    take: number,
+  ): Promise<BookingRecord[]> {
+    return prisma.booking.findMany({
+      where: {
+        userId,
+        businessId,
+        status: { in: ["PENDING", "CONFIRMED", "PENDING_PAYMENT"] },
+        scheduledAt: { gt: now },
+      },
+      orderBy: [{ scheduledAt: "asc" }, { id: "asc" }],
+      take,
+      select: bookingSelect,
+    });
+  }
+
   public listForUser(data: ListCustomerBookingsData): Promise<BookingRecord[]> {
     return prisma.booking.findMany({
       where: {
