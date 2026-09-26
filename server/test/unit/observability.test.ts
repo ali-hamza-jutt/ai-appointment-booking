@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import type {
   AiProvider,
-  AiProviderCompletionRequest,
-  AiProviderCompletionResponse,
+  AiToolCompletionRequest,
+  AiToolCompletionResponse,
 } from "../../src/integrations/ai/dto/ai.dto.js";
 import { AiProviderError } from "../../src/integrations/ai/errors/ai-provider.error.js";
 import { InstrumentedAiProvider } from "../../src/integrations/ai/providers/instrumented.provider.js";
@@ -21,11 +21,12 @@ class FakeProvider implements AiProvider {
 
   public constructor(private readonly outcome: "ok" | "fail") {}
 
-  public completeJson(_request: AiProviderCompletionRequest): Promise<AiProviderCompletionResponse> {
+  public completeWithTools(_request: AiToolCompletionRequest): Promise<AiToolCompletionResponse> {
     if (this.outcome === "fail") return Promise.reject(new AiProviderError("TIMEOUT", "timed out"));
 
     return Promise.resolve({
-      content: "{}",
+      content: "Here you go.",
+      toolCalls: [],
       provider: "mistral",
       model: "mistral-small-2506",
       usage: { promptTokens: 1_000, completionTokens: 200, totalTokens: 1_200 },
@@ -33,7 +34,14 @@ class FakeProvider implements AiProvider {
   }
 }
 
-const REQUEST = { systemPrompt: "s", messages: [], maxOutputTokens: 100, temperature: 0 };
+const REQUEST = {
+  systemPrompt: "s",
+  messages: [],
+  tools: [],
+  toolChoice: "auto" as const,
+  maxOutputTokens: 100,
+  temperature: 0,
+};
 
 describe("observability", () => {
   let meter: ReturnType<typeof installTestMeter>;
@@ -43,7 +51,7 @@ describe("observability", () => {
   });
 
   it("records LLM tokens, latency and estimated cost per business", async () => {
-    await new InstrumentedAiProvider(new FakeProvider("ok")).completeJson({ ...REQUEST, businessId: "biz-1" });
+    await new InstrumentedAiProvider(new FakeProvider("ok")).completeWithTools({ ...REQUEST, businessId: "biz-1" });
 
     const business = { business_id: "biz-1", model: "mistral-small-2506" };
 
@@ -57,7 +65,7 @@ describe("observability", () => {
 
   it("counts failed LLM calls without inventing usage", async () => {
     await expect(
-      new InstrumentedAiProvider(new FakeProvider("fail")).completeJson({ ...REQUEST, businessId: "biz-2" }),
+      new InstrumentedAiProvider(new FakeProvider("fail")).completeWithTools({ ...REQUEST, businessId: "biz-2" }),
     ).rejects.toThrow("timed out");
 
     await expect(meter.total("bookwise_llm_requests", { business_id: "biz-2", outcome: "error" })).resolves.toBe(1);

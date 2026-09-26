@@ -239,24 +239,38 @@ export const CHAT_CONSTANTS = {
   RESPONSE_LOCALE: "en-US",
   SERVICE_SUGGESTION_COUNT: 6,
   ASSISTANT_MESSAGES: {
-    UNKNOWN_INTENT:
-      "I’m focused on appointment booking. Tell me the service, date, and time you would prefer, and I’ll help you schedule it.",
     GREETING:
-      "Hello! I can help you book an appointment. What would you like to schedule?",
+      "Hello! I can help you book, move or cancel an appointment. What would you like to do?",
     BOOKING_HELP:
-      "I can collect the service, date, time, duration, and notes for a new appointment. Tell me any details you already know, or use the booking form.",
-    MANAGE_APPOINTMENT:
-      "To cancel or reschedule an existing booking, open My appointments and choose the appointment you want to manage.",
-    PAST_TIME:
-      "That time has already passed in your timezone. Please choose a future date and time.",
-    INVALID_TIME:
-      "I couldn’t interpret that date and time safely. Please provide a specific future date and time.",
-    CONFIRMATION_SUFFIX: "Please confirm to book it.",
+      "Tell me what you'd like and when — for example “a haircut on Friday afternoon” — and I'll find open times. You can also tap a service below or use the booking form.",
+    ASSISTANT_UNAVAILABLE:
+      "The booking assistant is unavailable right now, but you can still book: pick a service below or use the booking form.",
+    EMPTY_REPLY: "Here's what I found.",
     BOOKING_SUCCESS_PREFIX: "Your appointment has been booked",
     BOOKING_PENDING_PREFIX: "Your request has been sent for approval",
     NO_ONLINE_SERVICES: "This business has no services open for online booking yet.",
     NO_OPEN_TIMES:
       "There are no open times for that service in the next few weeks. Please try another service or contact the business.",
+  },
+} as const;
+
+export const AGENT_CONSTANTS = {
+  /** Tool rounds the model may take in one turn before it must answer. */
+  MAX_TOOL_ROUNDS: 5,
+  /** Offered slots stay bookable for this long. */
+  SLOT_TOKEN_TTL_MINUTES: 30,
+  MAX_SERVICE_RESULTS: 5,
+  MAX_SLOTS_SHOWN: 12,
+  MAX_AVAILABILITY_DAYS: 7,
+  /** How far ahead list_staff looks for each provider's next free day. */
+  STAFF_LOOKAHEAD_DAYS: 14,
+  MAX_BOOKINGS_LISTED: 5,
+  MAX_TOOL_RESULT_CHARS: 6_000,
+  MAX_OUTPUT_TOKENS: 700,
+  PART_OF_DAY: {
+    morning: { fromMinute: 0, toMinute: 12 * 60 },
+    afternoon: { fromMinute: 12 * 60, toMinute: 17 * 60 },
+    evening: { fromMinute: 17 * 60, toMinute: 24 * 60 },
   },
 } as const;
 
@@ -270,25 +284,8 @@ export const AI_CONSTANTS = {
   MAX_REQUEST_TIMEOUT_MS: 60_000,
   DEFAULT_MAX_HISTORY_MESSAGES: 12,
   MAX_HISTORY_MESSAGES: 50,
-  HISTORY_QUERY_LIMIT: 51,
-  MAX_OUTPUT_TOKENS: 600,
   TEMPERATURE: 0,
   MAX_COMPLETION_ATTEMPTS: 2,
-  INTENTS: [
-    "BOOK_APPOINTMENT",
-    "GREETING",
-    "BOOKING_HELP",
-    "MANAGE_APPOINTMENT",
-    "OUT_OF_SCOPE",
-  ] as const,
-  CONVERSATION_ROLES: ["user", "assistant"] as const,
-  BOOKING_FIELDS: [
-    "serviceName",
-    "scheduledAt",
-    "durationMinutes",
-    "notes",
-  ] as const,
-  REQUIRED_BOOKING_FIELDS: ["serviceName", "scheduledAt"] as const,
   PROVIDER_ERROR_CODES: [
     "TIMEOUT",
     "NETWORK_ERROR",
@@ -296,32 +293,10 @@ export const AI_CONSTANTS = {
     "INVALID_RESPONSE",
   ] as const,
   MAX_TIME_ZONE_LENGTH: 100,
-  MAX_CLARIFICATION_QUESTION_LENGTH: 300,
-  MAX_ASSISTANT_REPLY_LENGTH: 500,
   PURE_GREETING_PATTERN:
     /^(?:(?:hi|hello|hey)(?:\s+there)?|good\s+(?:morning|afternoon|evening))[.!?\s]*$/i,
   BOOKING_HELP_PATTERN:
     /^(?:help|what\s+can\s+you\s+do|how\s+(?:can|do)\s+(?:i|you)\s+(?:book|schedule)(?:\s+an?\s+appointment)?)[.!?\s]*$/i,
-  MANAGE_APPOINTMENT_PATTERN:
-    /^(?:please\s+)?(?:cancel|reschedule)\s+(?:my\s+)?(?:existing\s+)?appointment[.!?\s]*$/i,
-  EXPLICIT_SERVICE_CHANGE_PATTERN:
-    /^(?:please\s+)?(?:change|update)\s+(?:the\s+)?service(?:\s+name)?\s+to\s+(.+?)[.!?]*$/i,
-  SERVICE_CHANGE_TRAILING_DETAILS_PATTERN:
-    /\s+(?:and\s+)?(?:(?:move|change|set|schedule|book)\b|(?:the\s+)?(?:date|time|duration|notes?)\s+to\b).*$/i,
-  CLEAR_SERVICE_PATTERN:
-    /^(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?service(?:\s+name)?[.!?\s]*$/i,
-  CLEAR_SCHEDULE_PATTERN:
-    /^(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?(?:date|time|scheduled\s+time|schedule)[.!?\s]*$/i,
-  CLEAR_NOTES_PATTERN:
-    /^(?:(?:please\s+)?(?:clear|remove)\s+(?:the\s+)?notes?|no\s+notes?)[.!?\s]*$/i,
-  DEFAULT_DURATION_PATTERN:
-    /^(?:(?:please\s+)?(?:clear|remove|reset)\s+(?:the\s+)?duration|use\s+(?:the\s+)?default\s+duration)[.!?\s]*$/i,
-  CLARIFICATION_QUESTIONS: {
-    serviceName: "What service would you like to book?",
-    scheduledAt: "What date and time would you prefer for the appointment?",
-    serviceNameAndScheduledAt:
-      "What service would you like to book, and what date and time would you prefer?",
-  },
 } as const;
 
 export const VALIDATION_PATTERNS = {

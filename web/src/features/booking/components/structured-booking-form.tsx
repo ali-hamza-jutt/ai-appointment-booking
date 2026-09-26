@@ -9,7 +9,7 @@ import { usePublicDaySlots } from "@/features/availability/hooks/use-day-slots";
 import type { StructuredBookingFormValues } from "@/features/booking/types/booking-ui";
 import { toStructuredBookingFormValues } from "@/features/booking/utils/booking-format";
 import { formatDuration } from "@/features/catalog/utils/catalog-format";
-import type { AppointmentBookingContext, AvailableSlot } from "@/generated/api/models";
+import type { AvailableSlot, ChatBookingDraft } from "@/generated/api/models";
 import {
   useListPublicServices,
   useListPublicStaff,
@@ -21,7 +21,7 @@ import { formatMoney } from "@/lib/utils/money";
 const MAX_NOTES_LENGTH = 2000;
 
 interface StructuredBookingFormProps {
-  bookingContext: AppointmentBookingContext | null;
+  draft: ChatBookingDraft | null;
   businessSlug: string;
   initialValues?: StructuredBookingFormValues;
   isSubmitting: boolean;
@@ -32,7 +32,7 @@ interface StructuredBookingFormProps {
 }
 
 export function StructuredBookingForm({
-  bookingContext,
+  draft,
   businessSlug,
   initialValues,
   isSubmitting,
@@ -41,7 +41,7 @@ export function StructuredBookingForm({
   submissionError,
   timeZone,
 }: StructuredBookingFormProps) {
-  const initial = initialValues ?? toStructuredBookingFormValues(bookingContext, timeZone);
+  const initial = initialValues ?? toStructuredBookingFormValues(draft, timeZone);
   const servicesQuery = useListPublicServices(businessSlug);
   const [chosenServiceId, setServiceId] = useState(initial.serviceId);
   const [staffId, setStaffId] = useState(initial.staffId ?? "");

@@ -1,5 +1,4 @@
 import {
-  APPOINTMENT_CONSTANTS,
   BUSINESS_CONSTANTS,
   CHAT_CONSTANTS,
   ERROR_CODES,
@@ -17,15 +16,16 @@ import {
   encodeTimestampCursor,
 } from "../../utils/pagination.js";
 import { normalizeWhitespace } from "../../utils/text.js";
-import { normalizeIanaTimeZone } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { businessService } from "../businesses/business.service.js";
+import { parseStoredParts } from "./chat-parts.schema.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
   AssistantTurnPersistenceResult,
-  AppointmentBookingContext,
+  ChatBookingDraft,
   ChatBookingPersistenceResult,
+  ChatDraftPatch,
   ChatMessageCreationResult,
   ChatMessageListResponse,
   ChatMessageMetadata,
@@ -43,8 +43,6 @@ import type {
   ListChatMessagesOptions,
   ListChatSessionsOptions,
   SaveAssistantTurnRequest,
-  StoredAppointmentBookingContext,
-  StoredChatMessageMetadata,
 } from "./dto/chat.dto.js";
 
 export class ChatService {
@@ -54,26 +52,6 @@ export class ChatService {
   ): Promise<ChatSessionResponse> {
     const title = request.title
       ? normalizeWhitespace(request.title) || null
-      : null;
-    // Clients may seed only what a customer could type; hold details are server-owned.
-    const bookingContext = request.bookingContext
-      ? this.normalizeBookingContext({
-          ...(request.bookingContext.serviceName !== undefined
-            ? { serviceName: request.bookingContext.serviceName }
-            : {}),
-          ...(request.bookingContext.scheduledAt !== undefined
-            ? { scheduledAt: request.bookingContext.scheduledAt }
-            : {}),
-          ...(request.bookingContext.timeZone !== undefined
-            ? { timeZone: request.bookingContext.timeZone }
-            : {}),
-          ...(request.bookingContext.durationMinutes !== undefined
-            ? { durationMinutes: request.bookingContext.durationMinutes }
-            : {}),
-          ...(request.bookingContext.notes !== undefined
-            ? { notes: request.bookingContext.notes }
-            : {}),
-        })
       : null;
     const businessId = request.businessSlug
       ? (await businessService.getPublicBusiness(request.businessSlug)).id
@@ -93,9 +71,6 @@ export class ChatService {
         businessId,
         userId,
         title,
-        bookingContext: bookingContext
-          ? this.serializeBookingContext(bookingContext)
-          : null,
         replaceActive: request.replaceActive ?? false,
       });
     } catch (error) {
@@ -293,27 +268,34 @@ export class ChatService {
     };
   }
 
-  public async updateBookingContext(
+  public async updateDraft(
     userId: string,
     sessionId: string,
-    bookingContext: AppointmentBookingContext,
+    draft: ChatDraftPatch,
   ): Promise<ChatSessionResponse> {
     this.validateSessionId(sessionId);
 
     try {
-      const session = await chatDal.updateBookingContext({
-        userId,
-        sessionId,
-        bookingContext: this.serializeBookingContext(
-          this.normalizeBookingContext(bookingContext),
-        ),
-      });
-
-      return this.toSessionResponse(session);
+      return this.toSessionResponse(await chatDal.updateDraft({ userId, sessionId, draft }));
     } catch (error) {
-      if (isRecordNotFoundError(error)) {
-        this.throwSessionNotFound();
-      }
+      if (isRecordNotFoundError(error)) this.throwSessionNotFound();
+
+      throw error;
+    }
+  }
+
+  /** Flags the chat for staff to pick up. */
+  public async requestHandoff(
+    userId: string,
+    sessionId: string,
+    reason: string | null,
+  ): Promise<ChatSessionResponse> {
+    this.validateSessionId(sessionId);
+
+    try {
+      return this.toSessionResponse(await chatDal.requestHandoff(userId, sessionId, reason));
+    } catch (error) {
+      if (isRecordNotFoundError(error)) this.throwSessionNotFound();
 
       throw error;
     }
@@ -383,13 +365,7 @@ export class ChatService {
         sessionId,
         replyToMessageId: request.replyToMessageId,
         content: this.normalizeMessageContent(request.content),
-        ...(request.bookingContext
-          ? {
-              bookingContext: this.serializeBookingContext(
-                this.normalizeBookingContext(request.bookingContext),
-              ),
-            }
-          : {}),
+        ...(request.draft ? { draft: request.draft } : {}),
         structuredData: this.serializeMessageMetadata(request.structuredData),
       });
 
@@ -552,90 +528,6 @@ export class ChatService {
     }
   }
 
-  private normalizeBookingContext(
-    context: AppointmentBookingContext,
-  ): AppointmentBookingContext {
-    const serviceName = context.serviceName
-      ? normalizeWhitespace(context.serviceName)
-      : undefined;
-    const notes = context.notes?.trim() || undefined;
-    const timeZone =
-      context.timeZone !== undefined
-        ? normalizeIanaTimeZone(context.timeZone)
-        : undefined;
-
-    if (
-      serviceName !== undefined &&
-      (serviceName.length < APPOINTMENT_CONSTANTS.MIN_SERVICE_NAME_LENGTH ||
-        serviceName.length > APPOINTMENT_CONSTANTS.MAX_SERVICE_NAME_LENGTH)
-    ) {
-      throwRequestValidationError(
-        "bookingContext.serviceName",
-        VALIDATION_MESSAGES.APPOINTMENT_SERVICE_NAME,
-      );
-    }
-
-    if (
-      context.timeZone !== undefined &&
-      !timeZone
-    ) {
-      throwRequestValidationError(
-        "bookingContext.timeZone",
-        VALIDATION_MESSAGES.APPOINTMENT_TIME_ZONE,
-      );
-    }
-
-    if (
-      context.scheduledAt !== undefined &&
-      (!(context.scheduledAt instanceof Date) ||
-        Number.isNaN(context.scheduledAt.getTime()) ||
-        context.scheduledAt.getTime() <= Date.now())
-    ) {
-      throwRequestValidationError(
-        "bookingContext.scheduledAt",
-        VALIDATION_MESSAGES.BOOKING_CONTEXT_TIME,
-      );
-    }
-
-    if (
-      context.durationMinutes !== undefined &&
-      (!Number.isInteger(context.durationMinutes) ||
-        context.durationMinutes < APPOINTMENT_CONSTANTS.MIN_DURATION_MINUTES ||
-        context.durationMinutes > APPOINTMENT_CONSTANTS.MAX_DURATION_MINUTES)
-    ) {
-      throwRequestValidationError(
-        "bookingContext.durationMinutes",
-        VALIDATION_MESSAGES.BOOKING_CONTEXT_DURATION,
-      );
-    }
-
-    if (
-      notes !== undefined &&
-      notes.length > APPOINTMENT_CONSTANTS.MAX_NOTES_LENGTH
-    ) {
-      throwRequestValidationError(
-        "bookingContext.notes",
-        VALIDATION_MESSAGES.APPOINTMENT_NOTES,
-      );
-    }
-
-    return {
-      ...(serviceName !== undefined ? { serviceName } : {}),
-      ...this.pickHoldFields(context),
-      ...(context.holdExpiresAt !== undefined
-        ? { holdExpiresAt: context.holdExpiresAt }
-        : {}),
-      ...(context.scheduledAt !== undefined
-        ? { scheduledAt: context.scheduledAt }
-        : {}),
-      ...(timeZone ? { timeZone } : {}),
-      ...(context.durationMinutes !== undefined
-        ? { durationMinutes: context.durationMinutes }
-        : {}),
-      ...(notes !== undefined ? { notes } : {}),
-    };
-  }
-
   private normalizeMessageContent(content: string): string {
     const normalized = content.trim();
 
@@ -652,146 +544,40 @@ export class ChatService {
     return normalized;
   }
 
-  private pickHoldFields(context: AppointmentBookingContext) {
-    return {
-      ...(context.serviceId !== undefined ? { serviceId: context.serviceId } : {}),
-      ...(context.staffId !== undefined ? { staffId: context.staffId } : {}),
-      ...(context.staffName !== undefined ? { staffName: context.staffName } : {}),
-      ...(context.holdBookingId !== undefined
-        ? { holdBookingId: context.holdBookingId }
-        : {}),
-      ...(context.priceMinor !== undefined ? { priceMinor: context.priceMinor } : {}),
-      ...(context.currency !== undefined ? { currency: context.currency } : {}),
-    };
-  }
-
-  private serializeBookingContext(
-    context: AppointmentBookingContext,
-  ): StoredAppointmentBookingContext {
-    return {
-      ...(context.serviceName !== undefined
-        ? { serviceName: context.serviceName }
-        : {}),
-      ...this.pickHoldFields(context),
-      ...(context.holdExpiresAt !== undefined
-        ? { holdExpiresAt: context.holdExpiresAt.toISOString() }
-        : {}),
-      ...(context.scheduledAt !== undefined
-        ? { scheduledAt: context.scheduledAt.toISOString() }
-        : {}),
-      ...(context.timeZone !== undefined ? { timeZone: context.timeZone } : {}),
-      ...(context.durationMinutes !== undefined
-        ? { durationMinutes: context.durationMinutes }
-        : {}),
-      ...(context.notes !== undefined ? { notes: context.notes } : {}),
-    };
-  }
-
-  private deserializeBookingContext(
-    value: unknown,
-  ): AppointmentBookingContext | null {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-
-    const context = value as Partial<StoredAppointmentBookingContext>;
-    const scheduledAt = context.scheduledAt
-      ? new Date(context.scheduledAt)
-      : undefined;
-    const holdExpiresAt = context.holdExpiresAt
-      ? new Date(context.holdExpiresAt)
-      : undefined;
-    const stringField = (key: keyof StoredAppointmentBookingContext) =>
-      typeof context[key] === "string" ? { [key]: context[key] as string } : {};
-
-    return {
-      ...(typeof context.serviceName === "string"
-        ? { serviceName: context.serviceName }
-        : {}),
-      ...stringField("serviceId"),
-      ...stringField("staffId"),
-      ...stringField("staffName"),
-      ...stringField("holdBookingId"),
-      ...stringField("currency"),
-      ...(typeof context.priceMinor === "number" ? { priceMinor: context.priceMinor } : {}),
-      ...(holdExpiresAt && !Number.isNaN(holdExpiresAt.getTime()) ? { holdExpiresAt } : {}),
-      ...(scheduledAt && !Number.isNaN(scheduledAt.getTime())
-        ? { scheduledAt }
-        : {}),
-      ...(typeof context.timeZone === "string"
-        ? { timeZone: context.timeZone }
-        : {}),
-      ...(typeof context.durationMinutes === "number"
-        ? { durationMinutes: context.durationMinutes }
-        : {}),
-      ...(typeof context.notes === "string" ? { notes: context.notes } : {}),
-    };
-  }
-
-  private serializeMessageMetadata(
-    metadata: ChatMessageMetadata,
-  ): StoredChatMessageMetadata {
+  private serializeMessageMetadata(metadata: ChatMessageMetadata): ChatMessageMetadata {
     return {
       ...(metadata.intent !== undefined ? { intent: metadata.intent } : {}),
-      ...(metadata.bookingContext
-        ? {
-            bookingContext: this.serializeBookingContext(
-              this.normalizeBookingContext(metadata.bookingContext),
-            ),
-          }
-        : {}),
-      ...(metadata.missingFields !== undefined
-        ? { missingFields: metadata.missingFields }
-        : {}),
+      ...(metadata.parts?.length ? { parts: metadata.parts } : {}),
+      ...(metadata.missingFields !== undefined ? { missingFields: metadata.missingFields } : {}),
       ...(metadata.confirmationRequired !== undefined
         ? { confirmationRequired: metadata.confirmationRequired }
         : {}),
-      ...(metadata.appointmentId !== undefined
-        ? { appointmentId: metadata.appointmentId }
-        : {}),
-      ...(metadata.suggestedTimes !== undefined
-        ? { suggestedTimes: metadata.suggestedTimes.map((time) => time.toISOString()) }
-        : {}),
+      ...(metadata.appointmentId !== undefined ? { appointmentId: metadata.appointmentId } : {}),
     };
   }
 
-  private deserializeMessageMetadata(
-    value: unknown,
-  ): ChatMessageMetadata | null {
+  private deserializeMessageMetadata(value: unknown): ChatMessageMetadata | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
 
-    const metadata = value as Partial<StoredChatMessageMetadata>;
+    const metadata = value as Record<string, unknown>;
+    const parts = parseStoredParts(metadata.parts);
 
     return {
-      ...(metadata.intent === "BOOK_APPOINTMENT" ||
-      metadata.intent === "UNKNOWN"
+      ...(metadata.intent === "BOOK_APPOINTMENT" || metadata.intent === "UNKNOWN"
         ? { intent: metadata.intent }
         : {}),
-      ...(metadata.bookingContext
-        ? {
-            bookingContext:
-              this.deserializeBookingContext(metadata.bookingContext) ?? {},
-          }
-        : {}),
+      ...(parts.length > 0 ? { parts } : {}),
       ...(Array.isArray(metadata.missingFields) &&
       metadata.missingFields.every((field) => typeof field === "string")
-        ? { missingFields: metadata.missingFields }
+        ? { missingFields: metadata.missingFields as string[] }
         : {}),
       ...(typeof metadata.confirmationRequired === "boolean"
         ? { confirmationRequired: metadata.confirmationRequired }
         : {}),
       ...(typeof metadata.appointmentId === "string"
         ? { appointmentId: metadata.appointmentId }
-        : {}),
-      ...(Array.isArray(metadata.suggestedTimes)
-        ? {
-            suggestedTimes: metadata.suggestedTimes
-              .filter((time): time is string => typeof time === "string")
-              .map((time) => new Date(time))
-              .filter((time) => !Number.isNaN(time.getTime())),
-          }
         : {}),
     };
   }
@@ -873,9 +659,43 @@ export class ChatService {
       business: session.business,
       title: session.title,
       status: session.status,
-      bookingContext: this.deserializeBookingContext(session.bookingContext),
+      draft: this.toDraft(session),
+      handoff: session.handoffRequestedAt
+        ? {
+            requestedAt: session.handoffRequestedAt,
+            reason: session.handoffReason,
+            resolvedAt: session.handoffResolvedAt,
+          }
+        : null,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+    };
+  }
+
+  /** Only a still-held slot counts as the draft's hold. */
+  private toDraft(session: ChatSessionRecord): ChatBookingDraft {
+    const hold = session.draftHold?.status === "HELD" ? session.draftHold : null;
+
+    return {
+      service: session.draftService,
+      staff: session.draftStaff,
+      hold: hold
+        ? {
+            bookingId: hold.id,
+            serviceName: hold.serviceName,
+            staffName: hold.staff?.displayName ?? null,
+            startsAt: hold.scheduledAt.toISOString(),
+            endsAt: hold.endsAt.toISOString(),
+            durationMinutes: hold.durationMinutes,
+            priceMinor: hold.priceMinor,
+            currency: hold.currency,
+            status: hold.status,
+            holdExpiresAt: hold.holdExpiresAt?.toISOString() ?? null,
+            timeZone: hold.timeZone,
+          }
+        : null,
+      timeZone: session.draftTimeZone,
+      notes: session.draftNotes,
     };
   }
 

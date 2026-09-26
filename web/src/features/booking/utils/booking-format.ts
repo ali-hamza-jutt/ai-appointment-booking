@@ -3,8 +3,8 @@ import type {
   StructuredBookingFormValues,
 } from "@/features/booking/types/booking-ui";
 import type {
-  AppointmentBookingContext,
   AppointmentResponse,
+  ChatBookingDraft,
 } from "@/generated/api/models";
 import { getLocalDateTimeInputValues } from "@/lib/utils/date-time";
 import { formatMoney } from "@/lib/utils/money";
@@ -17,31 +17,45 @@ export function getBrowserTimeZone(): string {
   }
 }
 
+/** The side-panel view of a chat draft: the held slot, or just the chosen service. */
 export function toBookingDraft(
-  context: AppointmentBookingContext | null | undefined,
+  draft: ChatBookingDraft | null | undefined,
   timeZone: string,
 ): BookingDraftViewModel | null {
-  if (!context || !Object.values(context).some((value) => value !== undefined)) {
-    return null;
+  const hold = draft?.hold;
+
+  if (hold) {
+    const isStillHeld = !hold.holdExpiresAt || new Date(hold.holdExpiresAt).getTime() > Date.now();
+
+    return formatDraft({
+      serviceName: hold.serviceName,
+      scheduledAt: hold.startsAt,
+      durationMinutes: hold.durationMinutes,
+      notes: draft.notes ?? undefined,
+      staffName: hold.staffName ?? undefined,
+      price: hold.priceMinor !== null && hold.currency ? formatMoney(hold.priceMinor, hold.currency) : null,
+      heldUntil: isStillHeld ? (hold.holdExpiresAt ?? undefined) : undefined,
+      timeZone: draft.timeZone ?? timeZone,
+    });
   }
 
-  const hasActiveHold =
-    Boolean(context.holdExpiresAt) &&
-    new Date(context.holdExpiresAt as string).getTime() > Date.now();
+  if (!draft?.service) return null;
 
   return formatDraft({
-    serviceName: context.serviceName,
-    scheduledAt: context.scheduledAt,
-    durationMinutes: context.durationMinutes,
-    notes: context.notes,
-    staffName: context.staffName,
-    price:
-      context.priceMinor !== undefined && context.currency
-        ? formatMoney(context.priceMinor, context.currency)
-        : null,
-    heldUntil: hasActiveHold ? (context.holdExpiresAt as string) : undefined,
-    timeZone,
+    serviceName: draft.service.name,
+    scheduledAt: undefined,
+    durationMinutes: draft.service.durationMinutes,
+    notes: draft.notes ?? undefined,
+    staffName: draft.staff?.displayName,
+    price: formatMoney(draft.service.priceMinor, draft.service.currency),
+    heldUntil: undefined,
+    timeZone: draft.timeZone ?? timeZone,
   });
+}
+
+/** What the draft still needs before it can be confirmed. */
+export function getMissingDraftFields(draft: ChatBookingDraft | null | undefined): string[] {
+  return [...(draft?.service || draft?.hold ? [] : ["serviceName"]), ...(draft?.hold ? [] : ["scheduledAt"])];
 }
 
 export function toConfirmedBookingDraft(
@@ -63,19 +77,19 @@ export function toConfirmedBookingDraft(
 }
 
 export function toStructuredBookingFormValues(
-  context: AppointmentBookingContext | null | undefined,
+  draft: ChatBookingDraft | null | undefined,
   timeZone: string,
 ): StructuredBookingFormValues {
-  const localDateTime = context?.scheduledAt
-    ? getLocalDateTimeInputValues(context.scheduledAt, timeZone)
+  const localDateTime = draft?.hold
+    ? getLocalDateTimeInputValues(draft.hold.startsAt, timeZone)
     : null;
 
   return {
-    ...(context?.notes ? { notes: context.notes } : {}),
+    ...(draft?.notes ? { notes: draft.notes } : {}),
     scheduledDate: localDateTime?.date ?? "",
     scheduledTime: localDateTime?.time ?? "",
-    serviceId: context?.serviceId ?? "",
-    ...(context?.staffId ? { staffId: context.staffId } : {}),
+    serviceId: draft?.service?.id ?? "",
+    ...(draft?.staff ? { staffId: draft.staff.id } : {}),
   };
 }
 

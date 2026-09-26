@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatAction } from './chatAction';
 import type { ClientMessageId } from './clientMessageId';
 import type { StructuredBookingDetails } from './structuredBookingDetails';
 
@@ -20,6 +21,8 @@ export interface ProcessChatMessageRequest {
      * @maxLength 100
      */
   timeZone: string;
-  /** Form-provided values that bypass AI extraction and are validated by the server. */
+  /** Form-provided values that bypass the assistant and are validated by the server. */
   bookingDetails?: StructuredBookingDetails;
+  /** A tap on a card or button in an assistant reply; handled without the assistant. */
+  action?: ChatAction;
 }

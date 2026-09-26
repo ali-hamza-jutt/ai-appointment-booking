@@ -269,6 +269,7 @@ model Service {
   providers       ServiceProvider[]
   resources       ServiceResource[]
   bookings        Booking[]
+  chatDrafts      ChatSession[]      @relation("ChatDraftService")
 
   @@index([businessId, isActive, sortOrder], map: "services_business_id_is_active_sort_order_idx")
   @@index([categoryId], map: "services_category_id_idx")
@@ -295,6 +296,7 @@ model Staff {
   workingHours WorkingHours[]
   timeOff      TimeOff[]
   bookings     Booking[]
+  chatDrafts   ChatSession[]     @relation("ChatDraftStaff")
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -500,7 +502,9 @@ model Booking {
   customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   service         Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   staff           Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
-  chatSession     ChatSession?      @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
+  chatSession     ChatSession?      @relation("ChatSessionBooking", fields: [chatSessionId], references: [id], onDelete: SetNull)
+  /// Chats whose draft currently points at this hold.
+  chatDrafts      ChatSession[]     @relation("ChatDraftHold")
   events          BookingEvent[]
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
@@ -548,20 +552,33 @@ model OutboxEvent {
 }
 
 model ChatSession {
-  id             String            @id @default(uuid()) @db.Uuid
-  businessId     String            @map("business_id") @db.Uuid
-  userId         String            @map("user_id") @db.Uuid
-  title          String?           @db.VarChar(120)
-  status         ChatSessionStatus @default(ACTIVE)
-  bookingContext Json?             @map("booking_context") @db.JsonB
-  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  business       Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages       ChatMessage[]
-  booking        Booking?
+  id                 String            @id @default(uuid()) @db.Uuid
+  businessId         String            @map("business_id") @db.Uuid
+  userId             String            @map("user_id") @db.Uuid
+  title              String?           @db.VarChar(120)
+  status             ChatSessionStatus @default(ACTIVE)
+  /// The booking being put together; each id points at a real row.
+  draftServiceId     String?           @map("draft_service_id") @db.Uuid
+  draftStaffId       String?           @map("draft_staff_id") @db.Uuid
+  draftHoldId        String?           @map("draft_hold_id") @db.Uuid
+  draftTimeZone      String?           @map("draft_time_zone") @db.VarChar(100)
+  draftNotes         String?           @map("draft_notes") @db.VarChar(2000)
+  /// Set when the assistant hands the conversation to staff.
+  handoffRequestedAt DateTime?         @map("handoff_requested_at") @db.Timestamptz(3)
+  handoffReason      String?           @map("handoff_reason") @db.VarChar(500)
+  handoffResolvedAt  DateTime?         @map("handoff_resolved_at") @db.Timestamptz(3)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draftService       Service?          @relation("ChatDraftService", fields: [draftServiceId], references: [id], onDelete: SetNull)
+  draftStaff         Staff?            @relation("ChatDraftStaff", fields: [draftStaffId], references: [id], onDelete: SetNull)
+  draftHold          Booking?          @relation("ChatDraftHold", fields: [draftHoldId], references: [id], onDelete: SetNull)
+  messages           ChatMessage[]
+  booking            Booking?          @relation("ChatSessionBooking")
 
   @@index([userId, updatedAt, id], map: "chat_sessions_user_id_updated_at_id_idx")
+  @@index([businessId, handoffRequestedAt], map: "chat_sessions_business_id_handoff_requested_at_idx")
   @@map("chat_sessions")
 }
 

@@ -263,6 +263,7 @@ export class AvailabilityService {
   public async getPublicAvailability(
     slug: string,
     query: AvailabilityQuery,
+    options: { excludeBookingId?: string } = {},
   ): Promise<AvailabilityResponse> {
     const business = await businessService.getPublicBusiness(slug);
 
@@ -271,6 +272,11 @@ export class AvailabilityService {
     const service = await availabilityDal.findBookableService(business.id, query.serviceId);
 
     if (!service?.onlineBookable) this.throwServiceNotFound();
+
+    // Times for moving a booking ignore the booking itself, so they are not cached.
+    if (options.excludeBookingId) {
+      return this.respondWithSlots(business, service, query, "CUSTOMER", options.excludeBookingId);
+    }
 
     return availabilityCache.getOrCompute(
       business.id,
@@ -352,6 +358,7 @@ export class AvailabilityService {
     service: AvailabilityServiceRecord,
     query: AvailabilityQuery,
     mode: AvailabilityMode,
+    excludeBookingId?: string,
   ): Promise<AvailabilityResponse> {
     const displayTimeZone = query.timeZone
       ? normalizeIanaTimeZone(query.timeZone)
@@ -374,6 +381,7 @@ export class AvailabilityService {
       to: range.to,
       now: new Date(),
       ...(query.staffId ? { staffId: query.staffId } : {}),
+      ...(excludeBookingId ? { excludeBookingId } : {}),
     });
 
     return {

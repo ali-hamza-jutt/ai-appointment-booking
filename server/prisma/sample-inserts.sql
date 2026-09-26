@@ -46,7 +46,8 @@ INSERT INTO "chat_sessions" (
   "user_id",
   "title",
   "status",
-  "booking_context",
+  "draft_time_zone",
+  "draft_notes",
   "created_at",
   "updated_at"
 )
@@ -56,7 +57,8 @@ VALUES (
   '11111111-1111-4111-8111-111111111111',
   'Product discovery consultation',
   'CLOSED',
-  '{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","timeZone":"UTC","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."}'::jsonb,
+  'UTC',
+  'Discuss product scope and delivery milestones.',
   '2026-08-15 09:05:00+00',
   '2026-08-15 09:10:00+00'
 )
@@ -132,7 +134,7 @@ VALUES
     '44444444-4444-4444-8444-444444444444',
     'ASSISTANT',
     'Your appointment has been booked for the product discovery consultation.',
-    '{"intent":"BOOK_APPOINTMENT","bookingContext":{"serviceName":"Product discovery consultation","scheduledAt":"2027-01-15T10:00:00.000Z","timeZone":"UTC","durationMinutes":60,"notes":"Discuss product scope and delivery milestones."},"missingFields":[],"confirmationRequired":false,"appointmentId":"33333333-3333-4333-8333-333333333333"}'::jsonb,
+    '{"intent":"BOOK_APPOINTMENT","confirmationRequired":false,"appointmentId":"33333333-3333-4333-8333-333333333333"}'::jsonb,
     '2026-08-15 09:10:00+00'
   )
 ON CONFLICT DO NOTHING;
