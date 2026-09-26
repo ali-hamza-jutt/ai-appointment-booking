@@ -104,6 +104,7 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 | `npm test` | Generate artifacts and run unit, integration and API contract tests. |
 | `npm run test:unit` | Run the database-free unit tests only. |
 | `npm run test:integration` | Run integration and contract tests against `TEST_DATABASE_URL`. |
+| `npm run eval` | Run the agent evals on recorded model replies (`eval:live` against Mistral, `eval:record` to refresh the recordings). |
 | `npm run db:validate` | Validate Prisma configuration and schema. |
 | `npm run db:migrate` | Create/apply a development migration. |
 | `npm run db:deploy` | Apply existing migrations in a deployment environment. |
@@ -189,7 +190,9 @@ Tests live in `test/` and run with Vitest:
 - `test/integration` exercises DALs and database constraints on a real PostgreSQL.
 - `test/contract` drives the tsoa app through Supertest (auth scopes, ownership isolation).
 
-Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_REDIS_URL` (default `redis://localhost:6379/15`) and flush it. GitHub Actions runs lint, typecheck and all tests on every pull request against PostgreSQL 16 and Redis 7 service containers.
+Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. Agent evals live in `evals/`: each case in `evals/cases.ts` is a scripted conversation run through the real AI service, catalog matching, availability and holds, with the clock frozen on a Monday so relative dates have one right answer. `npm run eval` replays `evals/recordings.json` (and runs as part of `npm test`); `npm run eval:live` calls Mistral and requires at least 80% booking success, at most 5% wrong slots and 85% correct outcomes; `npm run eval:record` re-records the replies. Results are written to `evals/results/`.
+
+Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_REDIS_URL` (default `redis://localhost:6379/15`) and flush it. GitHub Actions runs lint, typecheck and all tests on every pull request against PostgreSQL 16 and Redis 7 service containers.
 
 ## Security and reliability decisions
 

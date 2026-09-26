@@ -26,6 +26,17 @@ export default defineConfig({
           testTimeout: 30_000,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "evals",
+          include: ["evals/**/*.eval.ts"],
+          globalSetup: ["./test/setup/database.ts"],
+          fileParallelism: false,
+          hookTimeout: 60_000,
+          testTimeout: 120_000,
+        },
+      },
     ],
   },
 });
