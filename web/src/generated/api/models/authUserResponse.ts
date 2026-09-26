@@ -10,4 +10,12 @@ export interface AuthUserResponse {
   id: string;
   email: string;
   fullName: string;
+  emailVerified: boolean;
+  /**
+     * Verified phone number in E.164 format.
+     * @nullable
+     */
+  phone: string | null;
+  /** False for accounts that only sign in with Google. */
+  hasPassword: boolean;
 }

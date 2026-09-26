@@ -45,6 +45,20 @@ enum ChatSessionStatus {
   @@map("chat_session_status")
 }
 
+enum AuthTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+
+  @@map("auth_token_purpose")
+}
+
+enum PhoneVerificationPurpose {
+  LINK
+  SIGN_IN
+
+  @@map("phone_verification_purpose")
+}
+
 enum PlatformRole {
   USER
   ADMIN
@@ -88,21 +102,82 @@ enum ChatMessageRole {
 }
 
 model User {
-  id           String               @id @default(uuid()) @db.Uuid
-  email        String               @unique @db.VarChar(254)
-  passwordHash String               @map("password_hash") @db.VarChar(255)
-  fullName     String               @map("full_name") @db.VarChar(80)
-  platformRole PlatformRole         @default(USER) @map("platform_role")
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  bookings     Booking[]
-  chatSessions ChatSession[]
-  memberships  Membership[]
-  customers    Customer[]
-  invitations  BusinessInvitation[]
-  staff        Staff[]
+  id                 String               @id @default(uuid()) @db.Uuid
+  email              String               @unique @db.VarChar(254)
+  /// Null for accounts that only sign in with Google.
+  passwordHash       String?              @map("password_hash") @db.VarChar(255)
+  fullName           String               @map("full_name") @db.VarChar(80)
+  platformRole       PlatformRole         @default(USER) @map("platform_role")
+  emailVerifiedAt    DateTime?            @map("email_verified_at") @db.Timestamptz(3)
+  /// Verified E.164 number; set only after a code confirms it.
+  phone              String?              @unique @db.VarChar(16)
+  phoneVerifiedAt    DateTime?            @map("phone_verified_at") @db.Timestamptz(3)
+  googleSubject      String?              @unique @map("google_subject") @db.VarChar(255)
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  refreshTokens      RefreshToken[]
+  authTokens         AuthToken[]
+  phoneVerifications PhoneVerification[]
+  bookings           Booking[]
+  chatSessions       ChatSession[]
+  memberships        Membership[]
+  customers          Customer[]
+  invitations        BusinessInvitation[]
+  staff              Staff[]
 
   @@map("users")
+}
+
+/// One refresh token per rotation. Tokens issued from the same sign-in share
+/// a family, so presenting a rotated token revokes the whole family.
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  familyId   String    @map("family_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  persistent Boolean   @default(false)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  rotatedAt  DateTime? @map("rotated_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  userAgent  String?   @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "refresh_tokens_user_id_idx")
+  @@index([familyId], map: "refresh_tokens_family_id_idx")
+  @@map("refresh_tokens")
+}
+
+/// Single-use email links (verification, password reset); only hashes are stored.
+model AuthToken {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  purpose   AuthTokenPurpose
+  tokenHash String           @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?        @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose], map: "auth_tokens_user_id_purpose_idx")
+  @@map("auth_tokens")
+}
+
+/// One-time SMS codes for linking a phone or signing in with it.
+model PhoneVerification {
+  id         String                   @id @default(uuid()) @db.Uuid
+  phone      String                   @db.VarChar(16)
+  userId     String?                  @map("user_id") @db.Uuid
+  purpose    PhoneVerificationPurpose
+  codeHash   String                   @map("code_hash") @db.Char(64)
+  attempts   Int                      @default(0)
+  expiresAt  DateTime                 @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime?                @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User?                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone, purpose, createdAt], map: "phone_verifications_phone_purpose_created_at_idx")
+  @@map("phone_verifications")
 }
 
 model Business {

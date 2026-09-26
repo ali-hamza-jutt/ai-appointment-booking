@@ -56,6 +56,19 @@ export const authRateLimiter = createRateLimiter(
   AUTH_CONSTANTS.RATE_LIMIT_MAX_REQUESTS,
 );
 
+/** Actions that send email or SMS, or try one-time codes. */
+export const sensitiveAuthRateLimiter = createRateLimiter(
+  "auth-sensitive",
+  AUTH_CONSTANTS.SENSITIVE_RATE_LIMIT_WINDOW_MS,
+  AUTH_CONSTANTS.SENSITIVE_RATE_LIMIT_MAX_REQUESTS,
+);
+
+export const refreshRateLimiter = createRateLimiter(
+  "auth-refresh",
+  AUTH_CONSTANTS.REFRESH_RATE_LIMIT_WINDOW_MS,
+  AUTH_CONSTANTS.REFRESH_RATE_LIMIT_MAX_REQUESTS,
+);
+
 export const chatRateLimiter = createRateLimiter(
   "chat",
   CHAT_CONSTANTS.RATE_LIMIT_WINDOW_MS,

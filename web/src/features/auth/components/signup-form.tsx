@@ -6,9 +6,11 @@ import { useState, useTransition, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/form-controls";
-import { CheckCircleIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/feedback";
 import { useAuth } from "@/features/auth/auth-context";
+import { AlternativeSignIn } from "@/features/auth/components/alternative-sign-in";
+import { AUTH_LINK_CLASS, AuthCard } from "@/features/auth/components/auth-card";
+import { PasswordRequirements } from "@/features/auth/components/password-requirements";
 import { PasswordToggle } from "@/features/auth/components/password-toggle";
 import type { SignupFormErrors } from "@/features/auth/types/auth-context";
 import {
@@ -21,7 +23,6 @@ import {
   getApiFieldError,
   isApiError,
 } from "@/lib/api/api-error";
-import { cn } from "@/lib/utils/cn";
 
 export function SignupForm() {
   const router = useRouter();
@@ -109,7 +110,7 @@ export function SignupForm() {
           );
         },
         onSuccess: (response) => {
-          completeAuthentication(response, "session");
+          completeAuthentication(response);
           startTransition(() => router.replace("/book"));
         },
       },
@@ -117,11 +118,18 @@ export function SignupForm() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-6 shadow-card sm:p-8">
-      <h1 className="text-[22px] font-bold tracking-tight text-ink">Create your account</h1>
-      <p className="mb-6 mt-1 text-sm text-muted">
-        Book appointments in seconds with a little help from AI.
-      </p>
+    <AuthCard
+      description="Book appointments in seconds with a little help from AI."
+      footer={(
+        <>
+          Already have an account?{" "}
+          <Link className={AUTH_LINK_CLASS} href="/login">
+            Sign in
+          </Link>
+        </>
+      )}
+      title="Create your account"
+    >
 
       <form className="space-y-4" noValidate onSubmit={handleSubmit}>
         {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
@@ -181,20 +189,7 @@ export function SignupForm() {
             type={isPasswordVisible ? "text" : "password"}
             value={password}
           />
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-            {passwordRules.map((rule) => (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 text-xs",
-                  rule.valid ? "text-success" : "text-muted",
-                )}
-                key={rule.label}
-              >
-                <CheckCircleIcon className="size-3.5" />
-                {rule.label}
-              </span>
-            ))}
-          </div>
+          <PasswordRequirements password={password} />
         </div>
         <TextField
           autoComplete="new-password"
@@ -248,12 +243,7 @@ export function SignupForm() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-muted">
-        Already have an account?{" "}
-        <Link className="font-semibold text-brand hover:text-brand-hover" href="/login">
-          Sign in
-        </Link>
-      </p>
-    </section>
+      <AlternativeSignIn showPhone={false} />
+    </AuthCard>
   );
 }

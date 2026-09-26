@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/icons";
 import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
+import { AccountSecurity } from "@/features/profile/components/account-security";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 
 export function ProfileOverview() {
@@ -24,8 +25,7 @@ export function ProfileOverview() {
   if (!user) return null;
 
   function handleSignOut() {
-    signOut();
-    router.replace("/login");
+    void signOut().finally(() => router.replace("/login"));
   }
 
   return (
@@ -57,7 +57,9 @@ export function ProfileOverview() {
               <p className="mt-0.5 truncate text-sm text-muted">{user.email}</p>
             </div>
           </div>
-          <Badge tone="success">Authenticated</Badge>
+          <Badge tone={user.emailVerified ? "success" : "warning"}>
+            {user.emailVerified ? "Verified" : "Email not confirmed"}
+          </Badge>
         </header>
 
         <dl className="grid gap-x-8 gap-y-6 p-5 sm:grid-cols-2 sm:p-6">
@@ -90,6 +92,8 @@ export function ProfileOverview() {
           </p>
         </div>
       </section>
+
+      <AccountSecurity user={user} />
 
       <section className="mt-5 rounded-xl border border-border bg-surface p-5 shadow-card sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

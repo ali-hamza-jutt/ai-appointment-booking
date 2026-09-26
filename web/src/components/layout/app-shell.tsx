@@ -29,6 +29,7 @@ import {
   UsersIcon,
   type IconProps,
 } from "@/components/ui/icons";
+import { EmailVerificationBanner } from "@/features/auth/components/email-verification-banner";
 import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
 import { BusinessSwitcher } from "@/features/business-settings/components/business-switcher";
@@ -98,9 +99,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const email = user?.email ?? "";
 
   function handleSignOut() {
-    signOut();
     onNavigate?.();
-    router.replace("/login");
+    void signOut().finally(() => router.replace("/login"));
   }
 
   function handleNewBooking() {
@@ -332,6 +332,7 @@ export function AppShell({ children }: AppShellProps) {
             {getPageTitle(pathname)}
           </h1>
         </header>
+        <EmailVerificationBanner />
         <main id="main-content" tabIndex={-1}>{children}</main>
       </div>
     </div>

@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -16,86 +17,126 @@ import {
   getGetCurrentUserQueryKey,
   useGetCurrentUser,
 } from "@/generated/api/authentication/authentication";
-import { isApiError } from "@/lib/api/api-error";
+import type { AuthResponse, AuthUserResponse } from "@/generated/api/models";
 import {
-  clearAccessToken,
+  broadcastAuthChange,
+  endSession,
   getAccessToken,
+  refreshSession,
   setAccessToken,
-  subscribeToAccessTokenChanges,
-} from "@/lib/auth/token-storage";
+  subscribeToAccessToken,
+  subscribeToAuthBroadcasts,
+} from "@/lib/auth/session";
 import type { AuthContextValue } from "@/features/auth/types/auth-context";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+type RestoreState = "pending" | "done" | "failed";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const accessTokenRef = useRef<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const accessToken = useSyncExternalStore(subscribeToAccessToken, getAccessToken, () => null);
+  const [restoreState, setRestoreState] = useState<RestoreState>("pending");
+  const userIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const synchronizeToken = () => {
-      const nextToken = getAccessToken();
+  /** Drops cached data when the signed-in person changes, never on a token refresh. */
+  const adoptUser = useCallback(
+    (user: AuthUserResponse | null) => {
+      const nextUserId = user?.id ?? null;
 
-      if (accessTokenRef.current !== nextToken) {
-        queryClient.removeQueries();
-        accessTokenRef.current = nextToken;
-      }
+      if (userIdRef.current !== nextUserId) queryClient.removeQueries();
 
-      setAccessTokenState(nextToken);
-      setIsInitialized(true);
-    };
-
-    synchronizeToken();
-    return subscribeToAccessTokenChanges(synchronizeToken);
-  }, [queryClient]);
-
-  const currentUserQuery = useGetCurrentUser({
-    query: {
-      enabled: isInitialized && Boolean(accessToken),
-      retry: false,
-    },
-  });
-
-  const authenticationWasRejected =
-    isApiError(currentUserQuery.error) &&
-    (currentUserQuery.error.status === 401 || currentUserQuery.error.status === 404);
-
-  useEffect(() => {
-    if (authenticationWasRejected) clearAccessToken();
-  }, [authenticationWasRejected]);
-
-  const completeAuthentication = useCallback<AuthContextValue["completeAuthentication"]>(
-    (response, persistence) => {
-      queryClient.removeQueries();
-      accessTokenRef.current = response.accessToken;
-      setAccessToken(response.accessToken, persistence);
-      setAccessTokenState(response.accessToken);
-      queryClient.setQueryData(getGetCurrentUserQueryKey(), response.user);
+      userIdRef.current = nextUserId;
+      if (user) queryClient.setQueryData(getGetCurrentUserQueryKey(), user);
     },
     [queryClient],
   );
 
-  const signOut = useCallback(() => {
-    queryClient.removeQueries();
-    accessTokenRef.current = null;
-    clearAccessToken();
-    setAccessTokenState(null);
-  }, [queryClient]);
+  const restoreSession = useCallback(
+    () =>
+      refreshSession().then(
+        (session) => {
+          adoptUser(session?.user ?? null);
+          setRestoreState("done");
+        },
+        () => setRestoreState("failed"),
+      ),
+    [adoptUser],
+  );
+
+  useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
+
+  useEffect(
+    () =>
+      subscribeToAuthBroadcasts((message) => {
+        if (message.type === "signed-out") {
+          setAccessToken(null);
+          adoptUser(null);
+        } else {
+          void restoreSession();
+        }
+      }),
+    [adoptUser, restoreSession],
+  );
+
+  // Losing the token (for example after a failed refresh) signs this tab out.
+  useEffect(() => {
+    if (restoreState === "done" && !accessToken && userIdRef.current) adoptUser(null);
+  }, [accessToken, adoptUser, restoreState]);
+
+  const currentUserQuery = useGetCurrentUser({
+    query: {
+      enabled: restoreState === "done" && Boolean(accessToken),
+      retry: false,
+      staleTime: Infinity,
+    },
+  });
+
+  const completeAuthentication = useCallback(
+    (response: AuthResponse) => {
+      setAccessToken(response.accessToken);
+      adoptUser(response.user);
+      setRestoreState("done");
+      broadcastAuthChange({ type: "signed-in" });
+    },
+    [adoptUser],
+  );
+
+  const updateUser = useCallback(
+    (user: AuthUserResponse) => {
+      queryClient.setQueryData(getGetCurrentUserQueryKey(), user);
+    },
+    [queryClient],
+  );
+
+  const signOut = useCallback(async () => {
+    await endSession();
+    adoptUser(null);
+  }, [adoptUser]);
 
   const retryAuthentication = useCallback(() => {
-    void currentUserQuery.refetch();
-  }, [currentUserQuery]);
+    if (restoreState === "failed") {
+      setRestoreState("pending");
+      void restoreSession();
+    } else {
+      void currentUserQuery.refetch();
+    }
+  }, [currentUserQuery, restoreSession, restoreState]);
 
-  const status: AuthContextValue["status"] = !isInitialized
-    ? "loading"
-    : !accessToken || authenticationWasRejected
-      ? "unauthenticated"
-      : currentUserQuery.isPending
-        ? "loading"
-        : currentUserQuery.isError
-          ? "error"
-          : "authenticated";
+  const status: AuthContextValue["status"] =
+    restoreState === "pending"
+      ? "loading"
+      : restoreState === "failed"
+        ? "error"
+        : !accessToken
+          ? "unauthenticated"
+          : currentUserQuery.isPending
+            ? "loading"
+            : currentUserQuery.isError
+              ? "error"
+              : "authenticated";
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -104,8 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       retryAuthentication,
       signOut,
       status,
-      user:
-        status === "authenticated" ? (currentUserQuery.data ?? null) : null,
+      updateUser,
+      user: status === "authenticated" ? (currentUserQuery.data ?? null) : null,
     }),
     [
       completeAuthentication,
@@ -114,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       retryAuthentication,
       signOut,
       status,
+      updateUser,
     ],
   );
 

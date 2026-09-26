@@ -14,4 +14,6 @@ export interface SignInRequest {
      * @maxLength 128
      */
   password: string;
+  /** Keep the session after the browser closes. */
+  rememberMe?: boolean;
 }
