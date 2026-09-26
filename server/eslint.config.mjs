@@ -11,8 +11,10 @@ export default tseslint.config(
   {
     files: [
       "src/**/*.ts",
+      "test/**/*.ts",
       "prisma/**/*.ts",
       "prisma.config.ts",
+      "vitest.config.ts",
     ],
     languageOptions: {
       globals: globals.node,

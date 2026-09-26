@@ -7,8 +7,11 @@
     "dev": "npm run generate && tsx watch src/server.ts",
     "build": "npm run generate && tsc",
     "start": "node dist/server.js",
-    "typecheck": "npm run generate && tsc --noEmit",
-    "lint": "eslint src prisma.config.ts",
+    "typecheck": "npm run generate && tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint src test prisma.config.ts vitest.config.ts",
+    "test": "npm run generate && vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "npm run generate && vitest run --project integration",
     "postinstall": "prisma generate",
     "generate": "prisma generate && tsoa spec-and-routes",
     "tsoa:routes": "tsoa routes",
@@ -51,12 +54,15 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
     "@types/pg": "^8.21.0",
+    "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "prisma": "^7.9.1",
+    "supertest": "^7.3.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^5.0.2"
   }
 }

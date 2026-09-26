@@ -64,9 +64,22 @@ Authentication uses bearer JWTs. The authentication endpoints are rate-limited t
 | `npm run build` | Generate artifacts and compile TypeScript. |
 | `npm run typecheck` | Generate artifacts and check TypeScript without emitting output. |
 | `npm run lint` | Run ESLint. |
+| `npm test` | Generate artifacts and run unit, integration and API contract tests. |
+| `npm run test:unit` | Run the database-free unit tests only. |
+| `npm run test:integration` | Run integration and contract tests against `TEST_DATABASE_URL`. |
 | `npm run db:validate` | Validate Prisma configuration and schema. |
 | `npm run db:migrate` | Create/apply a development migration. |
 | `npm run db:deploy` | Apply existing migrations in a deployment environment. |
+
+## Tests
+
+Tests live in `test/` and run with Vitest:
+
+- `test/unit` covers pure logic and needs no database.
+- `test/integration` exercises DALs and database constraints on a real PostgreSQL.
+- `test/contract` drives the tsoa app through Supertest (auth scopes, ownership isolation).
+
+Integration and contract tests migrate and truncate the database in `TEST_DATABASE_URL` (default `postgresql://bookwise:bookwise@localhost:5432/bookwise_test`). Never point it at a database with data you need. GitHub Actions runs lint, typecheck and all tests on every pull request against a PostgreSQL 16 service container.
 
 ## Security and reliability decisions
 
