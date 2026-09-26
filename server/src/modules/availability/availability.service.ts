@@ -20,7 +20,11 @@ import {
   wallClockToUtc,
 } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
-import { parseStoredBusinessSettings } from "../businesses/business-settings.js";
+import {
+  prisma,
+  type DbClient,
+} from "../../infrastructure/database/prisma.js";
+import { resolveBookingPolicy } from "../bookings/booking-policy.js";
 import { businessService } from "../businesses/business.service.js";
 import { availabilityDal } from "./dal/availability.dal.js";
 import type {
@@ -28,6 +32,7 @@ import type {
   AvailabilityQuery,
   AvailabilityResponse,
   AvailabilityServiceRecord,
+  BookingLoadRecord,
   ClosureListResponse,
   ClosureResponse,
   CreateClosureRequest,
@@ -41,15 +46,43 @@ import type {
 } from "./dto/availability.dto.js";
 import {
   generateSlots,
+  type ClassSession,
+  type GeneratedSlot,
   type ProviderSchedule,
   type WeeklyRule,
 } from "./slot-generator.js";
 
 const MILLISECONDS_PER_DAY = 86_400_000;
+const STAFF_BOOKING_WINDOW_DAYS = 3_650;
 
-interface AvailabilityContext {
-  business: { id: string; timeZone: string; settings: unknown };
-  service: AvailabilityServiceRecord;
+export type AvailabilityMode = "CUSTOMER" | "STAFF";
+
+export interface SlotBusiness {
+  id: string;
+  timeZone: string;
+  settings: unknown;
+}
+
+/** Groups bookings of one class into sessions with their seat counts. */
+function toClassSessions(bookings: BookingLoadRecord[]): ClassSession[] {
+  const sessions = new Map<string, ClassSession>();
+
+  for (const booking of bookings) {
+    const session = sessions.get(booking.sessionKey);
+
+    if (session) {
+      session.seatsTaken += booking.seats;
+    } else {
+      sessions.set(booking.sessionKey, {
+        startsAt: booking.scheduledAt,
+        endsAt: booking.endsAt,
+        blocked: { startsAt: booking.occupiedFrom, endsAt: booking.occupiedUntil },
+        seatsTaken: booking.seats,
+      });
+    }
+  }
+
+  return [...sessions.values()];
 }
 
 export class AvailabilityService {
@@ -238,14 +271,83 @@ export class AvailabilityService {
 
     if (!service?.onlineBookable) this.throwServiceNotFound();
 
-    return this.computeAvailability({ business, service }, query);
+    return this.respondWithSlots(business, service, query, "CUSTOMER");
   }
 
-  private async computeAvailability(
-    context: AvailabilityContext,
+  /**
+   * Open times for staff taking a booking: ignores minimum notice, the
+   * booking window and the online-bookable flag, but never double books.
+   */
+  public async getBusinessAvailability(
+    businessId: string,
     query: AvailabilityQuery,
   ): Promise<AvailabilityResponse> {
-    const { business, service } = context;
+    const business = await businessService.getBusiness(businessId, null);
+
+    assertUuid("serviceId", query.serviceId);
+
+    const service = await availabilityDal.findBookableService(businessId, query.serviceId);
+
+    if (!service) this.throwServiceNotFound();
+
+    return this.respondWithSlots(business, service, query, "STAFF");
+  }
+
+  /**
+   * The slot starting exactly at `startsAt`, recomputed from the database
+   * (use a transaction client after locking the provider). Null if taken.
+   */
+  public async findSlot(input: {
+    client: DbClient;
+    business: SlotBusiness;
+    service: AvailabilityServiceRecord;
+    staffId?: string;
+    startsAt: Date;
+    mode: AvailabilityMode;
+    excludeBookingId?: string;
+    now?: Date;
+  }): Promise<GeneratedSlot | null> {
+    const slots = await this.computeSlots({
+      client: input.client,
+      business: input.business,
+      service: input.service,
+      mode: input.mode,
+      from: input.startsAt,
+      to: new Date(input.startsAt.getTime() + 1),
+      now: input.now ?? new Date(),
+      ...(input.staffId ? { staffId: input.staffId } : {}),
+      ...(input.excludeBookingId ? { excludeBookingId: input.excludeBookingId } : {}),
+    });
+
+    return slots.find((slot) => slot.startsAt.getTime() === input.startsAt.getTime()) ?? null;
+  }
+
+  /** Up to `count` open start times on or after `from`, for suggesting alternatives. */
+  public async findNextSlots(input: {
+    business: SlotBusiness;
+    service: AvailabilityServiceRecord;
+    from: Date;
+    count: number;
+  }): Promise<GeneratedSlot[]> {
+    const slots = await this.computeSlots({
+      client: prisma,
+      business: input.business,
+      service: input.service,
+      mode: "CUSTOMER",
+      from: input.from,
+      to: new Date(input.from.getTime() + AVAILABILITY_CONSTANTS.MAX_RANGE_DAYS * MILLISECONDS_PER_DAY),
+      now: new Date(),
+    });
+
+    return slots.slice(0, input.count);
+  }
+
+  private async respondWithSlots(
+    business: SlotBusiness,
+    service: AvailabilityServiceRecord,
+    query: AvailabilityQuery,
+    mode: AvailabilityMode,
+  ): Promise<AvailabilityResponse> {
     const displayTimeZone = query.timeZone
       ? normalizeIanaTimeZone(query.timeZone)
       : business.timeZone;
@@ -258,30 +360,80 @@ export class AvailabilityService {
 
     if (query.staffId) assertUuid("staffId", query.staffId);
 
+    const slots = await this.computeSlots({
+      client: prisma,
+      business,
+      service,
+      mode,
+      from: range.from,
+      to: range.to,
+      now: new Date(),
+      ...(query.staffId ? { staffId: query.staffId } : {}),
+    });
+
+    return {
+      serviceId: service.id,
+      timeZone: displayTimeZone,
+      days: this.groupByLocalDate(slots, displayTimeZone),
+    };
+  }
+
+  private async computeSlots(input: {
+    client: DbClient;
+    business: SlotBusiness;
+    service: AvailabilityServiceRecord;
+    mode: AvailabilityMode;
+    staffId?: string;
+    from: Date;
+    to: Date;
+    now: Date;
+    excludeBookingId?: string;
+  }): Promise<GeneratedSlot[]> {
+    const { business, client, service } = input;
     const providerDurations = new Map(
       service.providers
-        .filter((provider) => !query.staffId || provider.staffId === query.staffId)
+        .filter((provider) => !input.staffId || provider.staffId === input.staffId)
         .map((provider) => [
           provider.staffId,
           provider.customDurationMinutes ?? service.durationMinutes,
         ]),
     );
-    const settings = parseStoredBusinessSettings(business.settings);
-    const [staff, closedDates] = await Promise.all([
-      providerDurations.size > 0
-        ? availabilityDal.listStaffSchedules(
+
+    if (providerDurations.size === 0) return [];
+
+    const policy = resolveBookingPolicy(business.settings, service.policyOverrides);
+    const staffIds = [...providerDurations.keys()];
+    const activeResources = service.resources
+      .map(({ resource }) => resource)
+      .filter((resource) => resource.isActive);
+    // Load a day either side so buffers and overnight shifts at the edges count.
+    const loadFrom = new Date(input.from.getTime() - MILLISECONDS_PER_DAY);
+    const loadTo = new Date(input.to.getTime() + MILLISECONDS_PER_DAY);
+    const [staff, closedDates, bookingLoad, resourceLoad] = await Promise.all([
+      availabilityDal.listStaffSchedules(business.id, staffIds, loadFrom, loadTo, client),
+      availabilityDal.listClosedDates(business.id, loadFrom, loadTo, client),
+      availabilityDal.listBookingLoad(
+        business.id,
+        staffIds,
+        loadFrom,
+        loadTo,
+        input.now,
+        input.excludeBookingId,
+        client,
+      ),
+      activeResources.length > 0
+        ? availabilityDal.listResourceLoad(
             business.id,
-            [...providerDurations.keys()],
-            range.from,
-            range.to,
+            activeResources.map((resource) => resource.id),
+            loadFrom,
+            loadTo,
+            input.now,
+            input.excludeBookingId,
+            client,
           )
         : Promise.resolve([]),
-      availabilityDal.listClosedDates(
-        business.id,
-        new Date(range.from.getTime() - MILLISECONDS_PER_DAY),
-        new Date(range.to.getTime() + MILLISECONDS_PER_DAY),
-      ),
     ]);
+    const isClass = service.bookingType === "CLASS";
 
     const providers = staff
       .filter(
@@ -290,29 +442,43 @@ export class AvailabilityService {
           member.locations.length === 0 ||
           member.locations.some((location) => location.locationId === service.locationId),
       )
-      .map<ProviderSchedule>((member) => ({
-        staffId: member.id,
-        durationMinutes: providerDurations.get(member.id) ?? service.durationMinutes,
-        weeklyRules: member.workingHours
-          .filter(
-            (rule) =>
-              !service.locationId || !rule.locationId || rule.locationId === service.locationId,
-          )
-          .map<WeeklyRule>((rule) => ({
-            weekday: rule.weekday,
-            startMinute: rule.startMinute,
-            endMinute: rule.endMinute,
-            timeZone: rule.location?.timeZone ?? business.timeZone,
-          })),
-        timeOff: member.timeOff,
-        busy: [],
-        classSessions: [],
-      }));
+      .map<ProviderSchedule>((member) => {
+        const load = bookingLoad.filter((booking) => booking.staffId === member.id);
+        const sessionLoad = isClass
+          ? load.filter((booking) => booking.serviceId === service.id)
+          : [];
 
-    const slots = generateSlots({
-      from: range.from,
-      to: range.to,
-      now: new Date(),
+        return {
+          staffId: member.id,
+          durationMinutes: providerDurations.get(member.id) ?? service.durationMinutes,
+          weeklyRules: member.workingHours
+            .filter(
+              (rule) =>
+                !service.locationId ||
+                !rule.locationId ||
+                rule.locationId === service.locationId,
+            )
+            .map<WeeklyRule>((rule) => ({
+              weekday: rule.weekday,
+              startMinute: rule.startMinute,
+              endMinute: rule.endMinute,
+              timeZone: rule.location?.timeZone ?? business.timeZone,
+            })),
+          timeOff: member.timeOff,
+          busy: load
+            .filter((booking) => !sessionLoad.includes(booking))
+            .map((booking) => ({
+              startsAt: booking.occupiedFrom,
+              endsAt: booking.occupiedUntil,
+            })),
+          classSessions: toClassSessions(sessionLoad),
+        };
+      });
+
+    return generateSlots({
+      from: input.from,
+      to: input.to,
+      now: input.now,
       closedDates: new Set(closedDates),
       service: {
         bookingType: service.bookingType,
@@ -321,25 +487,20 @@ export class AvailabilityService {
         bufferAfterMin: service.bufferAfterMin,
       },
       policy: {
-        slotStepMinutes: settings.slotStepMinutes,
-        minimumNoticeMinutes: settings.minimumNoticeMinutes,
-        bookingWindowDays: settings.bookingWindowDays,
+        slotStepMinutes: policy.slotStepMinutes,
+        minimumNoticeMinutes: input.mode === "STAFF" ? 0 : policy.minimumNoticeMinutes,
+        bookingWindowDays:
+          input.mode === "STAFF" ? STAFF_BOOKING_WINDOW_DAYS : policy.bookingWindowDays,
       },
       providers,
-      resources: service.resources
-        .filter(({ resource }) => resource.isActive)
-        .map(({ resource }) => ({
-          resourceId: resource.id,
-          capacity: resource.capacity,
-          busy: [],
-        })),
+      resources: activeResources.map((resource) => ({
+        resourceId: resource.id,
+        capacity: resource.capacity,
+        busy: resourceLoad
+          .filter((load) => load.resourceIds.includes(resource.id))
+          .map((load) => ({ startsAt: load.occupiedFrom, endsAt: load.occupiedUntil })),
+      })),
     });
-
-    return {
-      serviceId: service.id,
-      timeZone: displayTimeZone,
-      days: this.groupByLocalDate(slots, displayTimeZone),
-    };
   }
 
   private resolveRange(from: string, to: string, timeZone: string): { from: Date; to: Date } {

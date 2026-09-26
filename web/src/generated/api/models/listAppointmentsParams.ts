@@ -5,10 +5,10 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
-import type { AppointmentStatus } from './appointmentStatus';
+import type { BookingStatus } from './bookingStatus';
 
 export type ListAppointmentsParams = {
-status?: AppointmentStatus;
+status?: BookingStatus;
 cursor?: string;
 /**
  * @minimum 1

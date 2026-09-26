@@ -25,10 +25,13 @@ import {
   RefreshIcon,
   SendIcon,
   SparklesIcon,
+  TagIcon,
+  UserIcon,
 } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
+import { BOOKING_UI_CONSTANTS } from "@/features/bookings/constants/booking-status.constants";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
 import { useChatMessagePolling } from "@/features/conversations/hooks/use-chat-message-polling";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
@@ -58,20 +61,16 @@ import type {
   ChatMessageResponse,
   ChatSessionResponse,
 } from "@/generated/api/models";
+import {
+  useGetPublicBusiness,
+  useListPublicServices,
+} from "@/generated/api/public-booking/public-booking";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
+import { getLocalDateTimeInputValues } from "@/lib/utils/date-time";
 
-const initialSuggestions = [
-  "Book a consultation next Tuesday at 10 AM",
-  "I need a planning session next week",
-];
-
-const serviceSuggestions = [
-  "Dental consultation",
-  "Planning consultation",
-  "Travel consultation",
-];
+const MAX_SERVICE_SUGGESTIONS = 3;
 
 const scheduleSuggestions = [
   "Tomorrow at 10 AM",
@@ -88,11 +87,13 @@ function createWelcomeMessage(firstName: string): ChatMessageViewModel {
 }
 
 interface BookingWorkspaceProps {
+  businessSlug?: string;
   initialSessionId?: string;
   onSessionCreated?: (sessionId: string) => void;
 }
 
 interface BookingExperienceProps {
+  businessSlug: string;
   initialMessageCursor?: string;
   initialMessages?: ChatMessageResponse[];
   initialSession?: ChatSessionResponse;
@@ -101,6 +102,7 @@ interface BookingExperienceProps {
 }
 
 export function BookingWorkspace({
+  businessSlug = BOOKING_UI_CONSTANTS.DEMO_BUSINESS_SLUG,
   initialSessionId,
   onSessionCreated,
 }: BookingWorkspaceProps) {
@@ -117,6 +119,7 @@ export function BookingWorkspace({
   if (!isResuming) {
     return (
       <BookingExperience
+        businessSlug={businessSlug}
         initialTimeZone={timeZone}
         onSessionCreated={onSessionCreated}
       />
@@ -157,6 +160,7 @@ export function BookingWorkspace({
 
   return (
     <BookingExperience
+      businessSlug={sessionQuery.data.business.slug}
       initialMessageCursor={messagesQuery.data.pages.at(-1)?.nextCursor}
       initialMessages={initialMessages}
       initialSession={sessionQuery.data}
@@ -167,6 +171,7 @@ export function BookingWorkspace({
 }
 
 function BookingExperience({
+  businessSlug,
   initialMessageCursor,
   initialMessages = [],
   initialSession,
@@ -183,6 +188,23 @@ function BookingExperience({
     .map(toBookingMessageViewModel);
   const initialMissingFields = getMissingBookingFields(
     initialSession?.bookingContext,
+  );
+  const businessQuery = useGetPublicBusiness(businessSlug);
+  const publicServicesQuery = useListPublicServices(businessSlug);
+  const businessName = businessQuery.data?.name ?? "this business";
+  const serviceSuggestions = useMemo(
+    () =>
+      (publicServicesQuery.data?.items ?? [])
+        .slice(0, MAX_SERVICE_SUGGESTIONS)
+        .map((service) => service.name),
+    [publicServicesQuery.data],
+  );
+  const initialSuggestions = useMemo(
+    () =>
+      serviceSuggestions.length > 0
+        ? [`Book a ${serviceSuggestions[0]} next Tuesday at 10 AM`, "What times are free this week?"]
+        : [],
+    [serviceSuggestions],
   );
   const createSessionMutation = useCreateSession();
   const createMessageMutation = useCreateMessage();
@@ -211,6 +233,7 @@ function BookingExperience({
     initialSession?.status === "ACTIVE" && initialMissingFields.length === 0,
   );
   const [isProcessingTurn, setIsProcessingTurn] = useState(false);
+  const [suggestedTimes, setSuggestedTimes] = useState<string[]>([]);
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
@@ -219,6 +242,7 @@ function BookingExperience({
   const [isConfirmed, setIsConfirmed] = useState(
     initialSession?.status === "CLOSED",
   );
+  const [isAwaitingApproval, setIsAwaitingApproval] = useState(false);
   const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const messageRequestLockRef = useRef(false);
   const confirmationRequestLockRef = useRef(false);
@@ -232,8 +256,8 @@ function BookingExperience({
     [messagePollingQuery.data?.items, messages],
   );
   const contextualSuggestions = useMemo(
-    () => getContextualSuggestions(missingFields),
-    [missingFields],
+    () => getContextualSuggestions(missingFields, initialSuggestions, serviceSuggestions),
+    [initialSuggestions, missingFields, serviceSuggestions],
   );
 
   const isSending = isProcessingTurn;
@@ -304,7 +328,7 @@ function BookingExperience({
 
       if (!activeSessionId) {
         const session = await createSessionMutation.mutateAsync({
-          data: { title: turn.text.slice(0, 120) },
+          data: { businessSlug, title: turn.text.slice(0, 120) },
         });
         activeSessionId = session.id;
         newlyCreatedSessionId = session.id;
@@ -359,6 +383,9 @@ function BookingExperience({
       setDraft(toBookingDraft(response.session.bookingContext, browserTimeZone));
       setMissingFields(
         response.assistantMessage.structuredData?.missingFields ?? [],
+      );
+      setSuggestedTimes(
+        (response.assistantMessage.structuredData?.suggestedTimes ?? []).map(String),
       );
       setIsReadyToConfirm(
         response.assistantMessage.structuredData?.confirmationRequired === true,
@@ -418,6 +445,24 @@ function BookingExperience({
 
   function retryPendingTurn() {
     if (pendingTurn && !isSending) void processTurn(pendingTurn);
+  }
+
+  function chooseSuggestedTime(startsAt: string) {
+    const local = getLocalDateTimeInputValues(startsAt, timeZone);
+    const serviceId = bookingContext?.serviceId;
+
+    if (!local || !serviceId || isComposerDisabled || messageRequestLockRef.current) return;
+
+    void processTurn({
+      bookingDetails: {
+        serviceId,
+        scheduledDate: local.date,
+        scheduledTime: local.time,
+        ...(bookingContext?.notes ? { notes: bookingContext.notes } : {}),
+      },
+      clientMessageId: crypto.randomUUID(),
+      text: `Book ${formatSuggestedTime(startsAt, timeZone)} instead.`,
+    });
   }
 
   async function submitStructuredBookingDetails(
@@ -509,6 +554,8 @@ function BookingExperience({
               : {}),
           });
           setIsReadyToConfirm(false);
+          setIsAwaitingApproval(response.appointment.status === "PENDING");
+          setSuggestedTimes([]);
           setIsConfirmed(true);
           setIsConfirmOpen(false);
           setIsStructuredFormOpen(false);
@@ -545,8 +592,8 @@ function BookingExperience({
               <SparklesIcon className="size-5" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold text-ink">AI booking assistant</h2>
-              <p className="text-xs text-muted">Describe your appointment in everyday language.</p>
+              <h2 className="text-sm font-semibold text-ink">Booking with {businessName}</h2>
+              <p className="text-xs text-muted">Describe what you need; I&rsquo;ll check real availability.</p>
             </div>
           </div>
         </div>
@@ -631,7 +678,22 @@ function BookingExperience({
               </Alert>
             ) : null}
 
-            {visibleMessages.length === 1 && !isConfirmed ? (
+            {suggestedTimes.length > 0 && !isConfirmed && !requestError ? (
+              <BookingSuggestions
+                disabled={isComposerDisabled}
+                label="Open times"
+                onSelect={(label) => {
+                  const startsAt = suggestedTimes.find(
+                    (time) => formatSuggestedTime(time, timeZone) === label,
+                  );
+
+                  if (startsAt) chooseSuggestedTime(startsAt);
+                }}
+                suggestions={suggestedTimes.map((time) => formatSuggestedTime(time, timeZone))}
+              />
+            ) : null}
+
+            {visibleMessages.length === 1 && !isConfirmed && initialSuggestions.length > 0 ? (
               <BookingSuggestions
                 disabled={isComposerDisabled}
                 label="Try an example"
@@ -674,7 +736,7 @@ function BookingExperience({
                     ? "This appointment has been booked"
                     : hasFailedTurn
                       ? "Retry or start over before sending another message"
-                      : "Example: Book a 30-minute consultation next Tuesday at 10 AM"
+                      : `Example: ${initialSuggestions[0] ?? "Book an appointment next Tuesday at 10 AM"}`
                 }
                 rows={1}
                 value={composer}
@@ -716,7 +778,9 @@ function BookingExperience({
 
           {isConfirmed ? (
             <Alert className="mb-4" tone="success">
-              Your appointment has been booked successfully.
+              {isAwaitingApproval
+                ? `Your request was sent to ${businessName} for approval.`
+                : "Your appointment has been booked successfully."}
             </Alert>
           ) : null}
 
@@ -731,7 +795,16 @@ function BookingExperience({
                 <DraftRow icon={<CalendarIcon className="size-[18px]" />} label="Appointment" value={draft.title} />
                 <DraftRow icon={<CalendarIcon className="size-[18px]" />} label="Date" value={draft.date} />
                 <DraftRow icon={<ClockIcon className="size-[18px]" />} label="Time" value={`${draft.time} · ${draft.duration}`} />
+                {draft.staff ? (
+                  <DraftRow icon={<UserIcon className="size-[18px]" />} label="With" value={draft.staff} />
+                ) : null}
+                {draft.price ? (
+                  <DraftRow icon={<TagIcon className="size-[18px]" />} label="Price" value={draft.price} />
+                ) : null}
                 <DraftRow icon={<GlobeIcon className="size-[18px]" />} label="Timezone" value={draft.timezone} />
+                {draft.heldUntil && !isConfirmed ? (
+                  <Alert tone="warning">This time is held for you until {draft.heldUntil}.</Alert>
+                ) : null}
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-semibold text-muted">Notes</p>
                   <p className="mt-1 text-sm leading-6 text-ink-soft">{draft.notes}</p>
@@ -779,19 +852,17 @@ function BookingExperience({
               </span>
               <h3 className="mt-4 text-sm font-semibold text-ink">No booking draft yet</h3>
               <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted">
-                Send a message and the assistant will organize the date, time, and other details here.
+                Tell the assistant what you need, or pick a service and an open time yourself.
               </p>
-              {visibleMessages.length > 1 ? (
-                <Button
-                  className="mt-5"
-                  disabled={isSending}
-                  leadingIcon={<EditIcon className="size-4" />}
-                  onClick={openStructuredBookingForm}
-                  variant="secondary"
-                >
-                  Complete details in form
-                </Button>
-              ) : null}
+              <Button
+                className="mt-5"
+                disabled={isSending}
+                leadingIcon={<EditIcon className="size-4" />}
+                onClick={openStructuredBookingForm}
+                variant="secondary"
+              >
+                Choose a time in the form
+              </Button>
             </div>
           )}
         </div>
@@ -828,6 +899,7 @@ function BookingExperience({
       {isStructuredFormOpen ? (
         <StructuredBookingForm
           bookingContext={bookingContext}
+          businessSlug={businessSlug}
           initialValues={pendingTurn?.bookingDetails}
           isSubmitting={isSending}
           onClose={() => !isSending && setIsStructuredFormOpen(false)}
@@ -916,7 +988,11 @@ function getMissingBookingFields(
   return missingFields;
 }
 
-function getContextualSuggestions(missingFields: string[]): string[] {
+function getContextualSuggestions(
+  missingFields: string[],
+  initialSuggestions: string[],
+  serviceSuggestions: string[],
+): string[] {
   const needsService = missingFields.includes("serviceName");
   const needsSchedule = missingFields.includes("scheduledAt");
 
@@ -925,6 +1001,17 @@ function getContextualSuggestions(missingFields: string[]): string[] {
   if (needsSchedule) return scheduleSuggestions;
 
   return [];
+}
+
+function formatSuggestedTime(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+    timeZone,
+    weekday: "short",
+  }).format(new Date(value));
 }
 
 function BookingSuggestions({

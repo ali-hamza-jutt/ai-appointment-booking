@@ -12,7 +12,11 @@ export interface ChatMessageViewModel {
 export interface BookingDraftViewModel {
   date: string;
   duration: string;
+  /** Local time the hold lapses, when a slot is being held. */
+  heldUntil: string | null;
   notes: string;
+  price: string | null;
+  staff: string | null;
   time: string;
   timezone: string;
   title: string;
@@ -25,9 +29,9 @@ export interface PendingChatTurn {
 }
 
 export interface StructuredBookingFormValues {
-  durationMinutes: number;
   notes?: string;
   scheduledDate: string;
   scheduledTime: string;
-  serviceName: string;
+  serviceId: string;
+  staffId?: string;
 }

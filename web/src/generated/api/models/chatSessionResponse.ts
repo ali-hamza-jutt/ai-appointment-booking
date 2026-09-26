@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AppointmentBookingContext } from './appointmentBookingContext';
+import type { ChatSessionBusiness } from './chatSessionBusiness';
 import type { ChatSessionStatus } from './chatSessionStatus';
 
 export interface ChatSessionResponse {
   id: string;
+  business: ChatSessionBusiness;
   /** @nullable */
   title: string | null;
   status: ChatSessionStatus;

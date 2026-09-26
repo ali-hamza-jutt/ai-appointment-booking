@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
-import {
-  appointmentDal,
-  appointmentSelect,
-} from "../../appointments/dal/appointment.dal.js";
+import { bookingSelect } from "../../bookings/dal/booking.dal.js";
 import type {
   ConfirmChatBookingData,
   ConfirmedChatBookingRecord,
@@ -13,58 +10,41 @@ import type {
 import { chatMessageSelect, chatSessionSelect } from "./chat.dal.js";
 
 export class ChatBookingDal {
-  public confirmBooking(
+  /** Closes the session and records the assistant's confirmation message. */
+  public completeBooking(
     data: ConfirmChatBookingData,
   ): Promise<ConfirmedChatBookingRecord> {
     const assistantMessageId = randomUUID();
 
-    return prisma.$transaction(async (transaction) => {
-      await appointmentDal.lockAppointmentSchedule(transaction, data.userId);
-      await appointmentDal.ensureAppointmentSlotAvailable(transaction, data);
-
-      return transaction.chatSession.update({
-        where: {
-          id: data.sessionId,
-          userId: data.userId,
-          status: "ACTIVE",
-        },
-        data: {
-          status: "CLOSED",
-          updatedAt: new Date(),
-          appointment: {
-            create: {
-              id: data.appointmentId,
-              business: { connect: { id: data.businessId } },
-              user: { connect: { id: data.userId } },
-              serviceName: data.serviceName,
-              scheduledAt: data.scheduledAt,
-              timeZone: data.timeZone,
-              durationMinutes: data.durationMinutes,
-              source: "CHAT",
-              notes: data.notes,
-            },
-          },
-          messages: {
-            create: {
-              id: assistantMessageId,
-              clientMessageId: null,
-              replyToMessageId: null,
-              role: "ASSISTANT",
-              content: data.assistantContent,
-              structuredData:
-                data.assistantStructuredData as unknown as Prisma.InputJsonObject,
-            },
+    return prisma.chatSession.update({
+      where: {
+        id: data.sessionId,
+        userId: data.userId,
+        status: "ACTIVE",
+      },
+      data: {
+        status: "CLOSED",
+        updatedAt: new Date(),
+        messages: {
+          create: {
+            id: assistantMessageId,
+            clientMessageId: null,
+            replyToMessageId: null,
+            role: "ASSISTANT",
+            content: data.assistantContent,
+            structuredData:
+              data.assistantStructuredData as unknown as Prisma.InputJsonObject,
           },
         },
-        select: {
-          ...chatSessionSelect,
-          appointment: { select: appointmentSelect },
-          messages: {
-            where: { id: assistantMessageId },
-            select: chatMessageSelect,
-          },
+      },
+      select: {
+        ...chatSessionSelect,
+        booking: { select: bookingSelect },
+        messages: {
+          where: { id: assistantMessageId },
+          select: chatMessageSelect,
         },
-      });
+      },
     });
   }
 
@@ -76,15 +56,15 @@ export class ChatBookingDal {
       where: {
         id: sessionId,
         userId,
-        appointment: { isNot: null },
+        booking: { isNot: null },
       },
       select: {
         ...chatSessionSelect,
-        appointment: { select: appointmentSelect },
+        booking: { select: bookingSelect },
       },
     });
 
-    if (!session?.appointment) {
+    if (!session?.booking) {
       return null;
     }
 
@@ -94,7 +74,7 @@ export class ChatBookingDal {
         role: "ASSISTANT",
         structuredData: {
           path: ["appointmentId"],
-          equals: session.appointment.id,
+          equals: session.booking.id,
         },
       },
       select: chatMessageSelect,

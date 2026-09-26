@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 
 export interface UpdateServiceRequest {
   /**
@@ -57,4 +58,6 @@ export interface UpdateServiceRequest {
   isActive?: boolean;
   onlineBookable?: boolean;
   sortOrder?: number;
+  /** Replaces all overrides; send {} to clear them. */
+  policyOverrides?: ServicePolicyOverrides;
 }

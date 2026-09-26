@@ -1,13 +1,13 @@
-import { AppointmentStatus } from "@/generated/api/models";
+import { BookingStatus } from "@/generated/api/models";
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 
 export const APPOINTMENT_UI_CONSTANTS = {
   PAGE_SIZE: 12,
   FILTERS: [
     { label: "All", value: "ALL" },
-    { label: "Pending", value: AppointmentStatus.PENDING },
-    { label: "Confirmed", value: AppointmentStatus.CONFIRMED },
-    { label: "Completed", value: AppointmentStatus.COMPLETED },
-    { label: "Cancelled", value: AppointmentStatus.CANCELLED },
+    { label: "Confirmed", value: BookingStatus.CONFIRMED },
+    { label: "Awaiting approval", value: BookingStatus.PENDING },
+    { label: "Completed", value: BookingStatus.COMPLETED },
+    { label: "Cancelled", value: BookingStatus.CANCELLED },
   ] satisfies ReadonlyArray<{ label: string; value: AppointmentFilter }>,
 } as const;

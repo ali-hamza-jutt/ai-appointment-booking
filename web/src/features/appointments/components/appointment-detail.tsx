@@ -12,6 +12,8 @@ import {
   ClockIcon,
   GlobeIcon,
   RefreshIcon,
+  TagIcon,
+  UserIcon,
 } from "@/components/ui/icons";
 import { AppointmentActions } from "@/features/appointments/components/appointment-actions";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
@@ -87,6 +89,7 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
               <Badge tone={appointment.statusTone}>{appointment.statusLabel}</Badge>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-ink">{appointment.title}</h2>
+            <p className="mt-1 text-sm text-muted">at {appointment.businessName}</p>
             <p className="mt-1 break-all text-xs text-subtle">
               Appointment ID {appointment.id}
             </p>
@@ -98,6 +101,8 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
         <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
           <DetailItem icon={<CalendarIcon className="size-[18px]" />} label="Date" value={appointment.date} />
           <DetailItem icon={<ClockIcon className="size-[18px]" />} label="Time" value={`${appointment.time} · ${appointment.duration}`} />
+          <DetailItem icon={<UserIcon className="size-[18px]" />} label="With" value={appointment.staffName} />
+          <DetailItem icon={<TagIcon className="size-[18px]" />} label="Price" value={appointment.priceLabel} />
           <DetailItem icon={<GlobeIcon className="size-[18px]" />} label="Timezone" value={appointment.timezone} />
           <DetailItem icon={<CalendarIcon className="size-[18px]" />} label="Created with" value={appointment.sourceLabel} />
           <DetailItem icon={<ClockIcon className="size-[18px]" />} label="Created" value={appointment.createdAtLabel} />

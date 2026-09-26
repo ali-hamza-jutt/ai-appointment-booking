@@ -53,6 +53,7 @@ const navigation: NavigationItem[] = [
 ];
 
 const businessNavigation: NavigationItem[] = [
+  { href: "/business/bookings", icon: CalendarIcon, label: "Bookings" },
   { href: "/business/services", icon: TagIcon, label: "Services" },
   { href: "/business/staff", icon: UserIcon, label: "Staff" },
   { href: "/business/availability", icon: ClockIcon, label: "Availability" },
@@ -66,6 +67,7 @@ const setupNavigation: NavigationItem[] = [
 ];
 
 const pageTitles: ReadonlyArray<[string, string]> = [
+  ["/business/bookings", "Bookings"],
   ["/business/setup", "Set up your business"],
   ["/business/services", "Services"],
   ["/business/staff", "Staff"],

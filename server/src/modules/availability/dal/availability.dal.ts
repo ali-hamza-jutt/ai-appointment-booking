@@ -1,6 +1,12 @@
-import { prisma } from "../../../infrastructure/database/prisma.js";
+import { BOOKING_CONSTANTS } from "../../../constants/app.constants.js";
+import {
+  prisma,
+  type DbClient,
+} from "../../../infrastructure/database/prisma.js";
 import type {
   AvailabilityServiceRecord,
+  BookingLoadRecord,
+  ResourceLoadRecord,
   AvailabilityStaffRecord,
   ClosureResponse,
   TimeOffResponse,
@@ -123,11 +129,15 @@ export class AvailabilityDal {
   public findBookableService(
     businessId: string,
     serviceId: string,
+    client: DbClient = prisma,
   ): Promise<AvailabilityServiceRecord | null> {
-    return prisma.service.findFirst({
+    return client.service.findFirst({
       where: { id: serviceId, businessId, isActive: true },
       select: {
         id: true,
+        name: true,
+        priceMinor: true,
+        currency: true,
         bookingType: true,
         capacity: true,
         durationMinutes: true,
@@ -135,7 +145,10 @@ export class AvailabilityDal {
         bufferAfterMin: true,
         locationId: true,
         onlineBookable: true,
-        providers: { select: { staffId: true, customDurationMinutes: true } },
+        policyOverrides: true,
+        providers: {
+          select: { staffId: true, customDurationMinutes: true, customPriceMinor: true },
+        },
         resources: {
           select: { resource: { select: { id: true, capacity: true, isActive: true } } },
         },
@@ -148,8 +161,9 @@ export class AvailabilityDal {
     staffIds: string[],
     from: Date,
     to: Date,
+    client: DbClient = prisma,
   ): Promise<AvailabilityStaffRecord[]> {
-    return prisma.staff.findMany({
+    return client.staff.findMany({
       where: { businessId, id: { in: staffIds }, isActive: true },
       select: {
         id: true,
@@ -175,13 +189,99 @@ export class AvailabilityDal {
     businessId: string,
     fromDate: Date,
     toDate: Date,
+    client: DbClient = prisma,
   ): Promise<string[]> {
-    const closures = await prisma.businessClosure.findMany({
+    const closures = await client.businessClosure.findMany({
       where: { businessId, date: { gte: fromDate, lte: toDate } },
       select: { date: true },
     });
 
     return closures.map((closure) => closure.date.toISOString().slice(0, 10));
+  }
+
+  /**
+   * Bookings that occupy these providers in the range. Holds count until they
+   * expire, judged against the same `now` the slots are computed with.
+   */
+  public listBookingLoad(
+    businessId: string,
+    staffIds: string[],
+    from: Date,
+    to: Date,
+    now: Date,
+    excludeBookingId: string | undefined,
+    client: DbClient = prisma,
+  ): Promise<BookingLoadRecord[]> {
+    return client.booking.findMany({
+      where: {
+        businessId,
+        staffId: { in: staffIds },
+        status: { in: [...BOOKING_CONSTANTS.ACTIVE_STATUSES] },
+        occupiedFrom: { lt: to },
+        occupiedUntil: { gt: from },
+        NOT: [
+          { status: "HELD", holdExpiresAt: { lte: now } },
+          ...(excludeBookingId ? [{ id: excludeBookingId }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        staffId: true,
+        serviceId: true,
+        sessionKey: true,
+        seats: true,
+        scheduledAt: true,
+        endsAt: true,
+        occupiedFrom: true,
+        occupiedUntil: true,
+      },
+    });
+  }
+
+  /** Bookings using any of these resources, one entry per session. */
+  public async listResourceLoad(
+    businessId: string,
+    resourceIds: string[],
+    from: Date,
+    to: Date,
+    now: Date,
+    excludeBookingId: string | undefined,
+    client: DbClient = prisma,
+  ): Promise<ResourceLoadRecord[]> {
+    const bookings = await client.booking.findMany({
+      where: {
+        businessId,
+        status: { in: [...BOOKING_CONSTANTS.ACTIVE_STATUSES] },
+        occupiedFrom: { lt: to },
+        occupiedUntil: { gt: from },
+        service: { resources: { some: { resourceId: { in: resourceIds } } } },
+        NOT: [
+          { status: "HELD", holdExpiresAt: { lte: now } },
+          ...(excludeBookingId ? [{ id: excludeBookingId }] : []),
+        ],
+      },
+      distinct: ["sessionKey"],
+      select: {
+        sessionKey: true,
+        occupiedFrom: true,
+        occupiedUntil: true,
+        service: {
+          select: {
+            resources: {
+              where: { resourceId: { in: resourceIds } },
+              select: { resourceId: true },
+            },
+          },
+        },
+      },
+    });
+
+    return bookings.map((booking) => ({
+      sessionKey: booking.sessionKey,
+      occupiedFrom: booking.occupiedFrom,
+      occupiedUntil: booking.occupiedUntil,
+      resourceIds: booking.service?.resources.map((resource) => resource.resourceId) ?? [],
+    }));
   }
 }
 

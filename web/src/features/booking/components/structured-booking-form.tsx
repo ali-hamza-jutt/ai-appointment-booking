@@ -1,32 +1,28 @@
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/feedback";
-import {
-  TextAreaField,
-  TextField,
-} from "@/components/ui/form-controls";
+import { Alert, Skeleton } from "@/components/ui/feedback";
+import { SelectField, TextAreaField } from "@/components/ui/form-controls";
 import { Modal } from "@/components/ui/modal";
+import { SlotPicker } from "@/features/availability/components/slot-picker";
+import { usePublicDaySlots } from "@/features/availability/hooks/use-day-slots";
 import type { StructuredBookingFormValues } from "@/features/booking/types/booking-ui";
+import { toStructuredBookingFormValues } from "@/features/booking/utils/booking-format";
+import { formatDuration } from "@/features/catalog/utils/catalog-format";
+import type { AppointmentBookingContext, AvailableSlot } from "@/generated/api/models";
 import {
-  toStructuredBookingFormValues,
-} from "@/features/booking/utils/booking-format";
-import type { AppointmentBookingContext } from "@/generated/api/models";
+  useListPublicServices,
+  useListPublicStaff,
+} from "@/generated/api/public-booking/public-booking";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 import { getCurrentLocalDate } from "@/lib/utils/date-time";
+import { formatMoney } from "@/lib/utils/money";
 
-const MIN_SERVICE_NAME_LENGTH = 2;
-const MAX_SERVICE_NAME_LENGTH = 120;
-const MIN_DURATION_MINUTES = 5;
-const MAX_DURATION_MINUTES = 480;
 const MAX_NOTES_LENGTH = 2000;
-
-type StructuredBookingField = keyof StructuredBookingFormValues;
-type StructuredBookingFormErrors = Partial<
-  Record<StructuredBookingField, string>
->;
 
 interface StructuredBookingFormProps {
   bookingContext: AppointmentBookingContext | null;
+  businessSlug: string;
   initialValues?: StructuredBookingFormValues;
   isSubmitting: boolean;
   onClose: () => void;
@@ -37,6 +33,7 @@ interface StructuredBookingFormProps {
 
 export function StructuredBookingForm({
   bookingContext,
+  businessSlug,
   initialValues,
   isSubmitting,
   onClose,
@@ -44,191 +41,149 @@ export function StructuredBookingForm({
   submissionError,
   timeZone,
 }: StructuredBookingFormProps) {
-  const [values, setValues] = useState<StructuredBookingFormValues>(() =>
-    initialValues ?? toStructuredBookingFormValues(bookingContext, timeZone),
+  const initial = initialValues ?? toStructuredBookingFormValues(bookingContext, timeZone);
+  const servicesQuery = useListPublicServices(businessSlug);
+  const [chosenServiceId, setServiceId] = useState(initial.serviceId);
+  const [staffId, setStaffId] = useState(initial.staffId ?? "");
+  const [date, setDate] = useState(initial.scheduledDate);
+  const [slot, setSlot] = useState<AvailableSlot | null>(null);
+  const [notes, setNotes] = useState(initial.notes ?? "");
+  const [formError, setFormError] = useState<string | null>(null);
+  const services = servicesQuery.data?.items ?? [];
+  const serviceId =
+    services.find((service) => service.id === chosenServiceId)?.id ?? services[0]?.id ?? "";
+  const staffQuery = useListPublicStaff(
+    businessSlug,
+    { serviceId },
+    { query: { enabled: Boolean(serviceId) } },
   );
-  const [errors, setErrors] = useState<StructuredBookingFormErrors>({});
-
-  function updateField<Field extends StructuredBookingField>(
-    field: Field,
-    value: StructuredBookingFormValues[Field],
-  ) {
-    setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
-  }
+  const daySlots = usePublicDaySlots(businessSlug, {
+    date,
+    serviceId,
+    timeZone,
+    ...(staffId ? { staffId } : {}),
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (isSubmitting) return;
 
-    const normalizedValues: StructuredBookingFormValues = {
-      durationMinutes: values.durationMinutes,
-      ...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
-      scheduledDate: values.scheduledDate,
-      scheduledTime: values.scheduledTime,
-      serviceName: values.serviceName.trim(),
-    };
-    const nextErrors = validateValues(normalizedValues);
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
+    if (!serviceId || !date || !slot) {
+      setFormError("Choose a service, a date and an open time.");
       return;
     }
 
-    const succeeded = await onSubmit(normalizedValues);
+    if (notes.length > MAX_NOTES_LENGTH) {
+      setFormError("Notes cannot exceed 2000 characters.");
+      return;
+    }
+
+    setFormError(null);
+
+    const succeeded = await onSubmit({
+      serviceId,
+      scheduledDate: date,
+      scheduledTime: slot.time,
+      ...(staffId ? { staffId } : {}),
+      ...(notes.trim() ? { notes: notes.trim() } : {}),
+    });
 
     if (succeeded) onClose();
   }
 
   return (
     <Modal
-      description="Enter the appointment details directly when chatting is unclear."
+      description="Pick a service and one of the open times."
       isOpen
-      onClose={() => !isSubmitting && onClose()}
-      title="Complete booking details"
+      onClose={onClose}
+      title="Booking form"
     >
-      <form className="space-y-3 p-4 sm:p-5" onSubmit={handleSubmit}>
-        {submissionError ? (
-          <Alert tone="danger">{submissionError}</Alert>
+      <form className="space-y-5 p-5 sm:p-6" noValidate onSubmit={handleSubmit}>
+        {formError || submissionError ? (
+          <Alert tone="danger">{formError ?? submissionError}</Alert>
         ) : null}
 
-        <TextField
-          autoComplete="off"
-          disabled={isSubmitting}
-          error={errors.serviceName}
-          id="structured-booking-service"
-          label="Service"
-          maxLength={MAX_SERVICE_NAME_LENGTH}
-          onChange={(event) => updateField("serviceName", event.target.value)}
-          placeholder="Example: System design consultation"
-          required
-          value={values.serviceName}
-        />
+        {servicesQuery.isPending ? (
+          <Skeleton className="h-16 rounded-[10px]" />
+        ) : servicesQuery.isError ? (
+          <Alert tone="danger">
+            {getApiErrorMessage(servicesQuery.error, "Services could not be loaded.")}
+          </Alert>
+        ) : services.length === 0 ? (
+          <Alert tone="warning">This business has no services open for online booking yet.</Alert>
+        ) : (
+          <>
+            <SelectField
+              id="booking-form-service"
+              label="Service"
+              onChange={(event) => {
+                setServiceId(event.target.value);
+                setStaffId("");
+                setSlot(null);
+              }}
+              value={serviceId}
+            >
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name} · {formatDuration(service.durationMinutes)} ·{" "}
+                  {formatMoney(service.priceMinor, service.currency)}
+                </option>
+              ))}
+            </SelectField>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField
-            disabled={isSubmitting}
-            error={errors.scheduledDate}
-            id="structured-booking-date"
-            label="Date"
-            min={getCurrentLocalDate(timeZone)}
-            onChange={(event) =>
-              updateField("scheduledDate", event.target.value)
-            }
-            required
-            type="date"
-            value={values.scheduledDate}
-          />
-          <TextField
-            disabled={isSubmitting}
-            error={errors.scheduledTime}
-            id="structured-booking-time"
-            label="Time"
-            onChange={(event) =>
-              updateField("scheduledTime", event.target.value)
-            }
-            required
-            type="time"
-            value={values.scheduledTime}
-          />
-        </div>
+            <SelectField
+              id="booking-form-staff"
+              label="With"
+              onChange={(event) => {
+                setStaffId(event.target.value);
+                setSlot(null);
+              }}
+              value={staffId}
+            >
+              <option value="">Anyone available</option>
+              {(staffQuery.data?.items ?? []).map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                </option>
+              ))}
+            </SelectField>
 
-        <TextField
-          disabled={isSubmitting}
-          error={errors.durationMinutes}
-          id="structured-booking-duration"
-          label="Duration (minutes)"
-          max={MAX_DURATION_MINUTES}
-          min={MIN_DURATION_MINUTES}
-          onChange={(event) =>
-            updateField("durationMinutes", Number(event.target.value))
-          }
-          required
-          step={1}
-          type="number"
-          value={values.durationMinutes}
-        />
+            <SlotPicker
+              date={date}
+              error={daySlots.error}
+              idPrefix="booking-form"
+              isLoading={daySlots.isLoading}
+              minDate={getCurrentLocalDate(timeZone)}
+              onDateChange={(value) => {
+                setDate(value);
+                setSlot(null);
+              }}
+              onSelect={setSlot}
+              selectedStartsAt={slot ? String(slot.startsAt) : null}
+              slots={daySlots.slots}
+              timeZone={timeZone}
+            />
+          </>
+        )}
 
         <TextAreaField
-          disabled={isSubmitting}
-          error={errors.notes}
-          hint="Optional"
-          id="structured-booking-notes"
-          label="Notes"
+          id="booking-form-notes"
+          label="Notes (optional)"
           maxLength={MAX_NOTES_LENGTH}
-          onChange={(event) => updateField("notes", event.target.value)}
-          placeholder="Add anything the appointment should include"
-          rows={2}
-          value={values.notes ?? ""}
+          onChange={(event) => setNotes(event.target.value)}
+          value={notes}
         />
 
-        <p className="rounded-[10px] bg-surface-subtle px-3 py-2 text-xs leading-5 text-muted">
-          Times are interpreted in <span className="font-semibold text-ink-soft">{timeZone}</span>.
-        </p>
-
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button
-            disabled={isSubmitting}
-            onClick={onClose}
-            variant="secondary"
-          >
+          <Button disabled={isSubmitting} onClick={onClose} variant="secondary">
             Cancel
           </Button>
-          <Button isLoading={isSubmitting} type="submit">
-            {isSubmitting ? "Saving details…" : "Use these details"}
+          <Button disabled={!slot} isLoading={isSubmitting} type="submit">
+            Hold this time
           </Button>
         </div>
       </form>
     </Modal>
   );
-}
-
-function validateValues(
-  values: StructuredBookingFormValues,
-): StructuredBookingFormErrors {
-  const errors: StructuredBookingFormErrors = {};
-
-  if (
-    values.serviceName.length < MIN_SERVICE_NAME_LENGTH ||
-    values.serviceName.length > MAX_SERVICE_NAME_LENGTH
-  ) {
-    errors.serviceName = "Enter a service name between 2 and 120 characters.";
-  }
-
-  if (!values.scheduledDate) {
-    errors.scheduledDate = "Select an appointment date.";
-  }
-
-  if (!values.scheduledTime) {
-    errors.scheduledTime = "Select an appointment time.";
-  }
-
-  if (values.scheduledDate && values.scheduledTime) {
-    const scheduledAt = new Date(
-      `${values.scheduledDate}T${values.scheduledTime}:00`,
-    );
-
-    if (
-      Number.isNaN(scheduledAt.getTime()) ||
-      scheduledAt.getTime() <= Date.now()
-    ) {
-      errors.scheduledDate = "Choose a future date and time.";
-      errors.scheduledTime = "Choose a future date and time.";
-    }
-  }
-
-  if (
-    !Number.isInteger(values.durationMinutes) ||
-    values.durationMinutes < MIN_DURATION_MINUTES ||
-    values.durationMinutes > MAX_DURATION_MINUTES
-  ) {
-    errors.durationMinutes = "Enter a whole number between 5 and 480.";
-  }
-
-  if ((values.notes?.length ?? 0) > MAX_NOTES_LENGTH) {
-    errors.notes = "Notes cannot exceed 2000 characters.";
-  }
-
-  return errors;
 }

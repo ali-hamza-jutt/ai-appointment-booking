@@ -38,7 +38,7 @@ describe("tenant scope extension", () => {
 
   it("accepts the owner key for customer-side appointment reads", async () => {
     await expect(
-      prisma.appointment.findMany({
+      prisma.booking.findMany({
         where: { userId: "00000000-0000-4000-8000-000000000002" },
       }),
     ).resolves.toEqual([]);

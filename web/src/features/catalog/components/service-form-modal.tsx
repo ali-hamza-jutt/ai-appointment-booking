@@ -40,7 +40,10 @@ interface ServiceFormModalProps {
 }
 
 type FieldErrors = Partial<
-  Record<"name" | "durationMinutes" | "price" | "deposit" | "capacity" | "buffers", string>
+  Record<
+    "name" | "durationMinutes" | "price" | "deposit" | "capacity" | "buffers" | "overrides",
+    string
+  >
 >;
 
 function parseWholeNumber(value: string): number | null {
@@ -84,6 +87,12 @@ export function ServiceFormModal({
   const [bufferAfter, setBufferAfter] = useState(String(service?.bufferAfterMin ?? 0));
   const [onlineBookable, setOnlineBookable] = useState(service?.onlineBookable ?? true);
   const [isActive, setIsActive] = useState(service?.isActive ?? true);
+  const [noticeOverride, setNoticeOverride] = useState(
+    service?.policyOverrides.minimumNoticeMinutes?.toString() ?? "",
+  );
+  const [cancelOverride, setCancelOverride] = useState(
+    service?.policyOverrides.cancellationWindowHours?.toString() ?? "",
+  );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const mutation = service ? updateMutation : createMutation;
   const error = mutation.error;
@@ -124,6 +133,20 @@ export function ServiceFormModal({
       errors.buffers = "Buffers must be whole minutes from 0 to 240.";
     }
 
+    const minimumNoticeMinutes = noticeOverride.trim() ? parseWholeNumber(noticeOverride) : undefined;
+    const cancellationWindowHours = cancelOverride.trim()
+      ? parseWholeNumber(cancelOverride)
+      : undefined;
+
+    if (
+      minimumNoticeMinutes === null ||
+      cancellationWindowHours === null ||
+      (minimumNoticeMinutes !== undefined && minimumNoticeMinutes > 10_080) ||
+      (cancellationWindowHours !== undefined && cancellationWindowHours > 720)
+    ) {
+      errors.overrides = "Notice is 0–10080 minutes and the cancellation window 0–720 hours.";
+    }
+
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) return null;
@@ -141,6 +164,10 @@ export function ServiceFormModal({
       bufferBeforeMin: bufferBeforeMin ?? 0,
       bufferAfterMin: bufferAfterMin ?? 0,
       onlineBookable,
+      policyOverrides: {
+        ...(minimumNoticeMinutes != null ? { minimumNoticeMinutes } : {}),
+        ...(cancellationWindowHours != null ? { cancellationWindowHours } : {}),
+      },
     };
   }
 
@@ -302,6 +329,32 @@ export function ServiceFormModal({
           onChange={(event) => setDescription(event.target.value)}
           value={description}
         />
+
+        <fieldset className="space-y-3">
+          <legend className="text-xs font-semibold text-ink">
+            Policy overrides (optional)
+          </legend>
+          <p className="-mt-1 text-xs leading-5 text-muted">
+            Leave empty to use the business booking policies.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TextField
+              error={fieldErrors.overrides}
+              id="service-notice-override"
+              inputMode="numeric"
+              label="Minimum notice (minutes)"
+              onChange={(event) => setNoticeOverride(event.target.value)}
+              value={noticeOverride}
+            />
+            <TextField
+              id="service-cancel-override"
+              inputMode="numeric"
+              label="Cancellation window (hours)"
+              onChange={(event) => setCancelOverride(event.target.value)}
+              value={cancelOverride}
+            />
+          </div>
+        </fieldset>
 
         <CheckboxField
           checked={onlineBookable}

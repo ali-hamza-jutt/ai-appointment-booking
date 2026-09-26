@@ -10,6 +10,11 @@ import type { AppointmentBookingContext } from './appointmentBookingContext';
 export interface CreateChatSessionRequest {
   /** @maxLength 120 */
   title?: string;
+  /**
+     * Booking link of the business to book with. Defaults to the demo business.
+     * @maxLength 60
+     */
+  businessSlug?: string;
   bookingContext?: AppointmentBookingContext;
   /** Abandons the current active chat before creating this session. */
   replaceActive?: boolean;

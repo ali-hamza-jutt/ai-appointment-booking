@@ -24,6 +24,18 @@ export interface UpdateServiceCategoryRequest {
   sortOrder?: number;
 }
 
+/** Business policies this service overrides; omitted keys use the business setting. */
+export interface ServicePolicyOverrides {
+  /** @isInt @minimum 0 @maximum 10080 */
+  minimumNoticeMinutes?: number;
+  /** @isInt @minimum 1 @maximum 365 */
+  bookingWindowDays?: number;
+  /** @isInt @minimum 0 @maximum 720 */
+  cancellationWindowHours?: number;
+  /** @isInt @minimum 0 @maximum 10 */
+  rescheduleLimit?: number;
+}
+
 export interface ServiceReference {
   id: string;
   name: string;
@@ -48,6 +60,7 @@ export interface ServiceResponse {
   isActive: boolean;
   onlineBookable: boolean;
   sortOrder: number;
+  policyOverrides: ServicePolicyOverrides;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +93,7 @@ export interface CreateServiceRequest {
   onlineBookable?: boolean;
   /** @isInt */
   sortOrder?: number;
+  policyOverrides?: ServicePolicyOverrides;
 }
 
 export interface UpdateServiceRequest {
@@ -106,6 +120,8 @@ export interface UpdateServiceRequest {
   onlineBookable?: boolean;
   /** @isInt */
   sortOrder?: number;
+  /** Replaces all overrides; send {} to clear them. */
+  policyOverrides?: ServicePolicyOverrides;
 }
 
 export interface PublicServiceResponse {
@@ -146,6 +162,7 @@ export interface ServiceRecord {
   isActive: boolean;
   onlineBookable: boolean;
   sortOrder: number;
+  policyOverrides: unknown;
   createdAt: Date;
   updatedAt: Date;
   category: ServiceReference | null;
@@ -167,6 +184,7 @@ export interface ServiceWriteData {
   isActive: boolean;
   onlineBookable: boolean;
   sortOrder: number;
+  policyOverrides: ServicePolicyOverrides;
 }
 
 export interface CreateServiceData extends ServiceWriteData {

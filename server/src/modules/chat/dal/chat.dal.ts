@@ -17,6 +17,7 @@ import type {
 
 export const chatSessionSelect = {
   id: true,
+  business: { select: { id: true, name: true, slug: true } },
   title: true,
   status: true,
   bookingContext: true,
@@ -50,13 +51,22 @@ export class ChatDal {
           select: chatSessionSelect,
         });
 
-        if (activeSession) {
+        if (activeSession?.business.id === data.businessId) {
           return activeSession;
+        }
+
+        // Only one chat is active per user; switching business starts afresh.
+        if (activeSession) {
+          await transaction.chatSession.updateMany({
+            where: { id: activeSession.id, userId: data.userId, status: "ACTIVE" },
+            data: { status: "ABANDONED" },
+          });
         }
       }
 
       return transaction.chatSession.create({
         data: {
+          businessId: data.businessId,
           userId: data.userId,
           title: data.title,
           ...(data.bookingContext

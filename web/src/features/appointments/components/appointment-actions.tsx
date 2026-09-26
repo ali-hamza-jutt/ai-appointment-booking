@@ -1,20 +1,22 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/form-controls";
 import { CalendarIcon, TrashIcon } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
+import { SlotPicker } from "@/features/availability/components/slot-picker";
+import { usePublicDaySlots } from "@/features/availability/hooks/use-day-slots";
 import {
   getGetAppointmentQueryKey,
   getListAppointmentsQueryKey,
   useCancelAppointment,
   useRescheduleAppointment,
 } from "@/generated/api/appointments/appointments";
-import type { AppointmentResponse } from "@/generated/api/models";
+import type { AppointmentResponse, AvailableSlot } from "@/generated/api/models";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import {
   getCurrentLocalDate,
@@ -28,144 +30,101 @@ interface AppointmentActionsProps {
 export function AppointmentActions({ appointment }: AppointmentActionsProps) {
   const queryClient = useQueryClient();
   const cancelMutation = useCancelAppointment();
-  const rescheduleMutation = useRescheduleAppointment();
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [scheduledTime, setScheduledTime] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const isBusy = cancelMutation.isPending || rescheduleMutation.isPending;
-  const canChangeAppointment =
-    appointment.status === "PENDING" || appointment.status === "CONFIRMED";
+  const hasActions = appointment.canCancel || appointment.canReschedule;
 
   function updateAppointment(response: AppointmentResponse) {
-    queryClient.setQueryData(
-      getGetAppointmentQueryKey(appointment.id),
-      response,
-    );
-    void queryClient.invalidateQueries({
-      queryKey: getListAppointmentsQueryKey(),
-    });
-  }
-
-  function openRescheduleDialog() {
-    const currentValues = getLocalDateTimeInputValues(
-      appointment.scheduledAt,
-      appointment.timeZone,
-    );
-
-    setScheduledDate(currentValues?.date ?? "");
-    setScheduledTime(currentValues?.time ?? "");
-    setFormError(null);
-    rescheduleMutation.reset();
-    setIsRescheduleOpen(true);
+    queryClient.setQueryData(getGetAppointmentQueryKey(appointment.id), response);
+    void queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
   }
 
   function cancelAppointment() {
-    if (isBusy) return;
+    if (cancelMutation.isPending) return;
 
     cancelMutation.mutate(
-      { appointmentId: appointment.id },
       {
-        onError: (error) => {
-          setFormError(
-            getApiErrorMessage(
-              error,
-              "The appointment could not be cancelled. Please try again.",
-            ),
-          );
-        },
+        appointmentId: appointment.id,
+        data: cancelReason.trim() ? { reason: cancelReason.trim() } : {},
+      },
+      {
         onSuccess: (response) => {
           updateAppointment(response);
-          setFeedback("Appointment cancelled successfully.");
-          setFormError(null);
+          setFeedback("Appointment cancelled.");
           setIsCancelOpen(false);
         },
       },
     );
   }
 
-  function submitReschedule(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isBusy) return;
-
-    if (!scheduledDate || !scheduledTime) {
-      setFormError("Choose both a new date and time.");
-      return;
-    }
-
-    rescheduleMutation.mutate(
-      {
-        appointmentId: appointment.id,
-        data: { scheduledDate, scheduledTime },
-      },
-      {
-        onError: (error) => {
-          setFormError(
-            getApiErrorMessage(
-              error,
-              "The appointment could not be rescheduled. Please try again.",
-            ),
-          );
-        },
-        onSuccess: (response) => {
-          updateAppointment(response);
-          setFeedback("Appointment rescheduled successfully.");
-          setFormError(null);
-          setIsRescheduleOpen(false);
-        },
-      },
-    );
+  if (!hasActions && !feedback) {
+    return appointment.status === "CONFIRMED" || appointment.status === "PENDING" ? (
+      <div className="border-b border-border px-5 py-4 sm:px-6">
+        <Alert tone="info">
+          This appointment is inside {appointment.business.name}&rsquo;s change window. Contact
+          them to change or cancel it.
+        </Alert>
+      </div>
+    ) : null;
   }
-
-  if (!canChangeAppointment && !feedback) return null;
 
   return (
     <div className="border-b border-border px-5 py-4 sm:px-6">
       {feedback ? <Alert tone="success">{feedback}</Alert> : null}
 
-      {canChangeAppointment ? (
+      {hasActions ? (
         <div className={feedback ? "mt-4 flex flex-wrap gap-2" : "flex flex-wrap gap-2"}>
-          <Button
-            disabled={isBusy}
-            leadingIcon={<CalendarIcon className="size-4" />}
-            onClick={openRescheduleDialog}
-            variant="secondary"
-          >
-            Reschedule
-          </Button>
-          <Button
-            disabled={isBusy}
-            leadingIcon={<TrashIcon className="size-4" />}
-            onClick={() => {
-              setFormError(null);
-              cancelMutation.reset();
-              setIsCancelOpen(true);
-            }}
-            variant="danger"
-          >
-            Cancel appointment
-          </Button>
+          {appointment.canReschedule ? (
+            <Button
+              leadingIcon={<CalendarIcon className="size-4" />}
+              onClick={() => setIsRescheduleOpen(true)}
+              variant="secondary"
+            >
+              Reschedule
+            </Button>
+          ) : null}
+          {appointment.canCancel ? (
+            <Button
+              leadingIcon={<TrashIcon className="size-4" />}
+              onClick={() => {
+                cancelMutation.reset();
+                setIsCancelOpen(true);
+              }}
+              variant="danger"
+            >
+              {appointment.status === "HELD" ? "Release hold" : "Cancel appointment"}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
       <Modal
-        description="The appointment will remain in your history, but its time will become available."
+        description="The appointment stays in your history and its time becomes available to others."
         isOpen={isCancelOpen}
-        onClose={() => !isBusy && setIsCancelOpen(false)}
+        onClose={() => !cancelMutation.isPending && setIsCancelOpen(false)}
         title="Cancel appointment?"
       >
         <div className="space-y-4 p-5 sm:p-6">
-          {formError ? <Alert tone="danger">{formError}</Alert> : null}
-          <p className="text-sm leading-6 text-ink-soft">
-            Cancel <span className="font-semibold text-ink">{appointment.serviceName}</span>?
-            This action cannot be undone.
-          </p>
+          {cancelMutation.error ? (
+            <Alert tone="danger">
+              {getApiErrorMessage(
+                cancelMutation.error,
+                "The appointment could not be cancelled. Please try again.",
+              )}
+            </Alert>
+          ) : null}
+          <TextField
+            id="cancel-reason"
+            label="Reason (optional)"
+            maxLength={500}
+            onChange={(event) => setCancelReason(event.target.value)}
+            value={cancelReason}
+          />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
-              disabled={isBusy}
+              disabled={cancelMutation.isPending}
               onClick={() => setIsCancelOpen(false)}
               variant="secondary"
             >
@@ -176,68 +135,103 @@ export function AppointmentActions({ appointment }: AppointmentActionsProps) {
               onClick={cancelAppointment}
               variant="danger"
             >
-              {cancelMutation.isPending ? "Cancelling…" : "Cancel appointment"}
+              Cancel appointment
             </Button>
           </div>
         </div>
       </Modal>
 
-      <Modal
-        description={`Change only the date and time. The ${appointment.durationMinutes}-minute duration remains unchanged.`}
-        isOpen={isRescheduleOpen}
-        onClose={() => !isBusy && setIsRescheduleOpen(false)}
-        title="Reschedule appointment"
-      >
-        <form className="space-y-4 p-5 sm:p-6" onSubmit={submitReschedule}>
-          {formError ? <Alert tone="danger">{formError}</Alert> : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextField
-              disabled={isBusy}
-              id="reschedule-appointment-date"
-              label="Date"
-              min={getCurrentLocalDate(appointment.timeZone)}
-              onChange={(event) => {
-                setScheduledDate(event.target.value);
-                setFormError(null);
-              }}
-              required
-              type="date"
-              value={scheduledDate}
-            />
-            <TextField
-              disabled={isBusy}
-              id="reschedule-appointment-time"
-              label="Time"
-              onChange={(event) => {
-                setScheduledTime(event.target.value);
-                setFormError(null);
-              }}
-              required
-              type="time"
-              value={scheduledTime}
-            />
-          </div>
-          <p className="rounded-[10px] bg-surface-subtle px-3 py-2 text-xs leading-5 text-muted">
-            Times are interpreted in{" "}
-            <span className="font-semibold text-ink-soft">
-              {appointment.timeZone}
-            </span>
-            .
-          </p>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              disabled={isBusy}
-              onClick={() => setIsRescheduleOpen(false)}
-              variant="secondary"
-            >
-              Keep current time
-            </Button>
-            <Button isLoading={rescheduleMutation.isPending} type="submit">
-              {rescheduleMutation.isPending ? "Rescheduling…" : "Save new time"}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {isRescheduleOpen ? (
+        <RescheduleModal
+          appointment={appointment}
+          onClose={() => setIsRescheduleOpen(false)}
+          onRescheduled={(response) => {
+            updateAppointment(response);
+            setFeedback("Appointment rescheduled.");
+            setIsRescheduleOpen(false);
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function RescheduleModal({
+  appointment,
+  onClose,
+  onRescheduled,
+}: {
+  appointment: AppointmentResponse;
+  onClose: () => void;
+  onRescheduled: (appointment: AppointmentResponse) => void;
+}) {
+  const rescheduleMutation = useRescheduleAppointment();
+  const initial = getLocalDateTimeInputValues(appointment.scheduledAt, appointment.timeZone);
+  const [date, setDate] = useState(initial?.date ?? "");
+  const [slot, setSlot] = useState<AvailableSlot | null>(null);
+  const daySlots = usePublicDaySlots(appointment.business.slug, {
+    date,
+    serviceId: appointment.serviceId ?? "",
+    timeZone: appointment.timeZone,
+    ...(appointment.staff ? { staffId: appointment.staff.id } : {}),
+  });
+
+  function submit() {
+    if (!slot) return;
+
+    rescheduleMutation.mutate(
+      {
+        appointmentId: appointment.id,
+        data: { scheduledDate: date, scheduledTime: slot.time },
+      },
+      { onSuccess: onRescheduled },
+    );
+  }
+
+  return (
+    <Modal
+      description={`Choose a new open time with ${appointment.staff?.name ?? appointment.business.name}.`}
+      isOpen
+      onClose={() => !rescheduleMutation.isPending && onClose()}
+      title="Reschedule appointment"
+    >
+      <div className="space-y-4 p-5 sm:p-6">
+        {rescheduleMutation.error ? (
+          <Alert tone="danger">
+            {getApiErrorMessage(
+              rescheduleMutation.error,
+              "The appointment could not be rescheduled. Please try again.",
+            )}
+          </Alert>
+        ) : null}
+        <SlotPicker
+          date={date}
+          error={daySlots.error}
+          idPrefix="reschedule"
+          isLoading={daySlots.isLoading}
+          minDate={getCurrentLocalDate(appointment.timeZone)}
+          onDateChange={(value) => {
+            setDate(value);
+            setSlot(null);
+          }}
+          onSelect={setSlot}
+          selectedStartsAt={slot ? String(slot.startsAt) : null}
+          slots={daySlots.slots}
+          timeZone={appointment.timeZone}
+        />
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            disabled={rescheduleMutation.isPending}
+            onClick={onClose}
+            variant="secondary"
+          >
+            Keep current time
+          </Button>
+          <Button disabled={!slot} isLoading={rescheduleMutation.isPending} onClick={submit}>
+            Save new time
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

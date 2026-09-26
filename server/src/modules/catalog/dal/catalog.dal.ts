@@ -1,4 +1,5 @@
 import { CATALOG_CONSTANTS } from "../../../constants/app.constants.js";
+import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
 import { escapeLikePattern } from "../../../utils/text.js";
 import type {
@@ -30,6 +31,7 @@ export const serviceSelect = {
   isActive: true,
   onlineBookable: true,
   sortOrder: true,
+  policyOverrides: true,
   createdAt: true,
   updatedAt: true,
   category: { select: { id: true, name: true } },
@@ -106,8 +108,10 @@ export class CatalogDal {
   }
 
   public createService(data: CreateServiceData): Promise<ServiceRecord> {
+    const { policyOverrides, ...fields } = data;
+
     return prisma.service.create({
-      data,
+      data: { ...fields, policyOverrides: policyOverrides as Prisma.InputJsonObject },
       select: serviceSelect,
     });
   }
@@ -117,9 +121,11 @@ export class CatalogDal {
     serviceId: string,
     data: ServiceWriteData,
   ): Promise<ServiceRecord> {
+    const { policyOverrides, ...fields } = data;
+
     return prisma.service.update({
       where: { id: serviceId, businessId },
-      data,
+      data: { ...fields, policyOverrides: policyOverrides as Prisma.InputJsonObject },
       select: serviceSelect,
     });
   }

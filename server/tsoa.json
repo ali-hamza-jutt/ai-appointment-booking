@@ -14,7 +14,7 @@
     "tags": [
       {
         "name": "Appointments",
-        "description": "Authenticated appointment creation and retrieval"
+        "description": "The signed-in customer's bookings at every business"
       },
       {
         "name": "Chat",
@@ -55,6 +55,10 @@
       {
         "name": "Availability",
         "description": "Working hours, time off, closures and bookable slots"
+      },
+      {
+        "name": "Bookings",
+        "description": "Bookings for a business: manual booking, approvals, check-in and audit"
       }
     ],
     "securityDefinitions": {

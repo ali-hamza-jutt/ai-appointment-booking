@@ -1,18 +1,12 @@
-import type { BadgeTone } from "@/components/ui/badge";
-import type {
-  AppointmentResponse,
-  AppointmentStatus,
-} from "@/generated/api/models";
 import type { AppointmentViewModel } from "@/features/appointments/types/appointment-ui";
+import { BOOKING_STATUS_PRESENTATION } from "@/features/bookings/constants/booking-status.constants";
+import type { AppointmentResponse } from "@/generated/api/models";
+import { formatMoney } from "@/lib/utils/money";
 
-const statusPresentation: Record<
-  AppointmentStatus,
-  { label: string; tone: BadgeTone }
-> = {
-  CANCELLED: { label: "Cancelled", tone: "danger" },
-  COMPLETED: { label: "Completed", tone: "success" },
-  CONFIRMED: { label: "Confirmed", tone: "brand" },
-  PENDING: { label: "Pending", tone: "warning" },
+const SOURCE_LABELS: Record<AppointmentResponse["source"], string> = {
+  CHAT: "BookWise AI assistant",
+  FORM: "Booking form",
+  STAFF: "Booked by the business",
 };
 
 export function toAppointmentViewModel(
@@ -20,10 +14,11 @@ export function toAppointmentViewModel(
 ): AppointmentViewModel {
   const scheduledAt = new Date(appointment.scheduledAt);
   const createdAt = new Date(appointment.createdAt);
-  const status = statusPresentation[appointment.status];
+  const status = BOOKING_STATUS_PRESENTATION[appointment.status];
   const timeZone = appointment.timeZone;
 
   return {
+    businessName: appointment.business.name,
     createdAtLabel: formatDateTime(createdAt, timeZone, {
       dateStyle: "medium",
       timeStyle: "short",
@@ -36,9 +31,13 @@ export function toAppointmentViewModel(
     duration: `${appointment.durationMinutes} minutes`,
     id: appointment.id,
     notes: appointment.notes || "No notes added.",
+    priceLabel:
+      appointment.priceMinor !== null && appointment.currency
+        ? formatMoney(appointment.priceMinor, appointment.currency)
+        : "Not set",
     reference: appointment.id.slice(0, 8).toUpperCase(),
-    sourceLabel:
-      appointment.source === "CHAT" ? "BookWise AI assistant" : "Appointment form",
+    sourceLabel: SOURCE_LABELS[appointment.source],
+    staffName: appointment.staff?.name ?? "Any available",
     status: appointment.status,
     statusLabel: status.label,
     statusTone: status.tone,

@@ -17,6 +17,9 @@ export type TransactionClient = Parameters<
   Parameters<DatabaseClient["$transaction"]>[0]
 >[0];
 
+/** Either the shared client or an interactive transaction. */
+export type DbClient = DatabaseClient | TransactionClient;
+
 export async function connectDatabase(): Promise<void> {
   await prisma.$connect();
   logger.info("PostgreSQL connection established");

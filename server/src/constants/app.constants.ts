@@ -96,6 +96,20 @@ export const AVAILABILITY_CONSTANTS = {
   MINUTES_PER_WEEK: 10_080,
 } as const;
 
+export const BOOKING_CONSTANTS = {
+  ACTIVE_STATUSES: ["HELD", "PENDING_PAYMENT", "PENDING", "CONFIRMED", "CHECKED_IN"] as const,
+  CUSTOMER_CHANGEABLE_STATUSES: ["PENDING", "CONFIRMED"] as const,
+  CLASS_SESSION_KEY_PREFIX: "class",
+  MAX_CANCEL_REASON_LENGTH: 500,
+  MAX_NOTES_LENGTH: 2_000,
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 100,
+  MAX_LIST_RANGE_DAYS: 92,
+  ALTERNATIVE_SLOT_COUNT: 3,
+  EXCLUSION_VIOLATION_CODE: "23P01",
+  AGGREGATE_TYPE: "booking",
+} as const;
+
 export const TENANT_SCOPE_FIELDS = {
   Location: ["businessId"],
   ServiceCategory: ["businessId"],
@@ -108,7 +122,8 @@ export const TENANT_SCOPE_FIELDS = {
   Customer: ["businessId"],
   BusinessInvitation: ["businessId", "email"],
   Membership: ["businessId", "userId"],
-  Appointment: ["businessId", "userId"],
+  Booking: ["businessId", "userId"],
+  BookingEvent: ["businessId", "bookingId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -134,6 +149,7 @@ export const CHAT_CONSTANTS = {
   MIN_MESSAGE_LENGTH: 1,
   MAX_MESSAGE_LENGTH: 4_000,
   RESPONSE_LOCALE: "en-US",
+  SERVICE_SUGGESTION_COUNT: 6,
   ASSISTANT_MESSAGES: {
     UNKNOWN_INTENT:
       "I’m focused on appointment booking. Tell me the service, date, and time you would prefer, and I’ll help you schedule it.",
@@ -147,8 +163,12 @@ export const CHAT_CONSTANTS = {
       "That time has already passed in your timezone. Please choose a future date and time.",
     INVALID_TIME:
       "I couldn’t interpret that date and time safely. Please provide a specific future date and time.",
-    CONFIRMATION_SUFFIX: "Please confirm to create this appointment.",
+    CONFIRMATION_SUFFIX: "Please confirm to book it.",
     BOOKING_SUCCESS_PREFIX: "Your appointment has been booked",
+    BOOKING_PENDING_PREFIX: "Your request has been sent for approval",
+    NO_ONLINE_SERVICES: "This business has no services open for online booking yet.",
+    NO_OPEN_TIMES:
+      "There are no open times for that service in the next few weeks. Please try another service or contact the business.",
   },
 } as const;
 
@@ -250,6 +270,11 @@ export const ERROR_CODES = {
     "APPOINTMENT_CANCELLATION_NOT_ALLOWED",
   APPOINTMENT_RESCHEDULE_NOT_ALLOWED: "APPOINTMENT_RESCHEDULE_NOT_ALLOWED",
   APPOINTMENT_SLOT_UNAVAILABLE: "APPOINTMENT_SLOT_UNAVAILABLE",
+  BOOKING_TRANSITION_NOT_ALLOWED: "BOOKING_TRANSITION_NOT_ALLOWED",
+  BOOKING_HOLD_EXPIRED: "BOOKING_HOLD_EXPIRED",
+  BOOKING_POLICY_VIOLATION: "BOOKING_POLICY_VIOLATION",
+  CLASS_FULL: "CLASS_FULL",
+  CUSTOMER_NOT_FOUND: "CUSTOMER_NOT_FOUND",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
   CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
@@ -301,11 +326,15 @@ export const ERROR_MESSAGES = {
   SERVICE_CATEGORY_ALREADY_EXISTS: "A category with this name already exists",
   APPOINTMENT_NOT_FOUND: "Appointment was not found",
   APPOINTMENT_CANCELLATION_NOT_ALLOWED:
-    "Completed appointments cannot be cancelled",
+    "This appointment can no longer be cancelled",
   APPOINTMENT_RESCHEDULE_NOT_ALLOWED:
-    "Cancelled or completed appointments cannot be rescheduled",
-  APPOINTMENT_SLOT_UNAVAILABLE:
-    "The selected time overlaps with another appointment",
+    "Only upcoming confirmed or pending appointments can be rescheduled",
+  APPOINTMENT_SLOT_UNAVAILABLE: "The selected time is no longer available",
+  BOOKING_TRANSITION_NOT_ALLOWED: "This booking cannot change to that status",
+  BOOKING_HOLD_EXPIRED: "Your hold on this time has expired and the slot was taken",
+  BOOKING_POLICY_VIOLATION: "This change is not allowed by the business's booking policy",
+  CLASS_FULL: "This class is full",
+  CUSTOMER_NOT_FOUND: "Customer was not found",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
@@ -359,6 +388,10 @@ export const VALIDATION_MESSAGES = {
   LOCATION_ADDRESS: "Address cannot exceed 300 characters",
   LOCATION_NAME: "Location name must contain between 2 and 120 characters",
   RESOURCE_ID: "Identifier must be a valid UUID",
+  BOOKING_CUSTOMER: "Choose an existing customer or enter a new customer's name",
+  BOOKING_LIST_RANGE: "Choose a valid date range of at most 92 days",
+  BOOKING_START: "Start time must be a valid future date and time",
+  CANCEL_REASON: "Reason cannot exceed 500 characters",
   AVAILABILITY_RANGE:
     "Choose a valid date range of at most 31 days, with the end on or after the start",
   CLOSURE_DATE: "Date must be a valid calendar date in YYYY-MM-DD format",
