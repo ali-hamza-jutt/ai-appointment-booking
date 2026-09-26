@@ -51,6 +51,10 @@
       {
         "name": "Staff",
         "description": "Staff members, the services they offer, and bookable resources"
+      },
+      {
+        "name": "Availability",
+        "description": "Working hours, time off, closures and bookable slots"
       }
     ],
     "securityDefinitions": {

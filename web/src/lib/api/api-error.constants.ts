@@ -29,6 +29,9 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   RESOURCE_NOT_FOUND: "This resource could not be found.",
   STAFF_ALREADY_LINKED: "This team member already has a staff profile.",
   STAFF_NOT_FOUND: "This staff member could not be found.",
+  CLOSURE_ALREADY_EXISTS: "The business is already closed on this date.",
+  CLOSURE_NOT_FOUND: "This closure could not be found.",
+  TIME_OFF_NOT_FOUND: "This time off could not be found.",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
     "Complete the service, date, and time before confirming the booking.",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -75,6 +78,9 @@ export const API_FIELD_ERROR_MESSAGES: Readonly<
   },
   STAFF_ALREADY_LINKED: {
     userId: "This team member already has a staff profile.",
+  },
+  CLOSURE_ALREADY_EXISTS: {
+    date: "The business is already closed on this date.",
   },
   WEAK_PASSWORD: {
     password:

@@ -22,6 +22,8 @@ import type {
 
 import type {
   ApiErrorResponse,
+  AvailabilityResponse,
+  GetPublicAvailabilityParams,
   ListPublicServicesParams,
   ListPublicStaffParams,
   PublicBusinessResponse,
@@ -363,6 +365,118 @@ export function useListPublicServices<TData = Awaited<ReturnType<typeof listPubl
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListPublicServicesQueryOptions(slug,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetPublicAvailabilityUrl = (slug: string,
+    params: GetPublicAvailabilityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/public/${slug}/availability?${stringifiedParams}` : `/public/${slug}/availability`
+}
+
+/**
+ * Bookable start times for a service, grouped by local date.
+ */
+export const getPublicAvailability = async (slug: string,
+    params: GetPublicAvailabilityParams, options?: Parameters<typeof apiFetch>[1]): Promise<AvailabilityResponse> => {
+
+  return apiFetch<AvailabilityResponse>(getGetPublicAvailabilityUrl(slug,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicAvailabilityQueryKey = (slug: string,
+    params?: GetPublicAvailabilityParams,) => {
+    return [
+    `/public/${slug}/availability`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPublicAvailabilityQueryOptions = <TData = Awaited<ReturnType<typeof getPublicAvailability>>, TError = ErrorType<ApiErrorResponse>>(slug: string,
+    params: GetPublicAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicAvailabilityQueryKey(slug,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicAvailability>>> = ({ signal }) => getPublicAvailability(slug,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPublicAvailabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicAvailability>>>
+export type GetPublicAvailabilityQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetPublicAvailability<TData = Awaited<ReturnType<typeof getPublicAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params: GetPublicAvailabilityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPublicAvailability>>,
+          TError,
+          Awaited<ReturnType<typeof getPublicAvailability>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPublicAvailability<TData = Awaited<ReturnType<typeof getPublicAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params: GetPublicAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPublicAvailability>>,
+          TError,
+          Awaited<ReturnType<typeof getPublicAvailability>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPublicAvailability<TData = Awaited<ReturnType<typeof getPublicAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params: GetPublicAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetPublicAvailability<TData = Awaited<ReturnType<typeof getPublicAvailability>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string,
+    params: GetPublicAvailabilityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPublicAvailability>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPublicAvailabilityQueryOptions(slug,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
