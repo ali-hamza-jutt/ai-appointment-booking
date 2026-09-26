@@ -83,4 +83,51 @@ describe("agent runner", () => {
     provider.script(failure, failure);
     await expect(run(provider)).rejects.toMatchObject({ statusCode: 503 });
   });
+
+  it("streams reply tokens and reports tool calls and parts to the listener", async () => {
+    const provider = new ScriptedProvider();
+    const events: string[] = [];
+
+    provider.script({ tools: [{ name: "echo", args: { word: "one" } }] }, { text: "All done now" });
+
+    const result = await new AgentRunner(provider).run({
+      systemPrompt: "sys",
+      history: [{ role: "user", content: "hi" }],
+      tools: [echo],
+      context: { calls: [] as string[] },
+      listener: {
+        token: (text) => events.push(`token:${text}`),
+        toolCall: (name, args) => events.push(`tool:${name}:${JSON.stringify(args)}`),
+        parts: (parts) => events.push(`parts:${parts.join(",")}`),
+      },
+    });
+
+    expect(result.text).toBe("All done now");
+    expect(provider.streamedCalls).toBe(2);
+    expect(events).toEqual([
+      'tool:echo:{"word":"one"}',
+      "parts:part:one",
+      "token:All ",
+      "token:done ",
+      "token:now",
+    ]);
+  });
+
+  it("doesn't report a tool call whose arguments are invalid", async () => {
+    const provider = new ScriptedProvider();
+    const calls: string[] = [];
+
+    provider.script({ tools: [{ name: "echo", args: { word: "x" } }] }, { text: "ok" });
+
+    await new AgentRunner(provider).run({
+      systemPrompt: "sys",
+      history: [{ role: "user", content: "hi" }],
+      tools: [echo],
+      context: { calls: [] as string[] },
+      listener: { toolCall: (name) => calls.push(name) },
+    });
+
+    expect(calls).toEqual([]);
+    expect(provider.streamedCalls).toBe(0);
+  });
 });

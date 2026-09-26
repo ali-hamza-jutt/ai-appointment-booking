@@ -158,6 +158,12 @@ The chat assistant is a tool-calling agent (`modules/chat/agent`) running on Mis
 - **Fallbacks.** Bare greetings and "what can you do" are answered locally with service cards. If Mistral is unavailable, the reply offers service cards to book by tapping, and the structured form still works.
 - **Evals.** `evals/` holds 73 scripted conversations (direct requests, preferred providers, open-ended times, clarification, multi-turn changes, unavailable times, managing bookings, refusals, handoffs and knowledge questions) on a seeded business with a frozen clock. They report booking success, wrong-slot rate, turns to book and outcome accuracy per category. Recordings use placeholders (`{{service:Haircut}}`, `{{slot:<start>}}`) so real model replies captured by `npm run eval:record` replay against a fresh database; the checked-in seed recordings are hand-written.
 
+## Realtime streaming
+
+- **Streamed replies.** `POST /api/chat/sessions/{id}/messages` with `Accept: text/event-stream` runs the same turn as the JSON endpoint but streams `status` ("Checking Thursday 5 Nov…"; any text streamed before it is superseded), `token`, `part` (a card as soon as a tool produces it) and finally `done` with the persisted turn, or `error`. The reply is saved once, and the `clientMessageId` keeps retries idempotent, so a client whose stream drops can re-send the same message to the JSON endpoint and get the saved reply. Mistral replies stream through the provider's `stream` method; the runner doesn't retry a call that already sent text.
+- **Plain Express routes.** tsoa can't stream, so `modules/chat/controllers/chat-stream.routes.ts` is registered before the generated routes; it authenticates with the same bearer check and validates the body with Zod. Requests without the event-stream `Accept` header fall through to tsoa.
+- **Change notices.** Saved messages, handoffs and completed bookings publish a small event to Redis pub/sub (`infrastructure/realtime`; an in-process bus without Redis). `GET /api/chat/sessions/{id}/events` streams a customer's chat, and `GET /api/businesses/{businessId}/chat-events` (scope `business:operate`) streams every chat at the business for the dashboard. Clients refetch on a notice and fall back to polling while disconnected. Streams send a heartbeat every 15 seconds and are closed on shutdown.
+
 ## Knowledge base
 
 Owners and managers add FAQs, policies and preparation notes (pasted or loaded from a `.txt`/`.md` file) at `/api/businesses/{businessId}/knowledge-sources`. The agent answers questions about the business only from these.
@@ -241,7 +247,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 ## Known prototype limitations
 
 - Rate limits are shared through Redis when `REDIS_URL` is set and fall back to per-process memory otherwise; trusted proxies still need deliberate configuration behind a load balancer.
-- Chat updates use polling rather than WebSockets.
+- Event streams are one per open chat tab; very large numbers of concurrent viewers would need a dedicated realtime service.
 - Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
 - Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.

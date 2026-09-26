@@ -1,6 +1,7 @@
 import type {
   AiAgentMessage,
   AiProvider,
+  AiTokenListener,
   AiToolCompletionRequest,
   AiToolCompletionResponse,
 } from "../../src/integrations/ai/dto/ai.dto.js";
@@ -29,6 +30,8 @@ export class ScriptedProvider implements AiProvider {
   public readonly name = "mistral" as const;
   public readonly model = "scripted";
   public readonly requests: AiToolCompletionRequest[] = [];
+  /** How many calls came through stream() rather than completeWithTools(). */
+  public streamedCalls = 0;
   private steps: ScriptStep[] = [];
 
   public script(...steps: ScriptStep[]): void {
@@ -62,5 +65,16 @@ export class ScriptedProvider implements AiProvider {
       provider: "mistral",
       model: this.model,
     });
+  }
+
+  /** Plays the same steps, handing text replies over word by word. */
+  public async stream(request: AiToolCompletionRequest, onToken: AiTokenListener): Promise<AiToolCompletionResponse> {
+    this.streamedCalls += 1;
+
+    const response = await this.completeWithTools(request);
+
+    for (const word of response.content.match(/\S+\s*/g) ?? []) onToken(word);
+
+    return response;
   }
 }

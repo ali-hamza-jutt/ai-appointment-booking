@@ -1,6 +1,6 @@
 # BookWise AI
 
-BookWise AI is a full-stack appointment-booking prototype built for the Full Stack Developer Technical Skills Assessment. It combines authenticated conversational booking, deterministic structured-form fallback, appointment management, conversation history, and near-real-time message polling.
+BookWise AI is a full-stack appointment-booking prototype built for the Full Stack Developer Technical Skills Assessment. It combines authenticated conversational booking, deterministic structured-form fallback, appointment management, conversation history, and streamed assistant replies with live updates.
 
 ## Submission links
 
@@ -23,7 +23,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - Duration-aware conflict detection that rejects overlapping appointments while allowing directly adjacent bookings.
 - Appointment cancellation and conflict-safe rescheduling in the original booking timezone.
 - Appointment and conversation lists with cursor pagination.
-- Three-second cursor-based polling for active conversation messages.
+- Assistant replies stream as they are written (status lines such as "Checking Thursday…", cards, then text) over server-sent events, with live updates for other tabs and the staff dashboard through Redis pub/sub; three-second cursor polling remains the fallback.
 - One active booking conversation per user, with automatic resume and explicit abandonment when a new booking starts.
 - Responsive UI with loading, error, retry, empty, disabled, and skeleton states.
 - Swagger/OpenAPI documentation and Orval-generated frontend API hooks.
@@ -51,7 +51,7 @@ flowchart LR
     Web --> State["Auth context + TanStack Query"]
     State --> Client["Orval-generated API client"]
     Client -->|"REST + bearer JWT"| Middleware["Express middleware"]
-    Client -.->|"3-second cursor polling"| Middleware
+    Client -.->|"SSE stream (polling fallback)"| Middleware
     Middleware --> Controllers["tsoa controllers"]
     Controllers --> Services["Domain services"]
     Services --> Orchestrator["Chat orchestration"]
@@ -95,7 +95,7 @@ Controllers do not query Prisma directly, DALs do not contain HTTP logic, and th
 8. Taps post typed actions handled by booking core without the model. Only times offered through signed slot tokens can be held.
 9. If the assistant is unavailable, the reply offers service cards to book by tapping, and the structured form always works. Structured values are validated by the server and bypass Mistral.
 10. The draft (service, provider and held slot as real row references) and the assistant reply are persisted on the chat session.
-11. Active clients poll from the latest message cursor every three seconds and merge only newly received messages.
+11. Replies stream to the sender over server-sent events and are saved once. Other open clients get a change notice on their event stream and fetch from the latest message cursor; while that stream is down they poll every three seconds.
 12. The user reviews the final details and confirms the booking.
 13. During confirmation, the backend locks that user's appointment schedule and rejects any overlapping time range.
 14. If the slot is available, one atomic database write closes the chat, creates the appointment, and stores the success message.
@@ -238,8 +238,10 @@ All domain routes except signup, sign-in, and health require `Authorization: Bea
 | `POST` | `/api/chat/sessions` | Return the active conversation or abandon and replace it when `replaceActive` is true |
 | `GET` | `/api/chat/sessions` | List owned conversations |
 | `GET` | `/api/chat/sessions/{sessionId}` | Retrieve one owned conversation |
-| `POST` | `/api/chat/sessions/{sessionId}/messages` | Process conversational or structured booking details |
+| `POST` | `/api/chat/sessions/{sessionId}/messages` | Process conversational or structured booking details; with `Accept: text/event-stream` the reply streams |
 | `GET` | `/api/chat/sessions/{sessionId}/messages` | Load history or poll after a message cursor |
+| `GET` | `/api/chat/sessions/{sessionId}/events` | Event stream of changes to one conversation |
+| `GET` | `/api/businesses/{businessId}/chat-events` | Event stream of chat changes for the staff dashboard |
 | `POST` | `/api/chat/sessions/{sessionId}/confirm` | Atomically create the chat appointment |
 | `GET` | `/api/health` | Report process availability |
 
@@ -326,7 +328,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 
 | Decision | Reason | Tradeoff |
 | --- | --- | --- |
-| REST with three-second polling | Simple near-real-time behavior that works with the existing API and free hosting | More requests and slightly higher latency than WebSockets |
+| Server-sent events with a polling fallback | One-way streaming is all chat needs, works over plain HTTP and proxies, and polling still covers networks that break streams | Long-lived connections per open chat; not bidirectional like WebSockets |
 | tsoa as the API contract | Generates validation, routes, and OpenAPI from typed controllers | Generated artifacts must be refreshed after contract changes |
 | Orval frontend generation | Keeps frontend hooks and response models synchronized with OpenAPI | Generated files add repository volume and are not hand-edited |
 | Prisma with DAL classes | Provides typed queries while keeping persistence outside business services | Adds an explicit mapping layer |
@@ -357,7 +359,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 
 - There is no provider availability, calendar synchronization, or reminder workflow.
 - The data model does not include optional multi-tenancy through a `business_id`.
-- Polling is near-real-time rather than a WebSocket connection.
+- Event streams carry change notices, not message bodies; clients refetch on a notice, so a missed notice only delays an update until the next reconnect or poll.
 - JWT access tokens are not refreshed, revoked, or stored in HttpOnly cookies.
 - Rate limiting uses process memory and is not shared across multiple server instances.
 - The health endpoint checks process availability but not database readiness.
@@ -404,7 +406,7 @@ Recommended manual verification:
 6. Create a conversational booking and correct its service or time before confirmation.
 7. Confirm that the stored appointment displays in the timezone captured when it was created.
 8. Retry a failed message and confirm it is not duplicated.
-9. Open the same active conversation in another tab and verify polling receives new messages.
+9. Open the same active conversation in another tab and verify new messages appear without a refresh.
 10. Confirm the appointment, then review appointment and conversation history.
 11. Create a 30-minute appointment, verify an overlapping booking returns a conflict, and verify a booking starting exactly at its end time succeeds.
 12. Reschedule an appointment, verify conflicting times are rejected, and confirm its previous interval becomes available.

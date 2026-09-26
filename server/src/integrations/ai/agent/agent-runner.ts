@@ -17,6 +17,7 @@ import type {
 } from "../dto/ai.dto.js";
 import { AiProviderError } from "../errors/ai-provider.error.js";
 import type {
+  AgentRunListener,
   AgentRunRequest,
   AgentRunResult,
   AgentTool,
@@ -68,7 +69,7 @@ export class AgentRunner {
         maxOutputTokens: AGENT_CONSTANTS.MAX_OUTPUT_TOKENS,
         temperature: AI_CONSTANTS.TEMPERATURE,
         ...(request.businessId ? { businessId: request.businessId } : {}),
-      });
+      }, request.listener?.token);
 
       usage.promptTokens += response.usage?.promptTokens ?? 0;
       usage.completionTokens += response.usage?.completionTokens ?? 0;
@@ -81,10 +82,13 @@ export class AgentRunner {
       messages.push({ role: "assistant", content: response.content, toolCalls: response.toolCalls });
 
       for (const call of response.toolCalls) {
-        const outcome = await this.callTool(tools.get(call.name), call, request.context);
+        const outcome = await this.callTool(tools.get(call.name), call, request.context, request.listener);
 
         toolCalls.push(outcome.log);
-        if (outcome.parts) parts.push(...outcome.parts);
+        if (outcome.parts) {
+          parts.push(...outcome.parts);
+          request.listener?.parts?.(outcome.parts);
+        }
         messages.push({
           role: "tool",
           toolCallId: call.id,
@@ -102,6 +106,7 @@ export class AgentRunner {
     tool: AnyTool<Context, Part> | undefined,
     call: AiToolCall,
     context: Context,
+    listener: AgentRunListener<Part> | undefined,
   ): Promise<{ data: unknown; parts?: Part[]; log: AgentToolCallLog }> {
     if (!tool) {
       return { data: { error: `Unknown tool ${call.name}` }, log: { name: call.name, ok: false, error: "unknown_tool" } };
@@ -130,6 +135,8 @@ export class AgentRunner {
       };
     }
 
+    listener?.toolCall?.(call.name, parsed.data);
+
     try {
       const result = await tool.handler(parsed.data as never, context);
 
@@ -151,15 +158,28 @@ export class AgentRunner {
     }
   }
 
-  /** One provider call, retried once on transient failures. */
+  /**
+   * One provider call, streamed when someone is listening for tokens.
+   * Retried once on transient failures, unless tokens were already sent.
+   */
   private async complete(
     request: Parameters<AiProvider["completeWithTools"]>[0],
+    onToken: ((text: string) => void) | undefined,
   ): Promise<AiToolCompletionResponse> {
     for (let attempt = 1; ; attempt += 1) {
+      let streamedText = false;
+
       try {
+        if (onToken && this.provider.stream) {
+          return await this.provider.stream(request, (text) => {
+            streamedText = true;
+            onToken(text);
+          });
+        }
+
         return await this.provider.completeWithTools(request);
       } catch (error) {
-        if (attempt < AI_CONSTANTS.MAX_COMPLETION_ATTEMPTS && this.isRetryable(error)) {
+        if (!streamedText && attempt < AI_CONSTANTS.MAX_COMPLETION_ATTEMPTS && this.isRetryable(error)) {
           logger.warn({ attempt, code: (error as AiProviderError).code }, "Retrying AI completion");
           continue;
         }

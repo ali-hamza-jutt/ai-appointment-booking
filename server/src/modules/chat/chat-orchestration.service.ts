@@ -5,6 +5,7 @@ import {
   CHAT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
+  REALTIME_CONSTANTS,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import { AgentRunner } from "../../integrations/ai/agent/agent-runner.js";
@@ -26,6 +27,8 @@ import {
 import { buildBookingAgentPrompt } from "./agent/booking-agent.prompt.js";
 import { bookingTools } from "./agent/booking-tools.js";
 import { classifyLocalIntent } from "./agent/local-intent.js";
+import { describeToolCall } from "./agent/tool-status.js";
+import { publishChatEvent } from "./chat-events.js";
 import { chatService } from "./chat.service.js";
 import type {
   ChatMessageMetadata,
@@ -37,6 +40,7 @@ import type {
   ProcessChatMessageRequest,
   StructuredBookingDetails,
 } from "./dto/chat.dto.js";
+import type { ChatTurnListener } from "./dto/chat-stream.dto.js";
 
 interface AssistantReply {
   content: string;
@@ -55,10 +59,15 @@ export class ChatOrchestrationService {
     this.runner = provider ? new AgentRunner(provider) : null;
   }
 
+  /**
+   * Runs one turn and persists the reply once. With a listener, progress
+   * (status lines, reply tokens, cards) is reported while the agent works.
+   */
   public async processMessage(
     userId: string,
     sessionId: string,
     request: ProcessChatMessageRequest,
+    listener?: ChatTurnListener,
   ): Promise<ChatTurnResponse> {
     const timeZone = normalizeIanaTimeZone(request.timeZone);
 
@@ -83,6 +92,16 @@ export class ChatOrchestrationService {
 
     const session = await chatService.getSession(userId, sessionId);
 
+    if (userMessageResult.created) {
+      publishChatEvent({
+        type: "message",
+        sessionId,
+        businessId: session.business.id,
+        messageId: userMessage.id,
+        role: "USER",
+      });
+    }
+
     if (session.status !== "ACTIVE") {
       throw new AppError(
         409,
@@ -103,7 +122,7 @@ export class ChatOrchestrationService {
       ? await this.handleAction(context, request.action)
       : request.bookingDetails
         ? await this.handleStructuredDetails(context, request.bookingDetails)
-        : await this.handleText(context, session, userMessage);
+        : await this.handleText(context, session, userMessage, listener);
 
     return this.saveTurn(userId, sessionId, userMessage, reply);
   }
@@ -142,6 +161,20 @@ export class ChatOrchestrationService {
         appointmentId: booking.id,
         parts: [{ type: "booking_summary", booking: bookingAssistantService.toSummary(booking, timeZone) }],
       },
+    });
+
+    publishChatEvent({
+      type: "message",
+      sessionId,
+      businessId: completed.session.business.id,
+      messageId: completed.assistantMessage.id,
+      role: "ASSISTANT",
+    });
+    publishChatEvent({
+      type: "session",
+      sessionId,
+      businessId: completed.session.business.id,
+      status: completed.session.status,
     });
 
     return {
@@ -250,6 +283,7 @@ export class ChatOrchestrationService {
     context: AssistantContext,
     session: ChatSessionResponse,
     userMessage: ChatMessageResponse,
+    listener?: ChatTurnListener,
   ): Promise<AssistantReply> {
     const localIntent = classifyLocalIntent(userMessage.content);
 
@@ -271,6 +305,8 @@ export class ChatOrchestrationService {
       authDal.findUserById(context.userId),
     ]);
 
+    listener?.status(REALTIME_CONSTANTS.STATUS.THINKING);
+
     try {
       const result = await this.runner.run({
         systemPrompt: buildBookingAgentPrompt({
@@ -284,6 +320,15 @@ export class ChatOrchestrationService {
         tools: bookingTools,
         context,
         businessId: context.business.id,
+        ...(listener
+          ? {
+              listener: {
+                token: (text: string) => listener.token(text),
+                toolCall: (name: string, args: unknown) => listener.status(describeToolCall(name, args)),
+                parts: (parts: ChatMessagePart[]) => parts.forEach((part) => listener.part(part)),
+              },
+            }
+          : {}),
       });
 
       logger.info(
@@ -375,6 +420,14 @@ export class ChatOrchestrationService {
       replyToMessageId: userMessage.id,
       content: reply.content,
       structuredData,
+    });
+
+    publishChatEvent({
+      type: "message",
+      sessionId,
+      businessId: persisted.session.business.id,
+      messageId: persisted.assistantMessage.id,
+      role: "ASSISTANT",
     });
 
     return { session: persisted.session, userMessage, assistantMessage: persisted.assistantMessage };
