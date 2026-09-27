@@ -4,6 +4,7 @@ import type { AgentTool } from "../../../integrations/ai/agent/agent.dto.js";
 import type { ChatMessagePart } from "../dto/chat.dto.js";
 import {
   bookingAssistantService,
+  PREFERENCE_KINDS,
   type AssistantContext,
 } from "./booking-assistant.service.js";
 
@@ -12,6 +13,7 @@ type BookingTool = AgentTool<AssistantContext, ChatMessagePart, never>;
 const uuid = z.uuid();
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const slotToken = z.string().min(10).describe("A slotToken exactly as returned by get_availability");
+const preferenceKind = z.enum(PREFERENCE_KINDS).describe("provider, service or part_of_day");
 
 function tool<Args>(definition: AgentTool<AssistantContext, ChatMessagePart, Args>): BookingTool {
   return definition as unknown as BookingTool;
@@ -87,6 +89,22 @@ export const bookingTools: BookingTool[] = [
       "Search this business's FAQs, policies and preparation instructions (opening hours, parking, cancellation rules, what to bring, pricing questions not about a specific service). Returns up to 4 passages with their source title.",
     schema: z.object({ query: z.string().min(2).max(500).describe("The customer's question in a few words") }),
     handler: (args, context) => bookingAssistantService.searchKnowledge(context, args.query),
+  }),
+  tool({
+    name: "remember_preference",
+    description:
+      "Save a lasting preference the customer stated explicitly, for their next bookings here. value is the staffId for provider, the serviceId for service, or morning, afternoon or evening for part_of_day. Never save something you inferred.",
+    schema: z.object({
+      preference: preferenceKind,
+      value: z.string().min(1).max(64).describe("staffId, serviceId, or morning / afternoon / evening"),
+    }),
+    handler: (args, context) => bookingAssistantService.rememberPreference(context, args),
+  }),
+  tool({
+    name: "forget_preference",
+    description: "Forget one of the customer's saved preferences when they ask you to.",
+    schema: z.object({ preference: preferenceKind }),
+    handler: (args, context) => bookingAssistantService.forgetPreference(context, args.preference),
   }),
   tool({
     name: "handoff_to_human",

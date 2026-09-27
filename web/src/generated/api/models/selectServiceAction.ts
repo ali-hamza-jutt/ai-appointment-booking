@@ -10,4 +10,6 @@ import type { SelectServiceActionType } from './selectServiceActionType';
 export interface SelectServiceAction {
   type: SelectServiceActionType;
   serviceId: string;
+  /** Show this provider's times only, for example a returning customer's usual one. */
+  staffId?: string;
 }

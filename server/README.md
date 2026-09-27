@@ -149,6 +149,7 @@ The chat assistant is a tool-calling agent (`modules/chat/agent`) running on Mis
 | `list_my_bookings` | The customer's upcoming bookings here | No |
 | `propose_cancel` / `propose_reschedule` | Show a button for the change | No |
 | `search_knowledge` | Up to 4 passages from the business's knowledge base | No |
+| `remember_preference` / `forget_preference` | Saves or removes a preference the customer stated (provider, service or part of day) | Preference only |
 | `handoff_to_human` | Flags the chat for staff (`/api/businesses/{businessId}/chat-handoffs`) | Flag only |
 
 - **The model proposes, booking core decides.** Tools run with the session's business and customer; ids the model passes are checked for ownership. Nothing is booked, cancelled or moved until the customer presses a button.
@@ -157,6 +158,17 @@ The chat assistant is a tool-calling agent (`modules/chat/agent`) running on Mis
 - **Typed draft.** The chat's draft is `draft_service_id`, `draft_staff_id` and `draft_hold_id` foreign keys (plus time zone and notes), so it always points at real rows. `POST /chat/sessions/{id}/confirm` turns the held slot into a booking.
 - **Fallbacks.** Bare greetings and "what can you do" are answered locally with service cards. If Mistral is unavailable, the reply offers service cards to book by tapping, and the structured form still works.
 - **Evals.** `evals/` holds 73 scripted conversations (direct requests, preferred providers, open-ended times, clarification, multi-turn changes, unavailable times, managing bookings, refusals, handoffs and knowledge questions) on a seeded business with a frozen clock. They report booking success, wrong-slot rate, turns to book and outcome accuracy per category. Recordings use placeholders (`{{service:Haircut}}`, `{{slot:<start>}}`) so real model replies captured by `npm run eval:record` replay against a fresh database; the checked-in seed recordings are hand-written.
+
+## Customer profile and memory
+
+The agent starts each turn knowing who it is talking to (`modules/customers/customer-profile.service.ts`).
+
+- **Preferences.** `customer_preferences` holds at most one value per customer per key: `PREFERRED_STAFF`, `USUAL_SERVICE` and `PREFERRED_PART_OF_DAY`. Only two things write them: the `remember_preference` tool when the customer states a lasting preference (source `CUSTOMER`, checked against an active provider, a bookable service or morning/afternoon/evening), and the worker on `booking.completed`, which re-derives them from the last 5 completed visits once a value repeats (source `BOOKING_HISTORY`). A derived value never replaces one the customer set, and model output is never saved directly.
+- **Agent context.** The system prompt lists the customer's preferences (with the ids the tools accept), completed-visit count and last 3 bookings, labelled as data. Preferences are defaults: the agent checks the usual provider and time first but follows what the customer asks. A preference whose provider or service is no longer bookable is left out.
+- **Book again.** A returning customer's greeting offers a one-tap "Book <service> again" button (a `select_service` action with an optional `staffId`) that opens their usual provider's times, or everyone's if that provider has nothing open.
+- **Rolling summary.** Once a chat passes 20 messages, older messages are folded into a short model-written summary stored on the session (`summary`, `summarized_count`), and the agent gets the summary plus every message after it. The summary is refreshed after 8 more messages, costs one extra model call when it runs, and the turn carries on without it if that call fails.
+- **Per-business chats.** A customer has at most one active chat per business (partial unique index on `user_id, business_id`), so opening another business's booking link no longer abandons the first chat. `GET /api/chat/sessions?businessSlug=` filters by business.
+- **APIs.** `GET /api/me/preferences` and `DELETE /api/me/preferences/{preferenceId}` let customers see and remove what each business remembers. `GET /api/businesses/{businessId}/customers/{customerId}/profile` (scope `business:read`) shows staff a customer's preferences, visit counts and recent bookings.
 
 ## Realtime streaming
 
@@ -191,7 +203,7 @@ Sign-in returns a 15-minute access token in the body and sets a refresh token in
 `src/worker.ts` is a separate process from the API. It needs PostgreSQL and Redis and runs:
 
 - **Outbox relay.** Every `OUTBOX_RELAY_INTERVAL_MS` it claims unpublished `outbox_events` rows with `FOR UPDATE SKIP LOCKED` (so several workers can run), adds each to the `outbox-events` BullMQ queue with the event id as job id, and marks them published in the same transaction. A failed publish increments `attempts`; an event is retried until `OUTBOX_MAX_ATTEMPTS`.
-- **Idempotent consumers.** `modules/outbox/outbox-consumers.ts` lists the consumers. Each claims an event in Redis before handling it and records it as done afterwards, so a redelivered event is skipped and a failed consumer is retried without re-running the ones that succeeded. Consumers drop cached availability and count metrics on `booking.*` events and embed knowledge sources on `knowledge.source_changed`.
+- **Idempotent consumers.** `modules/outbox/outbox-consumers.ts` lists the consumers. Each claims an event in Redis before handling it and records it as done afterwards, so a redelivered event is skipped and a failed consumer is retried without re-running the ones that succeeded. Consumers drop cached availability and count metrics on `booking.*` events, embed knowledge sources on `knowledge.source_changed`, and re-derive customer preferences on `booking.completed`.
 - **Scheduled maintenance** on the `booking-maintenance` queue: expire lapsed holds (every minute), mark no-shows for businesses with `autoMarkNoShows` once `noShowGraceMinutes` has passed (every 5 minutes), and complete checked-in visits an hour after they end (every 5 minutes). Each booking changes in its own transaction through the state machine as the `SYSTEM` actor, so a booking that staff changed in the meantime is skipped.
 
 Hold expiry does not depend on the worker: placing a booking also expires the provider's lapsed holds inside its transaction.
@@ -240,7 +252,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - AI output is runtime-validated before it becomes booking context.
 - Message and confirmation retries are idempotent through client IDs, reply links, and database constraints.
 - Booking writes serialize per provider and resource, and an exclusion constraint rejects any overlapping active booking for the same provider.
-- A partial unique index and transactional replacement enforce one active chat per user, including under concurrent requests.
+- A partial unique index and transactional replacement enforce one active chat per user per business, including under concurrent requests.
 - Provider secrets and conversation content are excluded from AI operational logs.
 - HTTP and worker shutdown close listeners, queue workers, Redis and PostgreSQL connections cleanly.
 

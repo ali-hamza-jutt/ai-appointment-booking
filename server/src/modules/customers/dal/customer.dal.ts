@@ -22,6 +22,13 @@ export class CustomerDal {
     });
   }
 
+  public findCustomer(businessId: string, customerId: string): Promise<CustomerRecord | null> {
+    return prisma.customer.findFirst({
+      where: { businessId, id: customerId },
+      select: customerSelect,
+    });
+  }
+
   public listCustomers(data: ListCustomersData): Promise<CustomerRecord[]> {
     return prisma.customer.findMany({
       where: {

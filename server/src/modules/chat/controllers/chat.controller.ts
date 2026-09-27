@@ -33,7 +33,10 @@ import type {
 @Tags("Chat")
 @Security("jwt")
 export class ChatController extends Controller {
-  /** Returns the active chat or abandons it and creates a replacement when requested. */
+  /**
+   * Returns the active chat with the business, or abandons it and creates a
+   * replacement when requested. Chats with other businesses are untouched.
+   */
   @Post("sessions")
   @SuccessResponse("201", "Chat session created")
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
@@ -48,6 +51,7 @@ export class ChatController extends Controller {
 
   /**
    * Lists the user's most recently active chat sessions.
+   * @param businessSlug Only chats with this business.
    * @isInt limit Limit must be a whole number
    * @minimum limit 1
    * @maximum limit 50
@@ -59,11 +63,13 @@ export class ChatController extends Controller {
   public listSessions(
     @Request() request: ExpressRequest,
     @Query() status?: ChatSessionStatus,
+    @Query() businessSlug?: string,
     @Query() cursor?: string,
     @Query() limit?: number,
   ): Promise<ChatSessionListResponse> {
     return chatService.listSessions(getAuthenticatedUser(request).id, {
       ...(status ? { status } : {}),
+      ...(businessSlug ? { businessSlug } : {}),
       ...(cursor ? { cursor } : {}),
       ...(limit !== undefined ? { limit } : {}),
     });

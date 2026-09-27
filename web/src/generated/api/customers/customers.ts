@@ -28,8 +28,10 @@ import type {
   ApiErrorResponse,
   CreateCustomerRequest,
   CustomerListResponse,
+  CustomerProfileResponse,
   CustomerResponse,
-  ListCustomersParams
+  ListCustomersParams,
+  MyPreferencesResponse
 } from '../models';
 
 import { apiFetch } from '../../../lib/api/api-fetch';
@@ -55,7 +57,171 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const getListCustomersUrl = (businessId: string,
+export const getListMyPreferencesUrl = () => {
+
+
+
+
+  return `/me/preferences`
+}
+
+/**
+ * What each business's booking assistant remembers about the signed-in user.
+ */
+export const listMyPreferences = async ( options?: Parameters<typeof apiFetch>[1]): Promise<MyPreferencesResponse> => {
+
+  return apiFetch<MyPreferencesResponse>(getListMyPreferencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyPreferencesQueryKey = () => {
+    return [
+    `/me/preferences`
+    ] as const;
+    }
+
+
+export const getListMyPreferencesQueryOptions = <TData = Awaited<ReturnType<typeof listMyPreferences>>, TError = ErrorType<ApiErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyPreferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyPreferences>>> = ({ signal }) => listMyPreferences({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListMyPreferencesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyPreferences>>>
+export type ListMyPreferencesQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useListMyPreferences<TData = Awaited<ReturnType<typeof listMyPreferences>>, TError = ErrorType<ApiErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMyPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof listMyPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMyPreferences<TData = Awaited<ReturnType<typeof listMyPreferences>>, TError = ErrorType<ApiErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMyPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof listMyPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMyPreferences<TData = Awaited<ReturnType<typeof listMyPreferences>>, TError = ErrorType<ApiErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListMyPreferences<TData = Awaited<ReturnType<typeof listMyPreferences>>, TError = ErrorType<ApiErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyPreferences>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListMyPreferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getDeleteMyPreferenceUrl = (preferenceId: string,) => {
+
+
+
+
+  return `/me/preferences/${preferenceId}`
+}
+
+/**
+ * Forgets one remembered preference.
+ */
+export const deleteMyPreference = async (preferenceId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getDeleteMyPreferenceUrl(preferenceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMyPreferenceMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyPreference>>, TError,{preferenceId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMyPreference>>, TError,{preferenceId: string}, TContext> => {
+
+const mutationKey = ['deleteMyPreference'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMyPreference>>, {preferenceId: string}> = (props) => {
+          const {preferenceId} = props ?? {};
+
+          return  deleteMyPreference(preferenceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMyPreferenceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMyPreference>>>
+
+    export type DeleteMyPreferenceMutationError = ErrorType<ApiErrorResponse>
+
+    export const useDeleteMyPreference = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyPreference>>, TError,{preferenceId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMyPreference>>,
+        TError,
+        {preferenceId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteMyPreferenceMutationOptions(options), queryClient);
+    }
+    export const getListCustomersUrl = (businessId: string,
     params?: ListCustomersParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -235,3 +401,108 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateCustomerMutationOptions(options), queryClient);
     }
+    export const getGetCustomerProfileUrl = (businessId: string,
+    customerId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/customers/${customerId}/profile`
+}
+
+/**
+ * One customer with what the business remembers about them and their recent visits.
+ */
+export const getCustomerProfile = async (businessId: string,
+    customerId: string, options?: Parameters<typeof apiFetch>[1]): Promise<CustomerProfileResponse> => {
+
+  return apiFetch<CustomerProfileResponse>(getGetCustomerProfileUrl(businessId,customerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCustomerProfileQueryKey = (businessId: string,
+    customerId: string,) => {
+    return [
+    `/businesses/${businessId}/customers/${customerId}/profile`
+    ] as const;
+    }
+
+
+export const getGetCustomerProfileQueryOptions = <TData = Awaited<ReturnType<typeof getCustomerProfile>>, TError = ErrorType<ApiErrorResponse>>(businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCustomerProfileQueryKey(businessId,customerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCustomerProfile>>> = ({ signal }) => getCustomerProfile(businessId,customerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined && customerId !== null && customerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCustomerProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getCustomerProfile>>>
+export type GetCustomerProfileQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetCustomerProfile<TData = Awaited<ReturnType<typeof getCustomerProfile>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCustomerProfile>>,
+          TError,
+          Awaited<ReturnType<typeof getCustomerProfile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCustomerProfile<TData = Awaited<ReturnType<typeof getCustomerProfile>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCustomerProfile>>,
+          TError,
+          Awaited<ReturnType<typeof getCustomerProfile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCustomerProfile<TData = Awaited<ReturnType<typeof getCustomerProfile>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetCustomerProfile<TData = Awaited<ReturnType<typeof getCustomerProfile>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCustomerProfile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCustomerProfileQueryOptions(businessId,customerId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

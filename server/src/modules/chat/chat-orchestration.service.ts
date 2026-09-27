@@ -19,6 +19,7 @@ import { authDal } from "../auth/dal/auth.dal.js";
 import { bookingService } from "../bookings/booking.service.js";
 import type { BookingRecord } from "../bookings/dto/booking.dto.js";
 import { catalogService } from "../catalog/catalog.service.js";
+import { customerProfileService } from "../customers/customer-profile.service.js";
 import {
   AssistantActionError,
   bookingAssistantService,
@@ -26,6 +27,7 @@ import {
 } from "./agent/booking-assistant.service.js";
 import { buildBookingAgentPrompt } from "./agent/booking-agent.prompt.js";
 import { bookingTools } from "./agent/booking-tools.js";
+import { ConversationMemory } from "./agent/conversation-memory.js";
 import { classifyLocalIntent } from "./agent/local-intent.js";
 import { describeToolCall } from "./agent/tool-status.js";
 import { publishChatEvent } from "./chat-events.js";
@@ -54,9 +56,12 @@ interface AssistantReply {
  */
 export class ChatOrchestrationService {
   private readonly runner: AgentRunner | null;
+  private readonly memory: ConversationMemory;
 
   public constructor(provider: AiProvider | null) {
     this.runner = provider ? new AgentRunner(provider) : null;
+    // The history window counts the message being answered.
+    this.memory = new ConversationMemory(provider, env.AI_MAX_HISTORY_MESSAGES + 1);
   }
 
   /**
@@ -287,22 +292,28 @@ export class ChatOrchestrationService {
   ): Promise<AssistantReply> {
     const localIntent = classifyLocalIntent(userMessage.content);
 
+    if (localIntent === "GREETING") {
+      return this.greet(context);
+    }
+
     if (localIntent) {
-      return this.withServiceCards(
-        context,
-        localIntent === "GREETING"
-          ? CHAT_CONSTANTS.ASSISTANT_MESSAGES.GREETING
-          : CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_HELP,
-      );
+      return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_HELP);
     }
 
     if (!this.runner) {
       return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_UNAVAILABLE);
     }
 
-    const [recentMessages, user] = await Promise.all([
-      chatService.listRecentMessages(context.userId, context.sessionId, env.AI_MAX_HISTORY_MESSAGES + 1),
+    const [memory, user, profile] = await Promise.all([
+      this.memory.load({
+        userId: context.userId,
+        sessionId: context.sessionId,
+        businessId: context.business.id,
+        businessName: context.business.name,
+        ...(listener ? { onSummarizing: () => listener.status(REALTIME_CONSTANTS.STATUS.SUMMARIZE) } : {}),
+      }),
       authDal.findUserById(context.userId),
+      customerProfileService.getAgentProfile(context.business.id, context.userId),
     ]);
 
     listener?.status(REALTIME_CONSTANTS.STATUS.THINKING);
@@ -311,12 +322,14 @@ export class ChatOrchestrationService {
       const result = await this.runner.run({
         systemPrompt: buildBookingAgentPrompt({
           businessName: context.business.name,
-          customerName: user?.fullName.split(/\s+/)[0] ?? "the customer",
+          customerName: this.firstName(user?.fullName) ?? "the customer",
           timeZone: context.timeZone,
           now: context.now,
           draft: session.draft,
+          profile,
+          summary: memory.summary,
         }),
-        history: this.toAgentHistory(recentMessages, userMessage),
+        history: this.toAgentHistory(memory.history, userMessage),
         tools: bookingTools,
         context,
         businessId: context.business.id,
@@ -352,6 +365,46 @@ export class ChatOrchestrationService {
 
       return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_UNAVAILABLE);
     }
+  }
+
+  /**
+   * A greeting. A returning customer with a usual service also gets a
+   * one-tap way to book it again, with their usual provider if they have one.
+   */
+  private async greet(context: AssistantContext): Promise<AssistantReply> {
+    const [reply, profile, user] = await Promise.all([
+      this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.GREETING),
+      customerProfileService.getAgentProfile(context.business.id, context.userId),
+      authDal.findUserById(context.userId),
+    ]);
+    const usualService = profile?.preferences.find((preference) => preference.key === "USUAL_SERVICE");
+
+    if (!usualService || reply.parts.length === 0) return reply;
+
+    const usualStaff = profile?.preferences.find((preference) => preference.key === "PREFERRED_STAFF");
+    const name = this.firstName(user?.fullName);
+
+    return {
+      content: `Welcome back${name ? `, ${name}` : ""}! Would you like another ${usualService.label}${usualStaff ? ` with ${usualStaff.label}` : ""}? Tap below to see times, or tell me what you need.`,
+      parts: [
+        {
+          type: "confirm",
+          label: `Book ${usualService.label} again`,
+          description: usualStaff ? `See ${usualStaff.label}'s next open times.` : "See the next open times.",
+          tone: "primary",
+          action: {
+            type: "select_service",
+            serviceId: usualService.value,
+            ...(usualStaff ? { staffId: usualStaff.value } : {}),
+          },
+        },
+        ...reply.parts,
+      ],
+    };
+  }
+
+  private firstName(fullName: string | undefined): string | null {
+    return fullName?.trim().split(/\s+/)[0] || null;
   }
 
   private async withServiceCards(context: AssistantContext, content: string): Promise<AssistantReply> {

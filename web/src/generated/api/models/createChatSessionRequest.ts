@@ -14,6 +14,6 @@ export interface CreateChatSessionRequest {
      * @maxLength 60
      */
   businessSlug?: string;
-  /** Abandons the current active chat before creating this session. */
+  /** Abandons the active chat at this business before creating this session. */
   replaceActive?: boolean;
 }

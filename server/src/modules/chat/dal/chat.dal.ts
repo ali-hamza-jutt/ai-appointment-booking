@@ -4,15 +4,18 @@ import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
 import type {
   ChatDraftPatch,
+  ChatMemoryState,
   ChatMessageRecord,
   ChatSessionRecord,
   ChatSessionWithMessagesRecord,
   CreateChatMessageData,
   CreateChatSessionData,
+  ListChatMessageRangeData,
   ListChatMessagesData,
   ListRecentChatMessagesData,
   ListChatSessionsData,
   SaveAssistantTurnData,
+  SaveChatSummaryData,
   UpdateChatDraftData,
 } from "../dto/chat.dto.js";
 
@@ -76,28 +79,20 @@ export const chatMessageSelect = {
 export class ChatDal {
   public createSession(data: CreateChatSessionData): Promise<ChatSessionRecord> {
     return prisma.$transaction(async (transaction) => {
+      // One chat is active per customer per business; other businesses' chats stay open.
       if (data.replaceActive) {
         await transaction.chatSession.updateMany({
-          where: { userId: data.userId, status: "ACTIVE" },
+          where: { userId: data.userId, businessId: data.businessId, status: "ACTIVE" },
           data: { status: "ABANDONED" },
         });
       } else {
         const activeSession = await transaction.chatSession.findFirst({
-          where: { userId: data.userId, status: "ACTIVE" },
-          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          where: { userId: data.userId, businessId: data.businessId, status: "ACTIVE" },
           select: chatSessionSelect,
         });
 
-        if (activeSession?.business.id === data.businessId) {
-          return activeSession;
-        }
-
-        // Only one chat is active per user; switching business starts afresh.
         if (activeSession) {
-          await transaction.chatSession.updateMany({
-            where: { id: activeSession.id, userId: data.userId, status: "ACTIVE" },
-            data: { status: "ABANDONED" },
-          });
+          return activeSession;
         }
       }
 
@@ -114,10 +109,10 @@ export class ChatDal {
 
   public findActiveSessionForUser(
     userId: string,
+    businessId: string,
   ): Promise<ChatSessionRecord | null> {
     return prisma.chatSession.findFirst({
-      where: { userId, status: "ACTIVE" },
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      where: { userId, businessId, status: "ACTIVE" },
       select: chatSessionSelect,
     });
   }
@@ -142,6 +137,7 @@ export class ChatDal {
       where: {
         userId: data.userId,
         ...(data.status ? { status: data.status } : {}),
+        ...(data.businessSlug ? { business: { slug: data.businessSlug } } : {}),
         ...(data.cursor
           ? {
               OR: [
@@ -266,6 +262,42 @@ export class ChatDal {
       },
       select: chatMessageSelect,
     });
+  }
+
+  public async getMemoryState(userId: string, sessionId: string): Promise<ChatMemoryState | null> {
+    const session = await prisma.chatSession.findFirst({
+      where: { id: sessionId, userId },
+      select: { summary: true, summarizedCount: true, _count: { select: { messages: true } } },
+    });
+
+    return session
+      ? {
+          messageCount: session._count.messages,
+          summary: session.summary,
+          summarizedCount: session.summarizedCount,
+        }
+      : null;
+  }
+
+  /** Messages by position in the chat, oldest first. */
+  public listMessageRange(data: ListChatMessageRangeData): Promise<ChatMessageRecord[]> {
+    return prisma.chatMessage.findMany({
+      where: { sessionId: data.sessionId, session: { userId: data.userId } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      skip: data.skip,
+      take: data.take,
+      select: chatMessageSelect,
+    });
+  }
+
+  /** Stores a newer summary; false when another turn already moved it on. */
+  public async saveSummary(data: SaveChatSummaryData): Promise<boolean> {
+    const { count } = await prisma.chatSession.updateMany({
+      where: { id: data.sessionId, userId: data.userId, summarizedCount: data.previousCount },
+      data: { summary: data.summary, summarizedCount: data.summarizedCount, summaryUpdatedAt: new Date() },
+    });
+
+    return count > 0;
   }
 
   public async listRecentMessages(
