@@ -17,6 +17,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - A Mistral tool-calling booking agent that searches services, reads real availability and proposes bookings, cancellations and reschedules as tap-to-confirm cards.
 - A per-business knowledge base (FAQs, policies, preparation notes) that the agent answers from, with pgvector and keyword search.
 - Booking notifications by email and SMS (Twilio): confirmations with a calendar invite, request, move and cancellation messages, and reminders (24 and 2 hours before by default) that wait out quiet hours. Businesses can reword every message, customers can turn a business's emails or texts off, and staff see what was sent for each booking.
+- Staff calendar sync with Google Calendar and Microsoft 365: busy times in a connected calendar block bookings like time off, and confirmed bookings appear on the staff member's calendar and follow every move or cancellation, kept current by push notifications and a 15-minute sweep.
 - Customer memory: the usual service, provider and time of day, saved when the customer asks or learned from repeat visits, a one-tap "Book again" for returning customers, and a rolling summary that keeps long chats in context. Customers can review and remove what each business remembers from their profile.
 - Multi-turn booking conversations with persisted context and history.
 - Structured booking form fallback when chat input is incomplete, ambiguous, or AI processing fails.

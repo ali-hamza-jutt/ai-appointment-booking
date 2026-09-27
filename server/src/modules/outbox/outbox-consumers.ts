@@ -1,10 +1,12 @@
 import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
 import {
+  CALENDAR_CONSTANTS,
   CUSTOMER_PROFILE_CONSTANTS,
   KNOWLEDGE_CONSTANTS,
   NOTIFICATION_CONSTANTS,
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
+import { calendarSyncService } from "../calendar/calendar-sync.service.js";
 import { customerProfileService } from "../customers/customer-profile.service.js";
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import { notificationService } from "../notifications/notification.service.js";
@@ -69,6 +71,21 @@ export const bookingNotificationsConsumer: OutboxConsumer = {
   handle: (message) => notificationService.handleBookingEvent(message),
 };
 
+const CALENDAR_EVENTS = new Set<string>(CALENDAR_CONSTANTS.BOOKING_EVENTS);
+
+/** Writes, moves or removes the booking's event in its staff member's connected calendar. */
+export const calendarEventsConsumer: OutboxConsumer = {
+  name: "calendar-events",
+  handles: (type) => CALENDAR_EVENTS.has(type),
+  async handle(message) {
+    const { bookingId } = message.payload;
+
+    if (!message.businessId || typeof bookingId !== "string") return;
+
+    await calendarSyncService.reconcileBooking(message.businessId, bookingId);
+  },
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
@@ -76,4 +93,5 @@ export const outboxConsumers: readonly OutboxConsumer[] = [
   knowledgeIndexConsumer,
   customerPreferencesConsumer,
   bookingNotificationsConsumer,
+  calendarEventsConsumer,
 ];

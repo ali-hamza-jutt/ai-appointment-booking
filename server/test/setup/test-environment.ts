@@ -9,6 +9,8 @@ export const TEST_ENVIRONMENT = {
   REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/15",
   // Tests read their own writes immediately; cache behaviour is tested directly.
   AVAILABILITY_CACHE_TTL_SECONDS: "0",
+  // A fixed key so calendar tokens can be sealed and opened in tests.
+  TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   // Tests never reach Mistral (fakes stand in); live evals keep the real key.
   ...(process.env.EVAL_MODE === "live" || process.env.EVAL_MODE === "record" ? {} : { MISTRAL_API_KEY: "" }),
 } as const;

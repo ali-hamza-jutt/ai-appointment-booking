@@ -477,7 +477,8 @@ export class AvailabilityService {
               endMinute: rule.endMinute,
               timeZone: rule.location?.timeZone ?? business.timeZone,
             })),
-          timeOff: member.timeOff,
+          // A busy time in the staff member's own calendar blocks them like time off.
+          timeOff: [...member.timeOff, ...member.externalBusy],
           busy: load
             .filter((booking) => !sessionLoad.includes(booking))
             .map((booking) => ({

@@ -64,6 +64,22 @@ const environmentSchema = z.object({
   TWILIO_AUTH_TOKEN: optionalNonEmptyString,
   /** Sender: a Twilio phone number in E.164 form, or a messaging service SID (MG…). */
   TWILIO_FROM: optionalNonEmptyString,
+  /**
+   * 32 random bytes, base64 encoded (openssl rand -base64 32). Encrypts
+   * calendar OAuth tokens; calendar sync is off without it.
+   */
+  TOKEN_ENCRYPTION_KEY: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z
+      .string()
+      .trim()
+      .refine((value) => Buffer.from(value, "base64").length === 32, "must be 32 bytes, base64 encoded")
+      .optional(),
+  ),
+  /** Microsoft Entra app for Microsoft 365 calendar sync. */
+  MICROSOFT_CLIENT_ID: optionalNonEmptyString,
+  MICROSOFT_CLIENT_SECRET: optionalNonEmptyString,
+  MICROSOFT_TENANT_ID: z.string().trim().min(1).default("common"),
   /** Exposes Prometheus metrics for the API on this port (e.g. 9464). */
   METRICS_PORT: z.coerce.number().int().min(1).max(65_535).optional(),
   /** Exposes Prometheus metrics for the worker on this port (e.g. 9465). */

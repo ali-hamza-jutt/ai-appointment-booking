@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,12 @@ import { BuildingIcon, EditIcon, MapPinIcon, PlusIcon, UsersIcon } from "@/compo
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/section-card";
 import { Tabs } from "@/components/ui/tabs";
+import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
 import { canManageBusiness } from "@/features/business-settings/utils/business-permissions";
+import { CalendarReturnNotice } from "@/features/calendar-sync/components/calendar-return-notice";
+import { StaffCalendar } from "@/features/calendar-sync/components/staff-calendar";
 import { ResourceFormModal } from "@/features/staff/components/resource-form-modal";
 import { StaffFormModal } from "@/features/staff/components/staff-form-modal";
 import { getProviderLabels, type ProviderLabels } from "@/features/staff/utils/staff-labels";
@@ -21,6 +24,10 @@ import {
   useListBusinessVerticals,
   useListLocations,
 } from "@/generated/api/businesses/businesses";
+import {
+  useGetCalendarProviders,
+  useListCalendarConnections,
+} from "@/generated/api/calendar-sync/calendar-sync";
 import { useListServices } from "@/generated/api/catalog/catalog";
 import type {
   BusinessSummaryResponse,
@@ -56,6 +63,9 @@ function StaffContent({ business }: { business: BusinessSummaryResponse }) {
   const servicesQuery = useListServices(business.id);
   const locationsQuery = useListLocations(business.id);
   const membersQuery = useListMembers(business.id);
+  const calendarsQuery = useListCalendarConnections(business.id);
+  const calendarProvidersQuery = useGetCalendarProviders({ query: { staleTime: Infinity } });
+  const { user } = useAuth();
   const [tab, setTab] = useState<StaffTab>("staff");
   const [staffEditor, setStaffEditor] = useState<EditorState<StaffResponse>>({ mode: "closed" });
   const [resourceEditor, setResourceEditor] = useState<EditorState<ResourceResponse>>({
@@ -103,6 +113,10 @@ function StaffContent({ business }: { business: BusinessSummaryResponse }) {
         title={labels.plural}
       />
 
+      <Suspense fallback={null}>
+        <CalendarReturnNotice />
+      </Suspense>
+
       <Tabs
         ariaLabel="Staff sections"
         controls="staff-panel"
@@ -121,6 +135,15 @@ function StaffContent({ business }: { business: BusinessSummaryResponse }) {
             isPending={staffQuery.isPending}
             labels={labels}
             onEdit={canEdit ? (item) => setStaffEditor({ mode: "edit", item }) : undefined}
+            renderCalendar={(member) => (
+              <StaffCalendar
+                businessId={business.id}
+                canManage={canEdit || (user !== null && member.userId === user.id)}
+                connection={calendarsQuery.data?.items.find((item) => item.staffId === member.id)}
+                providers={calendarProvidersQuery.data}
+                staffId={member.id}
+              />
+            )}
             staff={staff}
           />
         ) : (
@@ -166,12 +189,14 @@ function StaffPanel({
   isPending,
   labels,
   onEdit,
+  renderCalendar,
   staff,
 }: {
   error: Error | null;
   isPending: boolean;
   labels: ProviderLabels;
   onEdit: ((staff: StaffResponse) => void) | undefined;
+  renderCalendar: (staff: StaffResponse) => ReactNode;
   staff: StaffResponse[];
 }) {
   if (isPending) return <Skeleton className="h-48 rounded-xl" />;
@@ -240,6 +265,7 @@ function StaffPanel({
               ? "All locations"
               : member.locations.map((location) => location.name).join(", ")}
           </p>
+          {renderCalendar(member)}
         </article>
       ))}
     </div>

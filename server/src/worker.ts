@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import { JOB_CONSTANTS, NOTIFICATION_CONSTANTS } from "./constants/app.constants.js";
+import { CALENDAR_CONSTANTS, JOB_CONSTANTS, NOTIFICATION_CONSTANTS } from "./constants/app.constants.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -19,6 +19,10 @@ import {
   getRedis,
 } from "./infrastructure/redis/redis.js";
 import { bookingMaintenanceService } from "./modules/bookings/booking-maintenance.service.js";
+import { calendarSyncQueue } from "./modules/calendar/calendar-sync.queue.js";
+import { calendarSyncService } from "./modules/calendar/calendar-sync.service.js";
+import { calendarDal } from "./modules/calendar/dal/calendar.dal.js";
+import type { CalendarSyncJobData } from "./modules/calendar/dto/calendar.dto.js";
 import type { ReminderJobData } from "./modules/notifications/dto/notification.dto.js";
 import { notificationService, reminderScheduler } from "./modules/notifications/notification.service.js";
 import type { OutboxMessage } from "./modules/outbox/dto/outbox.dto.js";
@@ -97,6 +101,24 @@ function runNotificationJob(job: Job<ReminderJobData>): Promise<void> {
   return observeJob(QUEUES.NOTIFICATIONS, job, () => notificationService.sendReminder(job.data));
 }
 
+/** Syncs one calendar, or (every 15 minutes) queues a sync for every connected calendar. */
+async function runCalendarJob(job: Job<CalendarSyncJobData>): Promise<void> {
+  if (job.name === CALENDAR_CONSTANTS.SWEEP_JOB) {
+    await observeJob(QUEUES.CALENDAR, job, async () => {
+      for (const connection of await calendarDal.listActiveConnectionIds()) {
+        await calendarSyncQueue.enqueue(connection);
+      }
+    });
+    return;
+  }
+
+  if (job.name !== CALENDAR_CONSTANTS.SYNC_JOB) throw new Error(`Unknown calendar job ${job.name}`);
+
+  await observeJob(QUEUES.CALENDAR, job, () =>
+    calendarSyncService.syncConnection(job.data.businessId, job.data.connectionId),
+  );
+}
+
 /** Continues the trace and request id of the request that wrote the event. */
 function runOutboxJob(runner: OutboxConsumerRunner, job: Job<OutboxMessage>): Promise<string[]> {
   const message = job.data;
@@ -153,11 +175,18 @@ async function startWorker(): Promise<void> {
 
     const outboxQueue = createQueue<OutboxMessage>(QUEUES.OUTBOX);
     const maintenanceQueue = createQueue(QUEUES.MAINTENANCE);
+    const calendarQueue = createQueue(QUEUES.CALENDAR);
     const runner = new OutboxConsumerRunner(outboxConsumers, new ProcessedEventStore(redis));
 
     for (const [name, every] of Object.entries(MAINTENANCE_SCHEDULE)) {
       await maintenanceQueue.upsertJobScheduler(name, { every }, { name });
     }
+
+    await calendarQueue.upsertJobScheduler(
+      CALENDAR_CONSTANTS.SWEEP_JOB,
+      { every: CALENDAR_CONSTANTS.SWEEP_EVERY_MS },
+      { name: CALENDAR_CONSTANTS.SWEEP_JOB },
+    );
 
     watch(
       new Worker<OutboxMessage>(QUEUES.OUTBOX, (job) => runOutboxJob(runner, job), {
@@ -174,6 +203,12 @@ async function startWorker(): Promise<void> {
     );
     watch(
       new Worker<ReminderJobData>(QUEUES.NOTIFICATIONS, runNotificationJob, {
+        connection: createRedisConnection(),
+        prefix: QUEUE_PREFIX,
+      }),
+    );
+    watch(
+      new Worker<CalendarSyncJobData>(QUEUES.CALENDAR, runCalendarJob, {
         connection: createRedisConnection(),
         prefix: QUEUE_PREFIX,
       }),
@@ -207,6 +242,7 @@ async function shutdown(exitCode = 0): Promise<void> {
     await relayRunning;
     await Promise.all(workers.map((worker) => worker.close()));
     await reminderScheduler.close();
+    await calendarSyncQueue.close();
     await closeRedis();
     await disconnectDatabase();
     await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);

@@ -46,6 +46,8 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `API_PUBLIC_URL` | Public base URL of the API, used for the Google redirect URI. |
 | `COOKIE_DOMAIN` | Optional refresh-cookie domain for sibling subdomains. |
 | `SMTP_URL`, `MAIL_FROM` | Optional SMTP connection and sender for verification, reset and booking emails. Any SMTP service works, including Amazon SES and Resend. |
+| `TOKEN_ENCRYPTION_KEY` | Optional; 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts calendar OAuth tokens; calendar sync is off without it. |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Optional; a Microsoft Entra app for Microsoft 365 calendar sync (tenant defaults to `common`). Google calendar sync reuses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Optional; send booking texts and phone codes through Twilio. `TWILIO_FROM` is an E.164 number or a messaging service SID. Without them, texts are logged outside production. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional; enable "Continue with Google". |
 | `MISTRAL_API_KEY` | Mistral API key; chat processing returns 503 when omitted. |
@@ -71,6 +73,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses`: create a business (caller becomes owner), list your businesses, profile and booking-policy settings, and locations.
 - `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
+- `/api/businesses/{businessId}/calendar-connections` and `/staff/{staffId}/calendar-connection`: connect (returns the provider's consent URL), sync or disconnect a staff member's Google or Microsoft 365 calendar. `/api/calendar/providers` says which providers are configured.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -183,6 +186,15 @@ Customers hear about their bookings by email and, when a mobile number is known,
 - **Opt-outs and phone numbers.** A customer can turn a business's emails or texts off; a skipped message is logged as `SKIPPED`. Texts go to the account's verified phone or the customer record's number when it is in international (E.164) form.
 - **Delivery reports.** Twilio posts status callbacks to `/api/webhooks/twilio/sms-status`. Requests are checked against Twilio's signature over `{API_PUBLIC_URL}/api/webhooks/twilio/sms-status`; a message moves to `DELIVERED` or `FAILED` and never back.
 
+## Calendar sync
+
+Staff can connect a Google or Microsoft 365 calendar (`modules/calendar`, provider clients in `integrations/calendar`). Owners and managers can connect anyone's; staff only their own.
+
+- **Connecting.** The dashboard asks the API for the provider's consent URL and sends the browser there. The OAuth state carries the business, staff member, user, expiry and PKCE verifier, sealed with AES-256-GCM, so the callback (`/api/calendar/oauth/callback`) needs no cookie and can't be forged or replayed after 10 minutes. Refresh and access tokens are stored encrypted with `TOKEN_ENCRYPTION_KEY`; access tokens are refreshed a minute before they expire. A grant the provider refuses marks the connection `NEEDS_RECONNECT`.
+- **Busy times in.** A sync reads the calendar's events for the next 90 days and stores the busy ones as `external_busy` rows. Free, cancelled and declined events are skipped, as are events BookWise wrote itself. The availability engine treats these rows like time off, both when listing open times and when a booking is placed, so a busy time can't be booked. Rows are only rewritten, and the availability cache only cleared, when the busy times actually change.
+- **Bookings out.** An outbox consumer keeps each confirmed booking as an event on its staff member's calendar: created when confirmed, moved when rescheduled (to another calendar if the booking changes hands), and deleted when cancelled. The booking stores `calendarEventId` and `calendarConnectionId`. Google events use an id derived from the booking and Microsoft events a `transactionId`, so a retried create never adds a second event. Bookings made before the calendar was connected are written on its first sync.
+- **Staying in step.** With an HTTPS `API_PUBLIC_URL`, each connection opens a Google push channel or a Microsoft Graph subscription, renewed a day before it expires. Notifications (`/api/webhooks/calendar/google` and `/microsoft`) are matched by channel and a hashed per-channel secret, then queue a sync. Every 15 minutes the worker also syncs every active calendar, which is all that runs when push is unavailable.
+
 ## Realtime streaming
 
 - **Streamed replies.** `POST /api/chat/sessions/{id}/messages` with `Accept: text/event-stream` runs the same turn as the JSON endpoint but streams `status` ("Checking Thursday 5 Nov…"; any text streamed before it is superseded), `token`, `part` (a card as soon as a tool produces it) and finally `done` with the persisted turn, or `error`. The reply is saved once, and the `clientMessageId` keeps retries idempotent, so a client whose stream drops can re-send the same message to the JSON endpoint and get the saved reply. Mistral replies stream through the provider's `stream` method; the runner doesn't retry a call that already sent text.
@@ -275,6 +287,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - Event streams are one per open chat tab; very large numbers of concurrent viewers would need a dedicated realtime service.
 - Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
+- Calendar sync re-reads the next 90 days of a calendar on each sync rather than using incremental sync tokens, and events BookWise writes stay in a staff member's calendar after they disconnect it.
 - Email delivery is recorded as `SENT` when the SMTP server accepts it; bounces are not tracked. Web push notifications are not implemented yet.
 - Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.
 
