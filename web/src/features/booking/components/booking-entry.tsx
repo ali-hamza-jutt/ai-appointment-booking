@@ -40,8 +40,9 @@ export function BookingEntry({
     !initialSessionId &&
     !shouldStartNew &&
     !locallyCreatedSessionId;
+  // Each business keeps its own active chat, so a booking link resumes that business's one.
   const activeSessionsQuery = useListSessions(
-    { limit: 1, status: "ACTIVE" },
+    { limit: 1, status: "ACTIVE", ...(businessSlug ? { businessSlug } : {}) },
     {
       query: {
         enabled: shouldCheckActiveSessions,
@@ -75,25 +76,12 @@ export function BookingEntry({
   );
 
   const latestActiveSession = activeSessionsQuery.data?.items[0];
-  // A booking link for a different business starts a fresh conversation there.
-  const needsBusinessSwitch =
-    Boolean(businessSlug) &&
-    activeSessionsQuery.isFetchedAfterMount &&
-    latestActiveSession !== undefined &&
-    latestActiveSession.business.slug !== businessSlug;
 
   useEffect(() => {
-    if ((shouldStartNew || needsBusinessSwitch) && !initialSessionId) {
-      startNewBooking(needsBusinessSwitch ? `switch-${businessSlug}` : replacementKey);
+    if (shouldStartNew && !initialSessionId) {
+      startNewBooking(replacementKey);
     }
-  }, [
-    businessSlug,
-    initialSessionId,
-    needsBusinessSwitch,
-    replacementKey,
-    shouldStartNew,
-    startNewBooking,
-  ]);
+  }, [initialSessionId, replacementKey, shouldStartNew, startNewBooking]);
 
   if (initialSessionId) {
     return (
@@ -104,7 +92,7 @@ export function BookingEntry({
     );
   }
 
-  if (shouldStartNew || needsBusinessSwitch) {
+  if (shouldStartNew) {
     if (createSessionMutation.isError) {
       return (
         <BookingEntryError

@@ -215,6 +215,7 @@ export const TENANT_SCOPE_FIELDS = {
   BookingEvent: ["businessId", "bookingId"],
   KnowledgeSource: ["businessId"],
   KnowledgeChunk: ["businessId"],
+  CustomerPreference: ["businessId", "customerId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -296,7 +297,34 @@ export const REALTIME_CONSTANTS = {
     PREPARE_CHANGE: "Preparing that change…",
     SEARCH_KNOWLEDGE: "Checking our information…",
     HANDOFF: "Passing this to the team…",
+    REMEMBER_PREFERENCE: "Saving that for next time…",
+    FORGET_PREFERENCE: "Updating your preferences…",
+    SUMMARIZE: "Catching up on our conversation…",
   },
+} as const;
+
+export const CUSTOMER_PROFILE_CONSTANTS = {
+  /** Bookings the agent sees about a customer, newest first. */
+  RECENT_BOOKINGS_IN_CONTEXT: 3,
+  /** Completed visits looked at when deriving preferences from history. */
+  HISTORY_WINDOW: 5,
+  /** A service, provider or part of day becomes a preference after this many visits in the window. */
+  MIN_REPEATS: 2,
+  COMPLETED_EVENT: "booking.completed",
+  PARTS_OF_DAY: ["morning", "afternoon", "evening"],
+} as const;
+
+export const CHAT_MEMORY_CONSTANTS = {
+  /** Chats longer than this carry a summary of what fell out of the history window. */
+  SUMMARY_THRESHOLD_MESSAGES: 20,
+  /** Re-summarize once this many more messages have left the window. */
+  SUMMARY_BATCH_MESSAGES: 8,
+  /** Most messages folded into the summary in one go; the rest wait for the next turn. */
+  MAX_MESSAGES_PER_SUMMARY: 40,
+  MAX_SUMMARY_OUTPUT_TOKENS: 300,
+  MAX_SUMMARY_CHARS: 1_500,
+  /** Longest single message quoted to the summarizer. */
+  MAX_MESSAGE_CHARS: 600,
 } as const;
 
 export const KNOWLEDGE_CONSTANTS = {
@@ -397,6 +425,7 @@ export const ERROR_CODES = {
   BOOKING_POLICY_VIOLATION: "BOOKING_POLICY_VIOLATION",
   CLASS_FULL: "CLASS_FULL",
   CUSTOMER_NOT_FOUND: "CUSTOMER_NOT_FOUND",
+  CUSTOMER_PREFERENCE_NOT_FOUND: "CUSTOMER_PREFERENCE_NOT_FOUND",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
   CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
@@ -468,6 +497,7 @@ export const ERROR_MESSAGES = {
   BOOKING_POLICY_VIOLATION: "This change is not allowed by the business's booking policy",
   CLASS_FULL: "This class is full",
   CUSTOMER_NOT_FOUND: "Customer was not found",
+  CUSTOMER_PREFERENCE_NOT_FOUND: "Preference was not found",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:

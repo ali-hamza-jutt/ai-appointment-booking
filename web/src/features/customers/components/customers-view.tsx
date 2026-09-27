@@ -20,13 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
+import { CustomerProfileModal } from "@/features/customers/components/customer-profile-modal";
 import { CUSTOMER_UI_CONSTANTS } from "@/features/customers/constants/customer-ui.constants";
 import { useCustomers } from "@/features/customers/hooks/use-customers";
 import {
   getListCustomersQueryKey,
   useCreateCustomer,
 } from "@/generated/api/customers/customers";
-import type { BusinessSummaryResponse } from "@/generated/api/models";
+import type { BusinessSummaryResponse, CustomerResponse } from "@/generated/api/models";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { getApiErrorMessage, getApiFieldError } from "@/lib/api/api-error";
 import { formatDate } from "@/lib/utils/date-time";
@@ -43,6 +44,7 @@ function CustomersContent({ business }: { business: BusinessSummaryResponse }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [profileCustomer, setProfileCustomer] = useState<CustomerResponse | null>(null);
   const debouncedSearch = useDebouncedValue(
     search.trim(),
     CUSTOMER_UI_CONSTANTS.SEARCH_DEBOUNCE_MS,
@@ -103,6 +105,9 @@ function CustomersContent({ business }: { business: BusinessSummaryResponse }) {
                 <TableHeaderCell>Email</TableHeaderCell>
                 <TableHeaderCell>Phone</TableHeaderCell>
                 <TableHeaderCell>Added</TableHeaderCell>
+                <TableHeaderCell>
+                  <span className="sr-only">Actions</span>
+                </TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -117,6 +122,16 @@ function CustomersContent({ business }: { business: BusinessSummaryResponse }) {
                   <TableCell>{customer.email ?? "—"}</TableCell>
                   <TableCell>{customer.phone ?? "—"}</TableCell>
                   <TableCell>{formatDate(customer.createdAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      aria-label={`View ${customer.name}'s profile`}
+                      onClick={() => setProfileCustomer(customer)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Profile
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -136,6 +151,14 @@ function CustomersContent({ business }: { business: BusinessSummaryResponse }) {
           ) : null}
         </>
       )}
+
+      {profileCustomer ? (
+        <CustomerProfileModal
+          businessId={business.id}
+          customer={profileCustomer}
+          onClose={() => setProfileCustomer(null)}
+        />
+      ) : null}
 
       {isAddOpen ? (
         <AddCustomerModal

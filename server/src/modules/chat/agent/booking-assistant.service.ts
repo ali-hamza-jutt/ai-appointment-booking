@@ -17,6 +17,8 @@ import { availabilityService } from "../../availability/availability.service.js"
 import { bookingService } from "../../bookings/booking.service.js";
 import type { AppointmentResponse, BookingRecord } from "../../bookings/dto/booking.dto.js";
 import { catalogService } from "../../catalog/catalog.service.js";
+import { customerProfileService } from "../../customers/customer-profile.service.js";
+import type { CustomerPreferenceKey } from "../../customers/dto/customer-profile.dto.js";
 import { knowledgeService } from "../../knowledge/knowledge.service.js";
 import type { PublicServiceResponse } from "../../catalog/dto/catalog.dto.js";
 import { staffService } from "../../staff/staff.service.js";
@@ -41,6 +43,17 @@ export interface AssistantContext {
 }
 
 export type PartOfDay = keyof typeof AGENT_CONSTANTS.PART_OF_DAY;
+
+/** The preference kinds the agent's tools name, and what each is stored as. */
+export const PREFERENCE_KINDS = ["provider", "service", "part_of_day"] as const;
+
+export type PreferenceKind = (typeof PREFERENCE_KINDS)[number];
+
+const PREFERENCE_KEYS: Record<PreferenceKind, CustomerPreferenceKey> = {
+  provider: "PREFERRED_STAFF",
+  service: "USUAL_SERVICE",
+  part_of_day: "PREFERRED_PART_OF_DAY",
+};
 
 type Result = AgentToolResult<ChatMessagePart>;
 
@@ -383,6 +396,40 @@ export class BookingAssistantService {
     };
   }
 
+  /** Saves a preference the customer stated; the value must name something real. */
+  public async rememberPreference(
+    context: AssistantContext,
+    input: { preference: PreferenceKind; value: string },
+  ): Promise<Result> {
+    const saved = await customerProfileService.rememberPreference(
+      context.business.id,
+      context.userId,
+      PREFERENCE_KEYS[input.preference],
+      input.value.trim().toLowerCase(),
+    );
+
+    return {
+      data: {
+        saved: { preference: input.preference, value: saved.label },
+        next: "Tell the customer briefly that you'll remember this for their next bookings here.",
+      },
+    };
+  }
+
+  public async forgetPreference(context: AssistantContext, preference: PreferenceKind): Promise<Result> {
+    const forgotten = await customerProfileService.forgetPreference(
+      context.business.id,
+      context.userId,
+      PREFERENCE_KEYS[preference],
+    );
+
+    return {
+      data: forgotten
+        ? { forgotten: preference, next: "Tell the customer it's forgotten." }
+        : { forgotten: null, next: "Nothing was saved for that. Tell the customer so." },
+    };
+  }
+
   public async handoffToHuman(context: AssistantContext, reason: string): Promise<Result> {
     await chatService.requestHandoff(context.userId, context.sessionId, reason.trim().slice(0, 500) || null);
 
@@ -399,19 +446,35 @@ export class BookingAssistantService {
   ): Promise<{ content: string; parts: ChatMessagePart[] }> {
     switch (action.type) {
       case "select_service": {
-        const result = await this.getAvailability(context, {
-          serviceId: action.serviceId,
-          date: this.today(context),
-          days: AGENT_CONSTANTS.MAX_AVAILABILITY_DAYS,
-        });
-        const data = result.data as { service: string; slots: unknown[]; nextAvailable?: { label: string } | null };
+        const lookup = (staffId?: string) =>
+          this.getAvailability(context, {
+            serviceId: action.serviceId,
+            date: this.today(context),
+            days: AGENT_CONSTANTS.MAX_AVAILABILITY_DAYS,
+            ...(staffId ? { staffId } : {}),
+          });
+        type AvailabilityData = { service: string; slots: unknown[]; nextAvailable?: { label: string } | null };
+        let result = await lookup(action.staffId);
+        let data = result.data as AvailabilityData;
+        // A usual provider with nothing open this week shouldn't hide everyone else's times.
+        const withStaff = Boolean(action.staffId) && data.slots.length > 0;
 
-        await chatService.updateDraft(context.userId, context.sessionId, { serviceId: action.serviceId });
+        if (action.staffId && !withStaff) {
+          result = await lookup();
+          data = result.data as AvailabilityData;
+        }
+
+        await chatService.updateDraft(context.userId, context.sessionId, {
+          serviceId: action.serviceId,
+          ...(withStaff && action.staffId ? { staffId: action.staffId } : {}),
+        });
+
+        const staffName = withStaff ? this.firstStaffName(result.parts) : null;
 
         return {
           content:
             data.slots.length > 0
-              ? `Here are the next open times for ${data.service}. Pick one to hold it.`
+              ? `Here are the next open times for ${data.service}${staffName ? ` with ${staffName}` : ""}. Pick one to hold it.`
               : data.nextAvailable
                 ? `${data.service} is fully booked this week. The next opening is ${data.nextAvailable.label}.`
                 : `${data.service} has no open times in the next few weeks.`,
@@ -597,6 +660,12 @@ export class BookingAssistantService {
         },
       ],
     };
+  }
+
+  private firstStaffName(parts: ChatMessagePart[] | undefined): string | null {
+    const picker = parts?.find((part) => part.type === "slot_picker");
+
+    return picker?.type === "slot_picker" ? (picker.slots[0]?.staffName ?? null) : null;
   }
 
   private describeSlot(slot: ChatSlotOption, timeZone: string) {

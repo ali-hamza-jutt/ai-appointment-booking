@@ -13,7 +13,9 @@ import {
 } from "@tsoa/runtime";
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
+import { customerProfileService } from "../customer-profile.service.js";
 import { customerService } from "../customer.service.js";
+import type { CustomerProfileResponse } from "../dto/customer-profile.dto.js";
 import type {
   CreateCustomerRequest,
   CustomerListResponse,
@@ -46,6 +48,18 @@ export class CustomerController extends Controller {
       ...(cursor ? { cursor } : {}),
       ...(limit !== undefined ? { limit } : {}),
     });
+  }
+
+  /** One customer with what the business remembers about them and their recent visits. */
+  @Get("{customerId}/profile")
+  @Security("jwt", ["business:read"])
+  @SuccessResponse("200", "Customer profile retrieved")
+  @Response<ApiErrorResponse>(404, "Customer was not found")
+  public getCustomerProfile(
+    @Path() businessId: string,
+    @Path() customerId: string,
+  ): Promise<CustomerProfileResponse> {
+    return customerProfileService.getCustomerProfile(businessId, customerId);
   }
 
   /** Adds a customer record, for example a walk-in or phone booking. */

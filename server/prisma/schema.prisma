@@ -119,6 +119,23 @@ enum ChatMessageRole {
   @@map("chat_message_role")
 }
 
+enum CustomerPreferenceKey {
+  PREFERRED_STAFF
+  USUAL_SERVICE
+  PREFERRED_PART_OF_DAY
+
+  @@map("customer_preference_key")
+}
+
+enum CustomerPreferenceSource {
+  /// The customer asked for it in chat; always wins.
+  CUSTOMER
+  /// Derived from completed bookings; never overwrites CUSTOMER.
+  BOOKING_HISTORY
+
+  @@map("customer_preference_source")
+}
+
 model User {
   id                 String               @id @default(uuid()) @db.Uuid
   email              String               @unique @db.VarChar(254)
@@ -223,6 +240,7 @@ model Business {
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
   knowledgeChunks  KnowledgeChunk[]
+  preferences      CustomerPreference[]
 
   @@map("businesses")
 }
@@ -469,13 +487,34 @@ model Customer {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  bookings   Booking[]
+  user        User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  bookings    Booking[]
+  preferences CustomerPreference[]
 
   @@unique([businessId, userId], map: "customers_business_id_user_id_key")
   @@unique([businessId, email], map: "customers_business_id_email_key")
   @@index([businessId, createdAt, id], map: "customers_business_id_created_at_id_idx")
   @@map("customers")
+}
+
+/// What the booking agent remembers about a customer at one business.
+/// Written only by explicit tools or completed bookings, never free-form model output.
+model CustomerPreference {
+  id         String                   @id @default(uuid()) @db.Uuid
+  businessId String                   @map("business_id") @db.Uuid
+  customerId String                   @map("customer_id") @db.Uuid
+  key        CustomerPreferenceKey
+  /// A staff id, a service id or a part of day, depending on key.
+  value      String                   @db.VarChar(64)
+  source     CustomerPreferenceSource
+  createdAt  DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, key], map: "customer_preferences_customer_id_key_key")
+  @@index([businessId], map: "customer_preferences_business_id_idx")
+  @@map("customer_preferences")
 }
 
 /// A provider-side booking. Customers still see these as "appointments".
@@ -587,6 +626,11 @@ model ChatSession {
   handoffRequestedAt DateTime?         @map("handoff_requested_at") @db.Timestamptz(3)
   handoffReason      String?           @map("handoff_reason") @db.VarChar(500)
   handoffResolvedAt  DateTime?         @map("handoff_resolved_at") @db.Timestamptz(3)
+  /// Rolling summary of the messages older than the agent's history window.
+  summary            String?           @db.Text
+  /// How many of the oldest messages the summary covers.
+  summarizedCount    Int               @default(0) @map("summarized_count")
+  summaryUpdatedAt   DateTime?         @map("summary_updated_at") @db.Timestamptz(3)
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)

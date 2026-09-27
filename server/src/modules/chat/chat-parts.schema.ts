@@ -19,7 +19,7 @@ const bookingSummary = z.object({
 });
 
 export const chatActionSchema: z.ZodType<ChatAction> = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("select_service"), serviceId: z.uuid() }),
+  z.object({ type: z.literal("select_service"), serviceId: z.uuid(), staffId: z.uuid().optional() }),
   z.object({ type: z.literal("select_slot"), slotToken: z.string().min(10).max(1_000) }),
   z.object({ type: z.literal("confirm_booking") }),
   z.object({ type: z.literal("cancel_booking"), bookingId: z.uuid() }),

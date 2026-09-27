@@ -9,6 +9,10 @@ import type { ChatSessionStatus } from './chatSessionStatus';
 
 export type ListSessionsParams = {
 status?: ChatSessionStatus;
+/**
+ * Only chats with this business.
+ */
+businessSlug?: string;
 cursor?: string;
 /**
  * @minimum 1

@@ -43,6 +43,10 @@ export function describeToolCall(name: string, args: unknown): string {
       return STATUS.SEARCH_KNOWLEDGE;
     case "handoff_to_human":
       return STATUS.HANDOFF;
+    case "remember_preference":
+      return STATUS.REMEMBER_PREFERENCE;
+    case "forget_preference":
+      return STATUS.FORGET_PREFERENCE;
     default:
       return STATUS.THINKING;
   }

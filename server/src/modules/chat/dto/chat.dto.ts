@@ -76,6 +76,8 @@ export interface ChatSlotOption {
 export interface SelectServiceAction {
   type: "select_service";
   serviceId: string;
+  /** Show this provider's times only, for example a returning customer's usual one. */
+  staffId?: string | undefined;
 }
 
 export interface SelectSlotAction {
@@ -176,7 +178,7 @@ export interface CreateChatSessionRequest {
   /** Booking link of the business to book with. Defaults to the demo business. @maxLength 60 */
   businessSlug?: string;
 
-  /** Abandons the current active chat before creating this session. */
+  /** Abandons the active chat at this business before creating this session. */
   replaceActive?: boolean;
 }
 
@@ -268,6 +270,7 @@ export interface ChatMessageListResponse {
 
 export interface ListChatSessionsOptions {
   status?: ChatSessionStatus;
+  businessSlug?: string;
   cursor?: string;
   limit?: number;
 }
@@ -343,6 +346,7 @@ export interface ChatSessionPageCursor {
 export interface ListChatSessionsData {
   userId: string;
   status?: ChatSessionStatus;
+  businessSlug?: string;
   cursor?: ChatSessionPageCursor;
   take: number;
 }
@@ -360,6 +364,30 @@ export interface CreateChatMessageData {
 export interface ChatMessageCreationResult {
   message: ChatMessageResponse;
   created: boolean;
+}
+
+/** Where a chat's rolling summary stands. */
+export interface ChatMemoryState {
+  messageCount: number;
+  summary: string | null;
+  /** How many of the oldest messages the summary covers. */
+  summarizedCount: number;
+}
+
+export interface ListChatMessageRangeData {
+  userId: string;
+  sessionId: string;
+  skip: number;
+  take: number;
+}
+
+export interface SaveChatSummaryData {
+  userId: string;
+  sessionId: string;
+  summary: string;
+  summarizedCount: number;
+  /** The count the summary was built on; a newer summary wins a race. */
+  previousCount: number;
 }
 
 export interface ListRecentChatMessagesData {

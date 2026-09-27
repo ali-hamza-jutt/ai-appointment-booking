@@ -27,6 +27,7 @@ import type {
   ChatBookingDraft,
   ChatBookingPersistenceResult,
   ChatDraftPatch,
+  ChatMemoryState,
   ChatMessageCreationResult,
   ChatMessageListResponse,
   ChatMessageMetadata,
@@ -44,6 +45,7 @@ import type {
   ListChatMessagesOptions,
   ListChatSessionsOptions,
   SaveAssistantTurnRequest,
+  SaveChatSummaryData,
 } from "./dto/chat.dto.js";
 
 export class ChatService {
@@ -76,9 +78,9 @@ export class ChatService {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        const activeSession = await chatDal.findActiveSessionForUser(userId);
+        const activeSession = await chatDal.findActiveSessionForUser(userId, businessId);
 
-        if (activeSession?.business.id === businessId) {
+        if (activeSession) {
           return this.toSessionResponse(activeSession);
         }
       }
@@ -127,9 +129,11 @@ export class ChatService {
           updatedAt: decodedCursor.timestamp,
         }
       : undefined;
+    const businessSlug = options.businessSlug?.trim().toLowerCase();
     const records = await chatDal.listSessions({
       userId,
       ...(options.status ? { status: options.status } : {}),
+      ...(businessSlug ? { businessSlug } : {}),
       ...(cursor ? { cursor } : {}),
       take: limit + 1,
     });
@@ -348,6 +352,35 @@ export class ChatService {
     });
 
     return messages.map((message) => this.toMessageResponse(message));
+  }
+
+  /** How long the chat is and how much of it the rolling summary covers. */
+  public async getMemoryState(userId: string, sessionId: string): Promise<ChatMemoryState> {
+    this.validateSessionId(sessionId);
+    const state = await chatDal.getMemoryState(userId, sessionId);
+
+    if (!state) {
+      this.throwSessionNotFound();
+    }
+
+    return state;
+  }
+
+  /** Messages by position, oldest first, for folding into the summary. */
+  public async listMessageRange(
+    userId: string,
+    sessionId: string,
+    skip: number,
+    take: number,
+  ): Promise<ChatMessageResponse[]> {
+    this.validateSessionId(sessionId);
+    const messages = await chatDal.listMessageRange({ userId, sessionId, skip, take });
+
+    return messages.map((message) => this.toMessageResponse(message));
+  }
+
+  public saveSummary(data: SaveChatSummaryData): Promise<boolean> {
+    return chatDal.saveSummary(data);
   }
 
   public async saveAssistantTurn(

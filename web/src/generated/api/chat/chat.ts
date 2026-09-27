@@ -69,7 +69,8 @@ export const getCreateSessionUrl = () => {
 }
 
 /**
- * Returns the active chat or abandons it and creates a replacement when requested.
+ * Returns the active chat with the business, or abandons it and creates a
+ * replacement when requested. Chats with other businesses are untouched.
  */
 export const createSession = async (createChatSessionRequest: CreateChatSessionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ChatSessionResponse> => {
 

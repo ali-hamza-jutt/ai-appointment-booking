@@ -1,6 +1,10 @@
 import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
-import { KNOWLEDGE_CONSTANTS } from "../../constants/app.constants.js";
+import {
+  CUSTOMER_PROFILE_CONSTANTS,
+  KNOWLEDGE_CONSTANTS,
+} from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
+import { customerProfileService } from "../customers/customer-profile.service.js";
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
@@ -41,9 +45,23 @@ export const knowledgeIndexConsumer: OutboxConsumer = {
   },
 };
 
+/** A finished visit can make a service, provider or time of day the customer's usual one. */
+export const customerPreferencesConsumer: OutboxConsumer = {
+  name: "customer-preferences",
+  handles: (type) => type === CUSTOMER_PROFILE_CONSTANTS.COMPLETED_EVENT,
+  async handle(message) {
+    const { businessId, customerId } = message.payload;
+
+    if (typeof businessId !== "string" || typeof customerId !== "string") return;
+
+    await customerProfileService.refreshFromHistory(businessId, customerId);
+  },
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
   bookingMetricsConsumer,
   knowledgeIndexConsumer,
+  customerPreferencesConsumer,
 ];
