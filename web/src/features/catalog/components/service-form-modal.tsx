@@ -15,6 +15,7 @@ import {
   BOOKING_TYPE_OPTIONS,
   CATALOG_UI_CONSTANTS,
 } from "@/features/catalog/constants/catalog-ui.constants";
+import { PAYMENT_UI_CONSTANTS } from "@/features/payments/constants/payment-ui.constants";
 import {
   useCreateService,
   useUpdateService,
@@ -23,6 +24,7 @@ import type {
   LocationResponse,
   ServiceBookingType,
   ServiceCategoryResponse,
+  ServicePaymentMode,
   ServiceResponse,
 } from "@/generated/api/models";
 import { getApiErrorMessage, getApiFieldError } from "@/lib/api/api-error";
@@ -83,6 +85,7 @@ export function ServiceFormModal({
   const [deposit, setDeposit] = useState(
     service?.depositMinor != null ? minorToMajorInput(service.depositMinor, currency) : "",
   );
+  const [paymentMode, setPaymentMode] = useState<ServicePaymentMode>(service?.paymentMode ?? "NONE");
   const [bufferBefore, setBufferBefore] = useState(String(service?.bufferBeforeMin ?? 0));
   const [bufferAfter, setBufferAfter] = useState(String(service?.bufferAfterMin ?? 0));
   const [onlineBookable, setOnlineBookable] = useState(service?.onlineBookable ?? true);
@@ -120,6 +123,9 @@ export function ServiceFormModal({
     if (priceMinor === null) errors.price = "Enter a valid price, for example 25.00.";
     if (deposit.trim() && (depositMinor === null || (priceMinor !== null && depositMinor > priceMinor))) {
       errors.deposit = "Deposit must be a valid amount no higher than the price.";
+    }
+    if (paymentMode === "DEPOSIT" && !(depositMinor && depositMinor > 0)) {
+      errors.deposit = "Set a deposit amount to ask for a deposit when booking.";
     }
     if (seats === null || seats < 1 || seats > CATALOG_UI_CONSTANTS.MAX_CLASS_CAPACITY) {
       errors.capacity = "Enter between 1 and 500 seats.";
@@ -161,6 +167,7 @@ export function ServiceFormModal({
       durationMinutes: durationMinutes ?? 0,
       priceMinor: priceMinor ?? 0,
       depositMinor,
+      paymentMode,
       bufferBeforeMin: bufferBeforeMin ?? 0,
       bufferAfterMin: bufferAfterMin ?? 0,
       onlineBookable,
@@ -270,13 +277,27 @@ export function ServiceFormModal({
           />
           <TextField
             error={fieldErrors.deposit ?? getApiFieldError(error, "depositMinor")}
-            hint="Collected when payments are enabled."
+            hint="Kept if the customer cancels late."
             id="service-deposit"
             inputMode="decimal"
             label={`Deposit (${currency}, optional)`}
             onChange={(event) => setDeposit(event.target.value)}
             value={deposit}
           />
+          <SelectField
+            error={getApiFieldError(error, "paymentMode")}
+            hint="Online payment needs a connected Stripe account (Business › Payments)."
+            id="service-payment-mode"
+            label="Online payment"
+            onChange={(event) => setPaymentMode(event.target.value as ServicePaymentMode)}
+            value={paymentMode}
+          >
+            {PAYMENT_UI_CONSTANTS.MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </SelectField>
           <TextField
             error={fieldErrors.buffers}
             hint="Preparation time blocked before the start."

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePaymentMode } from './servicePaymentMode';
 import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 
 export interface CreateServiceRequest {
@@ -40,6 +41,8 @@ export interface CreateServiceRequest {
      * @maximum 100000000
      */
   depositMinor?: number;
+  /** DEPOSIT asks for depositMinor online when booking, FULL for the whole price. Needs the business's Stripe account. */
+  paymentMode?: ServicePaymentMode;
   /**
      * @minimum 0
      * @maximum 240

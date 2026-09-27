@@ -26,6 +26,7 @@ export const serviceSelect = {
   priceMinor: true,
   currency: true,
   depositMinor: true,
+  paymentMode: true,
   bufferBeforeMin: true,
   bufferAfterMin: true,
   isActive: true,

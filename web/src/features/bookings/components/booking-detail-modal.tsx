@@ -13,6 +13,7 @@ import { useBusinessDaySlots } from "@/features/availability/hooks/use-day-slots
 import { BOOKING_STATUS_PRESENTATION } from "@/features/bookings/constants/booking-status.constants";
 import { useBookingActions } from "@/features/bookings/hooks/use-booking-actions";
 import { BookingMessages } from "@/features/notifications/components/booking-messages";
+import { BookingPayment } from "@/features/payments/components/booking-payment";
 import {
   canStaffChange,
   formatBookingPrice,
@@ -36,6 +37,8 @@ type DetailMode = "view" | "reschedule" | "cancel";
 interface BookingDetailModalProps {
   booking: BookingResponse;
   businessId: string;
+  /** Owners and managers may refund. */
+  canManage: boolean;
   businessSlug: string;
   onClose: () => void;
   timeZone: string;
@@ -44,6 +47,7 @@ interface BookingDetailModalProps {
 export function BookingDetailModal({
   booking,
   businessId,
+  canManage,
   businessSlug,
   onClose,
   timeZone,
@@ -135,6 +139,8 @@ export function BookingDetailModal({
             </ol>
           )}
         </section>
+
+        <BookingPayment booking={booking} businessId={businessId} canRefund={canManage} />
 
         <BookingMessages bookingId={booking.id} businessId={businessId} timeZone={timeZone} />
       </div>

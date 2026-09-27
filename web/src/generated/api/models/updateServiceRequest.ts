@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePaymentMode } from './servicePaymentMode';
 import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 
 export interface UpdateServiceRequest {
@@ -45,6 +46,7 @@ export interface UpdateServiceRequest {
      * @nullable
      */
   depositMinor?: number | null;
+  paymentMode?: ServicePaymentMode;
   /**
      * @minimum 0
      * @maximum 240

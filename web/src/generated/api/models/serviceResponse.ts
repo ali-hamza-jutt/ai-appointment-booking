@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ServiceBookingType } from './serviceBookingType';
+import type { ServicePaymentMode } from './servicePaymentMode';
 import type { ServicePolicyOverrides } from './servicePolicyOverrides';
 import type { ServiceReference } from './serviceReference';
 
@@ -25,6 +26,7 @@ export interface ServiceResponse {
   currency: string;
   /** @nullable */
   depositMinor: number | null;
+  paymentMode: ServicePaymentMode;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   isActive: boolean;

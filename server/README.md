@@ -48,6 +48,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `SMTP_URL`, `MAIL_FROM` | Optional SMTP connection and sender for verification, reset and booking emails. Any SMTP service works, including Amazon SES and Resend. |
 | `TOKEN_ENCRYPTION_KEY` | Optional; 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts calendar OAuth tokens; calendar sync is off without it. |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Optional; a Microsoft Entra app for Microsoft 365 calendar sync (tenant defaults to `common`). Google calendar sync reuses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PLATFORM_FEE_PERCENT` | Optional; online deposits and prepayment through Stripe Connect. `STRIPE_WEBHOOK_SECRET` lists the signing secrets of the account and Connect webhook endpoints, comma-separated. The fee (default 0%) is BookWise's cut of each payment. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Optional; send booking texts and phone codes through Twilio. `TWILIO_FROM` is an E.164 number or a messaging service SID. Without them, texts are logged outside production. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional; enable "Continue with Google". |
 | `MISTRAL_API_KEY` | Mistral API key; chat processing returns 503 when omitted. |
@@ -74,6 +75,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
 - `/api/businesses/{businessId}/calendar-connections` and `/staff/{staffId}/calendar-connection`: connect (returns the provider's consent URL), sync or disconnect a staff member's Google or Microsoft 365 calendar. `/api/calendar/providers` says which providers are configured.
+- `/api/businesses/{businessId}/payments/account`: the business's Stripe account (onboarding link, status refresh, dashboard link); `/bookings/{bookingId}/payments` and `/refunds` show and refund a booking's payment. Customers reopen Checkout with `POST /api/appointments/{id}/payment`.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -186,6 +188,16 @@ Customers hear about their bookings by email and, when a mobile number is known,
 - **Opt-outs and phone numbers.** A customer can turn a business's emails or texts off; a skipped message is logged as `SKIPPED`. Texts go to the account's verified phone or the customer record's number when it is in international (E.164) form.
 - **Delivery reports.** Twilio posts status callbacks to `/api/webhooks/twilio/sms-status`. Requests are checked against Twilio's signature over `{API_PUBLIC_URL}/api/webhooks/twilio/sms-status`; a message moves to `DELIVERED` or `FAILED` and never back.
 
+## Payments and deposits
+
+Services can ask for a deposit or the full price online (`paymentMode` `DEPOSIT` or `FULL`; `modules/payments`, Stripe client in `integrations/stripe`). Nothing is charged until the business owner connects a Stripe account and Stripe enables charges on it; until then bookings confirm as before.
+
+- **Money goes to the business.** Owners connect a Stripe Express account from the Payments page. Payments are destination charges: created on the platform with the business as merchant of record (`on_behalf_of`) and paid out to its account, minus `STRIPE_PLATFORM_FEE_PERCENT`.
+- **Paying to confirm.** When a customer confirms a hold (in the app or in chat) and the service asks for payment, the booking moves to `PENDING_PAYMENT` and the response carries a Stripe Checkout link. The time stays held while the customer pays: 35 minutes, since Checkout stays open at least 30. Card details only ever go to Stripe; the chat shows a link.
+- **Confirmation comes from Stripe.** `POST /api/webhooks/stripe` checks Stripe's signature over the raw body and records each event once (`stripe_webhook_events`); a failed event is released so Stripe's retry runs it again. `checkout.session.completed` confirms the booking (or sends it for approval). A payment that arrives after the booking lost its time is refunded automatically.
+- **Unpaid bookings.** When the payment window closes, the booking expires like a hold, its time is freed, and its Checkout session is closed.
+- **Refunds.** When a paid booking is cancelled, an outbox consumer refunds it: in full when the business cancels or the customer cancels before the cancellation window, and less the service's deposit inside it. No-shows keep the payment. Staff with manage rights can refund all or part of a payment from the booking. Refunds made in Stripe are picked up from `charge.refunded`, and every refund uses an idempotency key so retries never refund twice.
+
 ## Calendar sync
 
 Staff can connect a Google or Microsoft 365 calendar (`modules/calendar`, provider clients in `integrations/calendar`). Owners and managers can connect anyone's; staff only their own.
@@ -287,6 +299,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - Event streams are one per open chat tab; very large numbers of concurrent viewers would need a dedicated realtime service.
 - Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
+- Payments are taken through Stripe Checkout only (no saved cards or in-page payment form), and disputes are handled in the business's Stripe dashboard.
 - Calendar sync re-reads the next 90 days of a calendar on each sync rather than using incremental sync tokens, and events BookWise writes stay in a staff member's calendar after they disconnect it.
 - Email delivery is recorded as `SENT` when the SMTP server accepts it; bounces are not tracked. Web push notifications are not implemented yet.
 - Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.

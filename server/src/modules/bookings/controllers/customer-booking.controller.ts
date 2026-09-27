@@ -17,6 +17,7 @@ import {
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
 import { getAuthenticatedUser } from "../../../utils/request.js";
+import { paymentService } from "../../payments/payment.service.js";
 import { bookingService } from "../booking.service.js";
 import type {
   AppointmentListResponse,
@@ -48,16 +49,35 @@ export class CustomerBookingController extends Controller {
     return bookingService.createHold(getAuthenticatedUser(request).id, body);
   }
 
-  /** Confirms a held slot. Returns PENDING when the business approves bookings manually. */
+  /**
+   * Confirms a held slot. Returns PENDING when the business approves bookings
+   * manually, or PENDING_PAYMENT with a Checkout link in `payment` when the
+   * service asks for a deposit or prepayment; the booking is confirmed once
+   * the payment goes through.
+   */
   @Post("{appointmentId}/confirm")
   @SuccessResponse("200", "Appointment confirmed")
   @Response<ApiErrorResponse>(404, "Appointment was not found")
   @Response<ApiErrorResponse>(409, "The hold expired and the slot was taken")
+  @Response<ApiErrorResponse>(502, "The payment provider could not be reached")
   public confirmAppointment(
     @Request() request: ExpressRequest,
     @Path() appointmentId: string,
   ): Promise<AppointmentResponse> {
-    return bookingService.confirmForCustomer(getAuthenticatedUser(request).id, appointmentId);
+    return paymentService.confirmForCustomer(getAuthenticatedUser(request).id, appointmentId);
+  }
+
+  /** Opens Checkout again for an appointment still waiting on its deposit or prepayment. */
+  @Post("{appointmentId}/payment")
+  @SuccessResponse("200", "Checkout ready")
+  @Response<ApiErrorResponse>(404, "Appointment was not found")
+  @Response<ApiErrorResponse>(409, "The appointment is not waiting for a payment")
+  @Response<ApiErrorResponse>(502, "The payment provider could not be reached")
+  public resumeAppointmentPayment(
+    @Request() request: ExpressRequest,
+    @Path() appointmentId: string,
+  ): Promise<AppointmentResponse> {
+    return paymentService.resumeForCustomer(getAuthenticatedUser(request).id, appointmentId);
   }
 
   /** Cancels an appointment within the business's cancellation window. */

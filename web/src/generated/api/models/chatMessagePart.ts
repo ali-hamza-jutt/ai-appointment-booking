@@ -8,6 +8,7 @@
 import type { ChatBookingListPart } from './chatBookingListPart';
 import type { ChatBookingSummaryPart } from './chatBookingSummaryPart';
 import type { ChatConfirmPart } from './chatConfirmPart';
+import type { ChatPaymentLinkPart } from './chatPaymentLinkPart';
 import type { ChatServiceCardsPart } from './chatServiceCardsPart';
 import type { ChatSlotPickerPart } from './chatSlotPickerPart';
 import type { ChatTextPart } from './chatTextPart';
@@ -15,4 +16,4 @@ import type { ChatTextPart } from './chatTextPart';
 /**
  * Structured pieces of an assistant reply that the web renders as components.
  */
-export type ChatMessagePart = ChatTextPart | ChatServiceCardsPart | ChatSlotPickerPart | ChatBookingSummaryPart | ChatBookingListPart | ChatConfirmPart;
+export type ChatMessagePart = ChatTextPart | ChatServiceCardsPart | ChatSlotPickerPart | ChatBookingSummaryPart | ChatBookingListPart | ChatConfirmPart | ChatPaymentLinkPart;

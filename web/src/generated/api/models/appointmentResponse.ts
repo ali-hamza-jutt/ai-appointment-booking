@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BookingBusinessReference } from './bookingBusinessReference';
+import type { BookingPaymentSummary } from './bookingPaymentSummary';
 import type { BookingReference } from './bookingReference';
 import type { BookingSource } from './bookingSource';
 import type { BookingStatus } from './bookingStatus';
@@ -44,6 +45,8 @@ export interface AppointmentResponse {
   canCancel: boolean;
   /** Whether the business's policy still lets the customer reschedule. */
   canReschedule: boolean;
+  /** The deposit or prepayment, when the service asks for one. */
+  payment: BookingPaymentSummary | null;
   createdAt: string;
   updatedAt: string;
 }

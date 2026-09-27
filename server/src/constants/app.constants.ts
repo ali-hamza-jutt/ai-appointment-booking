@@ -224,6 +224,9 @@ export const TENANT_SCOPE_FIELDS = {
   NotificationPreference: ["businessId", "customerId"],
   // Provider notifications find a connection by its channel id alone.
   CalendarConnection: ["businessId", "staffId", "channelId"],
+  // Stripe webhooks find accounts and payments by Stripe's own ids.
+  PaymentAccount: ["businessId", "stripeAccountId"],
+  Payment: ["businessId", "checkoutSessionId", "paymentIntentId"],
   ExternalBusy: ["businessId", "staffId", "connectionId"],
 } as const;
 
@@ -391,6 +394,26 @@ export const CALENDAR_CONSTANTS = {
   MAX_ERROR_LENGTH: 500,
 } as const;
 
+export const PAYMENT_CONSTANTS = {
+  API_URL: "https://api.stripe.com/v1",
+  WEBHOOK_PATH: "/api/webhooks/stripe",
+  /** Stripe Checkout sessions must stay open at least 30 minutes, so an unpaid booking is held a little longer. */
+  PAYMENT_HOLD_MINUTES: 35,
+  MIN_CHECKOUT_MINUTES: 31,
+  /** Signed webhook timestamps older than this are refused (replay protection). */
+  WEBHOOK_TOLERANCE_SECONDS: 300,
+  REQUEST_TIMEOUT_MS: 15_000,
+  /** Customers land here after Checkout, with ?payment=success or cancelled. */
+  RETURN_PATH: "/appointments",
+  /** Owners land here after Stripe onboarding. */
+  SETTINGS_PATH: "/business/payments",
+  EVENTS: {
+    CANCELLED: "booking.cancelled",
+    EXPIRED: "booking.expired",
+  },
+  BOOKING_LOG_LIMIT: 20,
+} as const;
+
 export const CHAT_MEMORY_CONSTANTS = {
   /** Chats longer than this carry a summary of what fell out of the history window. */
   SUMMARY_THRESHOLD_MESSAGES: 20,
@@ -505,6 +528,10 @@ export const ERROR_CODES = {
   CUSTOMER_PREFERENCE_NOT_FOUND: "CUSTOMER_PREFERENCE_NOT_FOUND",
   NOTIFICATION_TEMPLATE_NOT_FOUND: "NOTIFICATION_TEMPLATE_NOT_FOUND",
   CALENDAR_NOT_CONFIGURED: "CALENDAR_NOT_CONFIGURED",
+  PAYMENTS_NOT_CONFIGURED: "PAYMENTS_NOT_CONFIGURED",
+  PAYMENT_NOT_REQUIRED: "PAYMENT_NOT_REQUIRED",
+  PAYMENT_PROVIDER_ERROR: "PAYMENT_PROVIDER_ERROR",
+  REFUND_NOT_ALLOWED: "REFUND_NOT_ALLOWED",
   CALENDAR_CONNECTION_NOT_FOUND: "CALENDAR_CONNECTION_NOT_FOUND",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "CALENDAR_NOT_YOUR_STAFF_PROFILE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
@@ -581,6 +608,10 @@ export const ERROR_MESSAGES = {
   CUSTOMER_PREFERENCE_NOT_FOUND: "Preference was not found",
   NOTIFICATION_TEMPLATE_NOT_FOUND: "There is no such message template",
   CALENDAR_NOT_CONFIGURED: "Calendar sync with this provider is not available",
+  PAYMENTS_NOT_CONFIGURED: "Online payments are not available",
+  PAYMENT_NOT_REQUIRED: "This booking is not waiting for a payment",
+  PAYMENT_PROVIDER_ERROR: "The payment provider could not be reached. Please try again.",
+  REFUND_NOT_ALLOWED: "Nothing on this booking can be refunded",
   CALENDAR_CONNECTION_NOT_FOUND: "This staff member has no connected calendar",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "Only owners, managers or the staff member themselves can change this calendar",
   CHAT_MESSAGE_ALREADY_EXISTS:
@@ -660,6 +691,8 @@ export const VALIDATION_MESSAGES = {
     "Classes need between 1 and 500 seats; appointments always have 1",
   SERVICE_CATEGORY_NAME: "Category name must contain between 1 and 80 characters",
   SERVICE_DEPOSIT: "Deposit cannot be negative or exceed the price",
+  SERVICE_PAYMENT_DEPOSIT: "Set a deposit amount to ask for a deposit",
+  SERVICE_PAYMENT_PRICE: "A free service cannot ask for payment",
   SERVICE_DESCRIPTION: "Description cannot exceed 2000 characters",
   SERVICE_DURATION: "Duration must be whole minutes between 5 and 720",
   SERVICE_NAME: "Service name must contain between 2 and 120 characters",

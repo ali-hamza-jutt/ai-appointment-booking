@@ -119,6 +119,35 @@ enum ChatMessageRole {
   @@map("chat_message_role")
 }
 
+/// What a customer pays online when they confirm a booking.
+enum ServicePaymentMode {
+  NONE
+  DEPOSIT
+  FULL
+
+  @@map("service_payment_mode")
+}
+
+enum PaymentKind {
+  DEPOSIT
+  FULL
+
+  @@map("payment_kind")
+}
+
+enum PaymentStatus {
+  /// Checkout is open and waiting for the customer.
+  PENDING
+  SUCCEEDED
+  FAILED
+  /// Checkout expired or was abandoned without paying.
+  CANCELLED
+  PARTIALLY_REFUNDED
+  REFUNDED
+
+  @@map("payment_status")
+}
+
 enum CalendarProvider {
   GOOGLE
   MICROSOFT
@@ -285,6 +314,8 @@ model Business {
   timeOff          TimeOff[]
   calendarConnections CalendarConnection[]
   externalBusy        ExternalBusy[]
+  paymentAccount      PaymentAccount?
+  payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
   knowledgeChunks  KnowledgeChunk[]
@@ -343,6 +374,8 @@ model Service {
   priceMinor      Int                @map("price_minor")
   currency        String             @db.Char(3)
   depositMinor    Int?               @map("deposit_minor")
+  /// Whether customers pay the deposit, the full price or nothing online when booking.
+  paymentMode     ServicePaymentMode @default(NONE) @map("payment_mode")
   bufferBeforeMin Int                @default(0) @map("buffer_before_min") @db.SmallInt
   bufferAfterMin  Int                @default(0) @map("buffer_after_min") @db.SmallInt
   isActive        Boolean            @default(true) @map("is_active")
@@ -469,6 +502,56 @@ model WorkingHours {
 
   @@index([businessId, staffId, weekday], map: "working_hours_business_id_staff_id_weekday_idx")
   @@map("working_hours")
+}
+
+/// The business's Stripe account (Connect); customer payments go straight to it.
+model PaymentAccount {
+  id               String   @id @default(uuid()) @db.Uuid
+  businessId       String   @unique(map: "payment_accounts_business_id_key") @map("business_id") @db.Uuid
+  stripeAccountId  String   @unique(map: "payment_accounts_stripe_account_id_key") @map("stripe_account_id") @db.VarChar(100)
+  /// Stripe lets the account take card payments.
+  chargesEnabled   Boolean  @default(false) @map("charges_enabled")
+  payoutsEnabled   Boolean  @default(false) @map("payouts_enabled")
+  detailsSubmitted Boolean  @default(false) @map("details_submitted")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("payment_accounts")
+}
+
+/// One online payment for a booking, taken through Stripe Checkout on the business's account.
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  businessId        String        @map("business_id") @db.Uuid
+  bookingId         String        @map("booking_id") @db.Uuid
+  kind              PaymentKind
+  status            PaymentStatus @default(PENDING)
+  amountMinor       Int           @map("amount_minor")
+  currency          String        @db.Char(3)
+  refundedMinor     Int           @default(0) @map("refunded_minor")
+  stripeAccountId   String        @map("stripe_account_id") @db.VarChar(100)
+  checkoutSessionId String        @unique(map: "payments_checkout_session_id_key") @map("checkout_session_id") @db.VarChar(255)
+  checkoutUrl       String?       @map("checkout_url") @db.Text
+  checkoutExpiresAt DateTime      @map("checkout_expires_at") @db.Timestamptz(3)
+  paymentIntentId   String?       @unique(map: "payments_payment_intent_id_key") @map("payment_intent_id") @db.VarChar(255)
+  paidAt            DateTime?     @map("paid_at") @db.Timestamptz(3)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business          Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  booking           Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, createdAt], map: "payments_booking_id_created_at_idx")
+  @@map("payments")
+}
+
+/// Stripe webhook events already handled; Stripe delivers each at least once.
+model StripeWebhookEvent {
+  id         String   @id @db.VarChar(255)
+  type       String   @db.VarChar(100)
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  @@map("stripe_webhook_events")
 }
 
 /// A staff member's Google or Microsoft calendar, linked through OAuth.
@@ -677,6 +760,7 @@ model Booking {
   chatDrafts      ChatSession[]     @relation("ChatDraftHold")
   events          BookingEvent[]
   notifications   Notification[]
+  payments        Payment[]
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")

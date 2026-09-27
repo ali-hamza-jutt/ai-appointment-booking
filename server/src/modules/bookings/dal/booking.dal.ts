@@ -8,6 +8,7 @@ import {
   type TransactionClient,
 } from "../../../infrastructure/database/prisma.js";
 import { currentOutboxMeta } from "../../outbox/outbox-meta.js";
+import { paymentSelect } from "../../payments/dal/payment.dal.js";
 import { BOOKING_TRANSITIONS, nextStatus } from "../booking-state.js";
 import type {
   BookingActor,
@@ -57,6 +58,8 @@ export const bookingSelect = {
   customer: { select: { id: true, name: true, email: true, phone: true } },
   staff: { select: { id: true, displayName: true } },
   service: { select: { policyOverrides: true } },
+  // The latest payment, if the booking asked for one.
+  payments: { orderBy: { createdAt: "desc" }, take: 1, select: paymentSelect },
 } as const;
 
 export class BookingTransitionError extends Error {

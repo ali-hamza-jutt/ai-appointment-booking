@@ -1,13 +1,14 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import { CalendarIcon, CheckCircleIcon, ClockIcon, TrashIcon, UserIcon } from "@/components/ui/icons";
 import type {
   ChatAction,
   ChatBookingSummary,
   ChatConfirmPart,
   ChatMessagePart,
+  ChatPaymentLinkPart,
   ChatServiceCard,
   ChatSlotPickerPart,
 } from "@/generated/api/models";
@@ -47,6 +48,8 @@ export function ChatMessageParts({ disabled, onAction, parts }: ChatMessageParts
             );
           case "confirm":
             return <ConfirmButton disabled={disabled} key={index} onAction={onAction} part={part} />;
+          case "payment_link":
+            return <PaymentLink key={index} part={part} />;
           default:
             return null;
         }
@@ -198,6 +201,20 @@ function BookingSummaryCard({ booking }: { booking: ChatBookingSummary }) {
           </span>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** Stripe Checkout for the deposit; card details never pass through the chat. */
+function PaymentLink({ part }: { part: ChatPaymentLinkPart }) {
+  const until = new Intl.DateTimeFormat("en-US", { timeStyle: "short" }).format(new Date(part.expiresAt));
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <LinkButton href={part.url} leadingIcon={<CheckCircleIcon className="size-4" />} size="sm">
+        {part.label}
+      </LinkButton>
+      <span className="text-xs text-muted">Secure payment by Stripe · time held until {until}</span>
     </div>
   );
 }

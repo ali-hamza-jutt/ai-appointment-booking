@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/icons";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
+import { canManageBusiness } from "@/features/business-settings/utils/business-permissions";
 import { BookingDetailModal } from "@/features/bookings/components/booking-detail-modal";
 import { BookingLinkCard } from "@/features/bookings/components/booking-link-card";
 import { ManualBookingModal } from "@/features/bookings/components/manual-booking-modal";
@@ -257,6 +258,7 @@ function BookingsContent({ business }: { business: BusinessResponse }) {
         <BookingDetailModal
           booking={selected}
           businessId={business.id}
+          canManage={canManageBusiness(business.role)}
           businessSlug={business.slug}
           onClose={() => {
             setSelected(null);

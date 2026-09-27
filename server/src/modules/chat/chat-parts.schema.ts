@@ -70,6 +70,14 @@ const partSchema: z.ZodType<ChatMessagePart> = z.discriminatedUnion("type", [
     tone: z.enum(["primary", "danger"]),
     action: chatActionSchema,
   }),
+  z.object({
+    type: z.literal("payment_link"),
+    label: z.string(),
+    url: z.string(),
+    amountMinor: z.number(),
+    currency: z.string(),
+    expiresAt: isoInstant,
+  }),
 ]) as z.ZodType<ChatMessagePart>;
 
 /** Stored parts that still match the current shapes; anything else is dropped. */
