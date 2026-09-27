@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
 import { AccountSecurity } from "@/features/profile/components/account-security";
+import { MyNotificationSettings } from "@/features/notifications/components/my-notification-settings";
 import { SavedPreferences } from "@/features/profile/components/saved-preferences";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 
@@ -97,6 +98,8 @@ export function ProfileOverview() {
       <AccountSecurity user={user} />
 
       <SavedPreferences />
+
+      <MyNotificationSettings />
 
       <section className="mt-5 rounded-xl border border-border bg-surface p-5 shadow-card sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -1,4 +1,5 @@
 import type { EmailAddress } from "../../auth/dto/auth.dto.js";
+import type { LocalTime } from "../../availability/dto/availability.dto.js";
 
 export type BusinessVertical =
   | "SALON"
@@ -45,6 +46,12 @@ export interface BusinessSettings {
   autoConfirmBookings: boolean;
   /** Mark confirmed bookings without a check-in as no-shows once the grace period passes. */
   autoMarkNoShows: boolean;
+  /**
+   * SMS reminders due between these local times (in the customer's time
+   * zone) go out when quiet hours start instead. Equal times turn them off.
+   */
+  quietHoursStart: string;
+  quietHoursEnd: string;
 }
 
 export interface UpdateBusinessSettingsRequest {
@@ -67,6 +74,8 @@ export interface UpdateBusinessSettingsRequest {
   allowGuestBooking?: boolean;
   autoConfirmBookings?: boolean;
   autoMarkNoShows?: boolean;
+  quietHoursStart?: LocalTime;
+  quietHoursEnd?: LocalTime;
 }
 
 export interface CreateBusinessLocationInput {

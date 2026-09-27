@@ -22,6 +22,7 @@ import {
   ContactIcon,
   ConversationsIcon,
   LogoutIcon,
+  MailIcon,
   MenuIcon,
   PlusIcon,
   SettingsIcon,
@@ -63,6 +64,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/team", icon: UsersIcon, label: "Team" },
   { href: "/business/customers", icon: ContactIcon, label: "Customers" },
   { href: "/business/knowledge", icon: BookIcon, label: "Knowledge base" },
+  { href: "/business/notifications", icon: MailIcon, label: "Notifications" },
   { href: "/business/handoffs", icon: ChatIcon, label: "Chat handoffs" },
 ];
 
@@ -80,6 +82,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/team", "Team"],
   ["/business/customers", "Customers"],
   ["/business/knowledge", "Knowledge base"],
+  ["/business/notifications", "Notifications"],
   ["/business/handoffs", "Chat handoffs"],
 ];
 

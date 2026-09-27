@@ -12,6 +12,7 @@ import { SlotPicker } from "@/features/availability/components/slot-picker";
 import { useBusinessDaySlots } from "@/features/availability/hooks/use-day-slots";
 import { BOOKING_STATUS_PRESENTATION } from "@/features/bookings/constants/booking-status.constants";
 import { useBookingActions } from "@/features/bookings/hooks/use-booking-actions";
+import { BookingMessages } from "@/features/notifications/components/booking-messages";
 import {
   canStaffChange,
   formatBookingPrice,
@@ -134,6 +135,8 @@ export function BookingDetailModal({
             </ol>
           )}
         </section>
+
+        <BookingMessages bookingId={booking.id} businessId={businessId} timeZone={timeZone} />
       </div>
     </Modal>
   );

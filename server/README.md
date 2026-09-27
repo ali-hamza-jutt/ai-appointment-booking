@@ -45,7 +45,8 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 | `JWT_ACCESS_TOKEN_TTL_SECONDS` | Access-token lifetime. |
 | `API_PUBLIC_URL` | Public base URL of the API, used for the Google redirect URI. |
 | `COOKIE_DOMAIN` | Optional refresh-cookie domain for sibling subdomains. |
-| `SMTP_URL`, `MAIL_FROM` | Optional SMTP connection and sender for verification and reset emails. |
+| `SMTP_URL`, `MAIL_FROM` | Optional SMTP connection and sender for verification, reset and booking emails. Any SMTP service works, including Amazon SES and Resend. |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` | Optional; send booking texts and phone codes through Twilio. `TWILIO_FROM` is an E.164 number or a messaging service SID. Without them, texts are logged outside production. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional; enable "Continue with Google". |
 | `MISTRAL_API_KEY` | Mistral API key; chat processing returns 503 when omitted. |
 | `MISTRAL_MODEL` | Mistral chat-completion model. |
@@ -70,6 +71,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses`: create a business (caller becomes owner), list your businesses, profile and booking-policy settings, and locations.
 - `/api/businesses/{businessId}/members`: team roles and email invitations (accepted automatically on signup).
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
+- `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
 - `/api/businesses/{businessId}/staff/{staffId}/working-hours` and `/time-off`, and `/api/businesses/{businessId}/closures`: weekly shifts (several per day for breaks, overnight shifts allowed), time off and whole-day closures.
@@ -170,6 +172,17 @@ The agent starts each turn knowing who it is talking to (`modules/customers/cust
 - **Per-business chats.** A customer has at most one active chat per business (partial unique index on `user_id, business_id`), so opening another business's booking link no longer abandons the first chat. `GET /api/chat/sessions?businessSlug=` filters by business.
 - **APIs.** `GET /api/me/preferences` and `DELETE /api/me/preferences/{preferenceId}` let customers see and remove what each business remembers. `GET /api/businesses/{businessId}/customers/{customerId}/profile` (scope `business:read`) shows staff a customer's preferences, visit counts and recent bookings.
 
+## Notifications and reminders
+
+Customers hear about their bookings by email and, when a mobile number is known, by text (`modules/notifications`). Everything is sent by the worker, never inside a booking transaction.
+
+- **What is sent.** An outbox consumer turns `booking.confirmed`, `booking.pending_approval`, `booking.rescheduled` and `booking.cancelled` into a message. Confirmation, move and cancellation emails carry an iCalendar invite (`utils/ics.ts`) with a stable UID and a rising `SEQUENCE`, so calendar apps update or remove the same event. A cancelled hold that was never confirmed sends nothing, and an event overtaken by a later change (a confirmation for a booking already moved) is skipped.
+- **Reminders.** A confirmed or moved booking schedules one delayed job per `reminderOffsetsMinutes` (24 and 2 hours by default) on the `notifications` queue. A reminder due inside the business's quiet hours (`quietHoursStart` to `quietHoursEnd`, 21:00 to 08:00 by default, in the customer's time zone) goes out when quiet hours begin instead. Job ids include the booking's start, and each job re-reads the booking before sending, so a moved, cancelled or finished booking gets no stale reminder. Reminders already due when the booking is made are skipped.
+- **Exactly once per message.** Each message is written to `notifications` before it is sent, keyed by event (or reminder) and channel. A repeated event or job sends only what never went out. A temporary failure (SMTP down, Twilio 5xx) fails the job so the queue retries it, while a number Twilio refuses is marked `FAILED` without retrying.
+- **Templates.** Businesses can replace the built-in wording of any message with plain text and `{{placeholders}}` (`customerName`, `serviceName`, `staffName`, `date`, `time`, `timeZone`, `location`, `link` and `businessName`); unknown placeholders are rejected when saved.
+- **Opt-outs and phone numbers.** A customer can turn a business's emails or texts off; a skipped message is logged as `SKIPPED`. Texts go to the account's verified phone or the customer record's number when it is in international (E.164) form.
+- **Delivery reports.** Twilio posts status callbacks to `/api/webhooks/twilio/sms-status`. Requests are checked against Twilio's signature over `{API_PUBLIC_URL}/api/webhooks/twilio/sms-status`; a message moves to `DELIVERED` or `FAILED` and never back.
+
 ## Realtime streaming
 
 - **Streamed replies.** `POST /api/chat/sessions/{id}/messages` with `Accept: text/event-stream` runs the same turn as the JSON endpoint but streams `status` ("Checking Thursday 5 Nov…"; any text streamed before it is superseded), `token`, `part` (a card as soon as a tool produces it) and finally `done` with the persisted turn, or `error`. The reply is saved once, and the `clientMessageId` keeps retries idempotent, so a client whose stream drops can re-send the same message to the JSON endpoint and get the saved reply. Mistral replies stream through the provider's `stream` method; the runner doesn't retry a call that already sent text.
@@ -203,7 +216,7 @@ Sign-in returns a 15-minute access token in the body and sets a refresh token in
 `src/worker.ts` is a separate process from the API. It needs PostgreSQL and Redis and runs:
 
 - **Outbox relay.** Every `OUTBOX_RELAY_INTERVAL_MS` it claims unpublished `outbox_events` rows with `FOR UPDATE SKIP LOCKED` (so several workers can run), adds each to the `outbox-events` BullMQ queue with the event id as job id, and marks them published in the same transaction. A failed publish increments `attempts`; an event is retried until `OUTBOX_MAX_ATTEMPTS`.
-- **Idempotent consumers.** `modules/outbox/outbox-consumers.ts` lists the consumers. Each claims an event in Redis before handling it and records it as done afterwards, so a redelivered event is skipped and a failed consumer is retried without re-running the ones that succeeded. Consumers drop cached availability and count metrics on `booking.*` events, embed knowledge sources on `knowledge.source_changed`, and re-derive customer preferences on `booking.completed`.
+- **Idempotent consumers.** `modules/outbox/outbox-consumers.ts` lists the consumers. Each claims an event in Redis before handling it and records it as done afterwards, so a redelivered event is skipped and a failed consumer is retried without re-running the ones that succeeded. Consumers drop cached availability and count metrics on `booking.*` events, embed knowledge sources on `knowledge.source_changed`, re-derive customer preferences on `booking.completed`, and send booking notifications.
 - **Scheduled maintenance** on the `booking-maintenance` queue: expire lapsed holds (every minute), mark no-shows for businesses with `autoMarkNoShows` once `noShowGraceMinutes` has passed (every 5 minutes), and complete checked-in visits an hour after they end (every 5 minutes). Each booking changes in its own transaction through the state machine as the `SYSTEM` actor, so a booking that staff changed in the meantime is skipped.
 
 Hold expiry does not depend on the worker: placing a booking also expires the provider's lapsed holds inside its transaction.
@@ -262,6 +275,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - Event streams are one per open chat tab; very large numbers of concurrent viewers would need a dedicated realtime service.
 - Access tokens stay valid until they expire (15 minutes by default) even after sign-out; refresh tokens are revoked immediately.
 - The health endpoint reports process availability and does not perform a database readiness query.
+- Email delivery is recorded as `SENT` when the SMTP server accepts it; bounces are not tracked. Web push notifications are not implemented yet.
 - Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.
 
 ## Sample data

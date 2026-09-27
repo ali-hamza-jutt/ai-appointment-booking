@@ -119,6 +119,37 @@ enum ChatMessageRole {
   @@map("chat_message_role")
 }
 
+enum NotificationChannel {
+  EMAIL
+  SMS
+
+  @@map("notification_channel")
+}
+
+enum NotificationKind {
+  BOOKING_CONFIRMED
+  /// The business must approve the booking first.
+  BOOKING_REQUESTED
+  BOOKING_RESCHEDULED
+  BOOKING_CANCELLED
+  BOOKING_REMINDER
+
+  @@map("notification_kind")
+}
+
+enum NotificationStatus {
+  PENDING
+  /// Accepted by the provider.
+  SENT
+  /// The provider reported delivery (SMS status callbacks).
+  DELIVERED
+  FAILED
+  /// Not sent: the customer opted out or has no address for the channel.
+  SKIPPED
+
+  @@map("notification_status")
+}
+
 enum CustomerPreferenceKey {
   PREFERRED_STAFF
   USUAL_SERVICE
@@ -241,6 +272,9 @@ model Business {
   knowledgeSources KnowledgeSource[]
   knowledgeChunks  KnowledgeChunk[]
   preferences      CustomerPreference[]
+  notificationTemplates   NotificationTemplate[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("businesses")
 }
@@ -490,6 +524,8 @@ model Customer {
   user        User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   bookings    Booking[]
   preferences CustomerPreference[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([businessId, userId], map: "customers_business_id_user_id_key")
   @@unique([businessId, email], map: "customers_business_id_email_key")
@@ -565,6 +601,7 @@ model Booking {
   /// Chats whose draft currently points at this hold.
   chatDrafts      ChatSession[]     @relation("ChatDraftHold")
   events          BookingEvent[]
+  notifications   Notification[]
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")
@@ -664,6 +701,68 @@ model ChatMessage {
 }
 
 /// FAQs, policies and prep instructions an owner gives the assistant to quote.
+/// A business's wording for one kind of message on one channel; built-in text is used otherwise.
+model NotificationTemplate {
+  id         String              @id @default(uuid()) @db.Uuid
+  businessId String              @map("business_id") @db.Uuid
+  channel    NotificationChannel
+  kind       NotificationKind
+  /// Email only.
+  subject    String?             @db.VarChar(200)
+  /// Plain text with {{variable}} placeholders.
+  body       String              @db.Text
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, channel, kind], map: "notification_templates_business_id_channel_kind_key")
+  @@map("notification_templates")
+}
+
+/// One message to one customer on one channel, and what became of it.
+model Notification {
+  id                String              @id @default(uuid()) @db.Uuid
+  businessId        String              @map("business_id") @db.Uuid
+  bookingId         String?             @map("booking_id") @db.Uuid
+  customerId        String              @map("customer_id") @db.Uuid
+  channel           NotificationChannel
+  kind              NotificationKind
+  status            NotificationStatus  @default(PENDING)
+  recipient         String              @db.VarChar(254)
+  /// Sends each message at most once, for example "<event id>:EMAIL".
+  dedupeKey         String              @unique(map: "notifications_dedupe_key_key") @map("dedupe_key") @db.VarChar(200)
+  /// The provider's id, which delivery callbacks refer to.
+  providerMessageId String?             @map("provider_message_id") @db.VarChar(100)
+  error             String?             @db.VarChar(500)
+  sentAt            DateTime?           @map("sent_at") @db.Timestamptz(3)
+  deliveredAt       DateTime?           @map("delivered_at") @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business          Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  booking           Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt], map: "notifications_booking_id_created_at_idx")
+  @@index([providerMessageId], map: "notifications_provider_message_id_idx")
+  @@map("notifications")
+}
+
+/// Whether a customer wants messages from one business on one channel. No row means yes.
+model NotificationPreference {
+  id         String              @id @default(uuid()) @db.Uuid
+  businessId String              @map("business_id") @db.Uuid
+  customerId String              @map("customer_id") @db.Uuid
+  channel    NotificationChannel
+  optedIn    Boolean             @map("opted_in")
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, channel], map: "notification_preferences_customer_id_channel_key")
+  @@map("notification_preferences")
+}
+
 model KnowledgeSource {
   id          String                @id @default(uuid()) @db.Uuid
   businessId  String                @map("business_id") @db.Uuid

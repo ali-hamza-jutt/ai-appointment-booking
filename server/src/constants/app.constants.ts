@@ -142,6 +142,7 @@ export const JOB_CONSTANTS = {
   QUEUES: {
     OUTBOX: "outbox-events",
     MAINTENANCE: "booking-maintenance",
+    NOTIFICATIONS: "notifications",
   },
   MAINTENANCE_JOBS: {
     EXPIRE_HOLDS: "expire-holds",
@@ -216,6 +217,10 @@ export const TENANT_SCOPE_FIELDS = {
   KnowledgeSource: ["businessId"],
   KnowledgeChunk: ["businessId"],
   CustomerPreference: ["businessId", "customerId"],
+  NotificationTemplate: ["businessId"],
+  // Delivery callbacks find a message by the provider's id alone.
+  Notification: ["businessId", "providerMessageId"],
+  NotificationPreference: ["businessId", "customerId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -312,6 +317,32 @@ export const CUSTOMER_PROFILE_CONSTANTS = {
   MIN_REPEATS: 2,
   COMPLETED_EVENT: "booking.completed",
   PARTS_OF_DAY: ["morning", "afternoon", "evening"],
+} as const;
+
+export const NOTIFICATION_CONSTANTS = {
+  /** Booking events that send a message straight away. */
+  EVENTS: {
+    CONFIRMED: "booking.confirmed",
+    REQUESTED: "booking.pending_approval",
+    RESCHEDULED: "booking.rescheduled",
+    CANCELLED: "booking.cancelled",
+  },
+  REMINDER_JOB: "send-reminder",
+  MAX_SUBJECT_LENGTH: 200,
+  MAX_EMAIL_BODY_LENGTH: 4_000,
+  /** Three SMS segments. */
+  MAX_SMS_BODY_LENGTH: 480,
+  MAX_ERROR_LENGTH: 500,
+  DEFAULT_QUIET_HOURS_START: "21:00",
+  DEFAULT_QUIET_HOURS_END: "08:00",
+  /** A reminder due within this long of now is still sent rather than dropped. */
+  REMINDER_GRACE_MINUTES: 5,
+  ICS_PRODUCT_ID: "-//BookWise//Bookings//EN",
+  ICS_UID_DOMAIN: "bookwise.app",
+  TWILIO_API_URL: "https://api.twilio.com/2010-04-01",
+  TWILIO_STATUS_PATH: "/api/webhooks/twilio/sms-status",
+  SMS_REQUEST_TIMEOUT_MS: 10_000,
+  BOOKING_LOG_LIMIT: 50,
 } as const;
 
 export const CHAT_MEMORY_CONSTANTS = {
@@ -426,6 +457,7 @@ export const ERROR_CODES = {
   CLASS_FULL: "CLASS_FULL",
   CUSTOMER_NOT_FOUND: "CUSTOMER_NOT_FOUND",
   CUSTOMER_PREFERENCE_NOT_FOUND: "CUSTOMER_PREFERENCE_NOT_FOUND",
+  NOTIFICATION_TEMPLATE_NOT_FOUND: "NOTIFICATION_TEMPLATE_NOT_FOUND",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
   CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
@@ -498,6 +530,7 @@ export const ERROR_MESSAGES = {
   CLASS_FULL: "This class is full",
   CUSTOMER_NOT_FOUND: "Customer was not found",
   CUSTOMER_PREFERENCE_NOT_FOUND: "Preference was not found",
+  NOTIFICATION_TEMPLATE_NOT_FOUND: "There is no such message template",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:
