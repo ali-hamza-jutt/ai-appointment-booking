@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { LocalTime } from './localTime';
 
 export interface UpdateBusinessSettingsRequest {
   /**
@@ -47,4 +48,6 @@ export interface UpdateBusinessSettingsRequest {
   allowGuestBooking?: boolean;
   autoConfirmBookings?: boolean;
   autoMarkNoShows?: boolean;
+  quietHoursStart?: LocalTime;
+  quietHoursEnd?: LocalTime;
 }

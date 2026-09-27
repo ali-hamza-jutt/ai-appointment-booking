@@ -59,6 +59,11 @@ const environmentSchema = z.object({
   MAIL_FROM: z.string().trim().min(3).default("BookWise <no-reply@bookwise.local>"),
   GOOGLE_CLIENT_ID: optionalNonEmptyString,
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString,
+  /** Twilio credentials; without them SMS is logged outside production and unavailable in it. */
+  TWILIO_ACCOUNT_SID: optionalNonEmptyString,
+  TWILIO_AUTH_TOKEN: optionalNonEmptyString,
+  /** Sender: a Twilio phone number in E.164 form, or a messaging service SID (MG…). */
+  TWILIO_FROM: optionalNonEmptyString,
   /** Exposes Prometheus metrics for the API on this port (e.g. 9464). */
   METRICS_PORT: z.coerce.number().int().min(1).max(65_535).optional(),
   /** Exposes Prometheus metrics for the worker on this port (e.g. 9465). */

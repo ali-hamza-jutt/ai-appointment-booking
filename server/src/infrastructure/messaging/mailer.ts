@@ -7,6 +7,14 @@ export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
+  /** An iCalendar invite that mail clients offer to add to the calendar. */
+  calendarEvent?: CalendarAttachment;
+}
+
+export interface CalendarAttachment {
+  /** REQUEST adds or updates the event; CANCEL removes it. */
+  method: "REQUEST" | "CANCEL";
+  content: string;
 }
 
 export interface Mailer {
@@ -21,7 +29,15 @@ class SmtpMailer implements Mailer {
   }
 
   public async send(message: EmailMessage): Promise<void> {
-    await this.transport.sendMail({ from: env.MAIL_FROM, ...message });
+    const { calendarEvent, ...email } = message;
+
+    await this.transport.sendMail({
+      from: env.MAIL_FROM,
+      ...email,
+      ...(calendarEvent
+        ? { icalEvent: { method: calendarEvent.method, filename: "invite.ics", content: calendarEvent.content } }
+        : {}),
+    });
   }
 }
 

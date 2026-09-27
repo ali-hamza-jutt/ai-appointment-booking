@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import { JOB_CONSTANTS } from "./constants/app.constants.js";
+import { JOB_CONSTANTS, NOTIFICATION_CONSTANTS } from "./constants/app.constants.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -19,6 +19,8 @@ import {
   getRedis,
 } from "./infrastructure/redis/redis.js";
 import { bookingMaintenanceService } from "./modules/bookings/booking-maintenance.service.js";
+import type { ReminderJobData } from "./modules/notifications/dto/notification.dto.js";
+import { notificationService, reminderScheduler } from "./modules/notifications/notification.service.js";
 import type { OutboxMessage } from "./modules/outbox/dto/outbox.dto.js";
 import { OutboxConsumerRunner } from "./modules/outbox/outbox-consumer.runner.js";
 import { outboxConsumers } from "./modules/outbox/outbox-consumers.js";
@@ -85,6 +87,14 @@ async function runMaintenanceJob(job: Job): Promise<number> {
   if (changed > 0) logger.info({ job: job.name, changed }, "Booking maintenance applied");
 
   return changed;
+}
+
+function runNotificationJob(job: Job<ReminderJobData>): Promise<void> {
+  if (job.name !== NOTIFICATION_CONSTANTS.REMINDER_JOB) {
+    return Promise.reject(new Error(`Unknown notification job ${job.name}`));
+  }
+
+  return observeJob(QUEUES.NOTIFICATIONS, job, () => notificationService.sendReminder(job.data));
 }
 
 /** Continues the trace and request id of the request that wrote the event. */
@@ -162,6 +172,12 @@ async function startWorker(): Promise<void> {
         concurrency: 1,
       }),
     );
+    watch(
+      new Worker<ReminderJobData>(QUEUES.NOTIFICATIONS, runNotificationJob, {
+        connection: createRedisConnection(),
+        prefix: QUEUE_PREFIX,
+      }),
+    );
     startRelay(new OutboxRelayService(new QueueOutboxPublisher(outboxQueue)));
 
     logger.info({ environment: env.NODE_ENV }, "BookWise worker started");
@@ -190,6 +206,7 @@ async function shutdown(exitCode = 0): Promise<void> {
     clearTimeout(relayTimer);
     await relayRunning;
     await Promise.all(workers.map((worker) => worker.close()));
+    await reminderScheduler.close();
     await closeRedis();
     await disconnectDatabase();
     await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);

@@ -218,7 +218,7 @@ describe("phone codes", () => {
 
   beforeEach(async () => {
     await resetDatabase();
-    sendSms = vi.spyOn(smsSender, "send").mockResolvedValue();
+    sendSms = vi.spyOn(smsSender, "send").mockResolvedValue(undefined);
   });
   afterEach(() => vi.restoreAllMocks());
   afterAll(disconnectTestDatabase);

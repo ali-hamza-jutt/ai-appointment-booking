@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  NOTIFICATION_CONSTANTS,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
@@ -24,6 +25,8 @@ export const bookingPolicyFields = {
   autoMarkNoShows: z.boolean(),
 } as const;
 
+const localTime = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+
 export const businessSettingsSchema = z.object({
   bookingWindowDays: bookingPolicyFields.bookingWindowDays.default(60),
   minimumNoticeMinutes: bookingPolicyFields.minimumNoticeMinutes.default(120),
@@ -36,6 +39,8 @@ export const businessSettingsSchema = z.object({
   allowGuestBooking: bookingPolicyFields.allowGuestBooking.default(true),
   autoConfirmBookings: bookingPolicyFields.autoConfirmBookings.default(true),
   autoMarkNoShows: bookingPolicyFields.autoMarkNoShows.default(false),
+  quietHoursStart: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_START),
+  quietHoursEnd: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_END),
 });
 
 export const DEFAULT_BUSINESS_SETTINGS = businessSettingsSchema.parse({});

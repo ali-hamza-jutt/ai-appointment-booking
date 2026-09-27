@@ -2,10 +2,12 @@ import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
 import {
   CUSTOMER_PROFILE_CONSTANTS,
   KNOWLEDGE_CONSTANTS,
+  NOTIFICATION_CONSTANTS,
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
 import { customerProfileService } from "../customers/customer-profile.service.js";
 import { knowledgeService } from "../knowledge/knowledge.service.js";
+import { notificationService } from "../notifications/notification.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
 const BOOKING_EVENT_PREFIX = "booking.";
@@ -58,10 +60,20 @@ export const customerPreferencesConsumer: OutboxConsumer = {
   },
 };
 
+const NOTIFYING_EVENTS = new Set<string>(Object.values(NOTIFICATION_CONSTANTS.EVENTS));
+
+/** Emails and texts the customer about a confirmed, requested, moved or cancelled booking, and plans reminders. */
+export const bookingNotificationsConsumer: OutboxConsumer = {
+  name: "booking-notifications",
+  handles: (type) => NOTIFYING_EVENTS.has(type),
+  handle: (message) => notificationService.handleBookingEvent(message),
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
   bookingMetricsConsumer,
   knowledgeIndexConsumer,
   customerPreferencesConsumer,
+  bookingNotificationsConsumer,
 ];
