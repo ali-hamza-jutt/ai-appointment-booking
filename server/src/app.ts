@@ -9,6 +9,7 @@ import { RegisterRoutes } from "./generated/routes.js";
 import { createCalendarRouter } from "./modules/calendar/controllers/calendar.routes.js";
 import { createChatStreamRouter } from "./modules/chat/controllers/chat-stream.routes.js";
 import { createTwilioWebhookRouter } from "./modules/notifications/controllers/twilio-webhook.routes.js";
+import { createStripeWebhookRouter } from "./modules/payments/controllers/stripe-webhook.routes.js";
 import { invalidateAvailabilityOnWrite } from "./middleware/availability-invalidation.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
@@ -62,6 +63,8 @@ app.post(
   chatRateLimiter,
 );
 app.use("/api/businesses/:businessId", invalidateAvailabilityOnWrite);
+// Stripe signs the raw body, so its webhook reads it before JSON parsing.
+app.use(createStripeWebhookRouter());
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser(env.JWT_SECRET));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));

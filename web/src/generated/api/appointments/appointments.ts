@@ -134,7 +134,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 }
 
 /**
- * Confirms a held slot. Returns PENDING when the business approves bookings manually.
+ * Confirms a held slot. Returns PENDING when the business approves bookings
+ * manually, or PENDING_PAYMENT with a Checkout link in `payment` when the
+ * service asks for a deposit or prepayment; the booking is confirmed once
+ * the payment goes through.
  */
 export const confirmAppointment = async (appointmentId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AppointmentResponse> => {
 
@@ -191,6 +194,73 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getConfirmAppointmentMutationOptions(options), queryClient);
+    }
+    export const getResumeAppointmentPaymentUrl = (appointmentId: string,) => {
+
+
+
+
+  return `/appointments/${appointmentId}/payment`
+}
+
+/**
+ * Opens Checkout again for an appointment still waiting on its deposit or prepayment.
+ */
+export const resumeAppointmentPayment = async (appointmentId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AppointmentResponse> => {
+
+  return apiFetch<AppointmentResponse>(getResumeAppointmentPaymentUrl(appointmentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResumeAppointmentPaymentMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeAppointmentPayment>>, TError,{appointmentId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resumeAppointmentPayment>>, TError,{appointmentId: string}, TContext> => {
+
+const mutationKey = ['resumeAppointmentPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resumeAppointmentPayment>>, {appointmentId: string}> = (props) => {
+          const {appointmentId} = props ?? {};
+
+          return  resumeAppointmentPayment(appointmentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResumeAppointmentPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof resumeAppointmentPayment>>>
+
+    export type ResumeAppointmentPaymentMutationError = ErrorType<ApiErrorResponse>
+
+    export const useResumeAppointmentPayment = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeAppointmentPayment>>, TError,{appointmentId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof resumeAppointmentPayment>>,
+        TError,
+        {appointmentId: string},
+        TContext
+      > => {
+      return useMutation(getResumeAppointmentPaymentMutationOptions(options), queryClient);
     }
     export const getCancelAppointmentUrl = (appointmentId: string,) => {
 

@@ -13,12 +13,14 @@ import type { AiAgentMessage, AiProvider } from "../../integrations/ai/dto/ai.dt
 import { InstrumentedAiProvider } from "../../integrations/ai/providers/instrumented.provider.js";
 import { MistralProvider } from "../../integrations/ai/providers/mistral.provider.js";
 import { AppError } from "../../middleware/app-error.js";
+import { formatMinorAmount } from "../../utils/money.js";
 import { localDateTimeToUtc, normalizeIanaTimeZone } from "../../utils/time-zone.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { authDal } from "../auth/dal/auth.dal.js";
 import { bookingService } from "../bookings/booking.service.js";
 import type { BookingRecord } from "../bookings/dto/booking.dto.js";
 import { catalogService } from "../catalog/catalog.service.js";
+import { paymentService, type PaymentService } from "../payments/payment.service.js";
 import { customerProfileService } from "../customers/customer-profile.service.js";
 import {
   AssistantActionError,
@@ -58,7 +60,10 @@ export class ChatOrchestrationService {
   private readonly runner: AgentRunner | null;
   private readonly memory: ConversationMemory;
 
-  public constructor(provider: AiProvider | null) {
+  public constructor(
+    provider: AiProvider | null,
+    private readonly payments: PaymentService = paymentService,
+  ) {
     this.runner = provider ? new AgentRunner(provider) : null;
     // The history window counts the message being answered.
     this.memory = new ConversationMemory(provider, env.AI_MAX_HISTORY_MESSAGES + 1);
@@ -155,7 +160,10 @@ export class ChatOrchestrationService {
       );
     }
 
-    const booking = await bookingService.confirmHold(hold, { type: "CUSTOMER", userId }, { chatSessionId: sessionId });
+    const confirmed = await bookingService.confirmHold(hold, { type: "CUSTOMER", userId }, { chatSessionId: sessionId });
+    // A service with a deposit waits for payment; the reply carries the link to pay.
+    const booking = await this.payments.withCheckout(confirmed);
+    const payment = bookingService.toAppointmentResponse(booking).payment;
     const timeZone = session.draft.timeZone ?? booking.timeZone;
     const completed = await chatService.completeBooking(userId, sessionId, {
       bookingId: booking.id,
@@ -164,7 +172,21 @@ export class ChatOrchestrationService {
         intent: "BOOK_APPOINTMENT",
         confirmationRequired: false,
         appointmentId: booking.id,
-        parts: [{ type: "booking_summary", booking: bookingAssistantService.toSummary(booking, timeZone) }],
+        parts: [
+          { type: "booking_summary", booking: bookingAssistantService.toSummary(booking, timeZone) },
+          ...(payment?.checkoutUrl
+            ? [
+                {
+                  type: "payment_link" as const,
+                  label: `Pay ${formatMinorAmount(payment.amountMinor, payment.currency)}`,
+                  url: payment.checkoutUrl,
+                  amountMinor: payment.amountMinor,
+                  currency: payment.currency,
+                  expiresAt: payment.checkoutExpiresAt.toISOString(),
+                },
+              ]
+            : []),
+        ],
       },
     });
 
@@ -492,6 +514,16 @@ export class ChatOrchestrationService {
       timeStyle: "short",
       timeZone,
     }).format(booking.scheduledAt);
+
+    const payment = booking.payments[0];
+
+    if (booking.status === "PENDING_PAYMENT" && payment) {
+      const until = new Intl.DateTimeFormat(CHAT_CONSTANTS.RESPONSE_LOCALE, { timeStyle: "short", timeZone }).format(
+        payment.checkoutExpiresAt,
+      );
+
+      return `Almost done: pay the ${formatMinorAmount(payment.amountMinor, payment.currency)} ${payment.kind === "DEPOSIT" ? "deposit" : "payment"} to confirm ${booking.serviceName} on ${when} at ${booking.business.name}. The time is held for you until ${until}.`;
+    }
 
     return booking.status === "PENDING"
       ? `${CHAT_CONSTANTS.ASSISTANT_MESSAGES.BOOKING_PENDING_PREFIX}: ${booking.serviceName} on ${when} at ${booking.business.name}. You'll see it confirmed in My appointments.`

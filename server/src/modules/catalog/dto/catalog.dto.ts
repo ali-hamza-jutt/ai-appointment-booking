@@ -1,3 +1,5 @@
+import type { ServicePaymentMode } from "../../payments/dto/payment.dto.js";
+
 export type ServiceBookingType = "APPOINTMENT" | "CLASS";
 
 export interface ServiceCategoryResponse {
@@ -55,6 +57,7 @@ export interface ServiceResponse {
   priceMinor: number;
   currency: string;
   depositMinor: number | null;
+  paymentMode: ServicePaymentMode;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   isActive: boolean;
@@ -86,6 +89,8 @@ export interface CreateServiceRequest {
   priceMinor: number;
   /** @isInt @minimum 0 @maximum 100000000 */
   depositMinor?: number;
+  /** DEPOSIT asks for depositMinor online when booking, FULL for the whole price. Needs the business's Stripe account. */
+  paymentMode?: ServicePaymentMode;
   /** @isInt @minimum 0 @maximum 240 */
   bufferBeforeMin?: number;
   /** @isInt @minimum 0 @maximum 240 */
@@ -112,6 +117,7 @@ export interface UpdateServiceRequest {
   priceMinor?: number;
   /** @isInt @minimum 0 @maximum 100000000 */
   depositMinor?: number | null;
+  paymentMode?: ServicePaymentMode;
   /** @isInt @minimum 0 @maximum 240 */
   bufferBeforeMin?: number;
   /** @isInt @minimum 0 @maximum 240 */
@@ -157,6 +163,7 @@ export interface ServiceRecord {
   priceMinor: number;
   currency: string;
   depositMinor: number | null;
+  paymentMode: ServicePaymentMode;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   isActive: boolean;
@@ -179,6 +186,7 @@ export interface ServiceWriteData {
   durationMinutes: number;
   priceMinor: number;
   depositMinor: number | null;
+  paymentMode: ServicePaymentMode;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   isActive: boolean;

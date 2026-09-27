@@ -6,10 +6,12 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
   OBSERVABILITY_CONSTANTS,
+  PAYMENT_CONSTANTS,
   VALIDATION_MESSAGES,
 } from "../../constants/app.constants.js";
 import {
   prisma,
+  type DbClient,
   type TransactionClient,
 } from "../../infrastructure/database/prisma.js";
 import { bookingMetrics } from "../../infrastructure/observability/metrics.js";
@@ -30,6 +32,10 @@ import type { AvailabilityServiceRecord } from "../availability/dto/availability
 import { businessService } from "../businesses/business.service.js";
 import { businessDal } from "../businesses/dal/business.dal.js";
 import { customerService } from "../customers/customer.service.js";
+import { paymentDal } from "../payments/dal/payment.dal.js";
+import type { BookingPaymentSummary, PaymentRequirement } from "../payments/dto/payment.dto.js";
+import { paymentsEnabled } from "../payments/payment-gateway.js";
+import { amountDue } from "../payments/payment-rules.js";
 import { resolveBookingPolicy } from "./booking-policy.js";
 import { BookingSlotConflictError } from "./booking-slot-conflict.error.js";
 import { bookingDal, BookingTransitionError } from "./dal/booking.dal.js";
@@ -307,10 +313,90 @@ export class BookingService {
     userId: string,
     bookingId: string,
   ): Promise<AppointmentResponse> {
+    return this.toAppointmentResponse(await this.confirmOwnHold(userId, bookingId));
+  }
+
+  /** Confirms the customer's own hold; it may come back waiting for payment. */
+  public async confirmOwnHold(userId: string, bookingId: string): Promise<BookingRecord> {
     const booking = await this.getOwnedBooking(userId, bookingId);
 
-    return this.toAppointmentResponse(
-      await this.confirmHold(booking, { type: "CUSTOMER", userId }),
+    return this.confirmHold(booking, { type: "CUSTOMER", userId });
+  }
+
+  /** The customer's own booking, as stored. */
+  public getOwnedRecord(userId: string, bookingId: string): Promise<BookingRecord> {
+    return this.getOwnedBooking(userId, bookingId);
+  }
+
+  /** A booking of the business, as stored; null when there is none. */
+  public findRecord(businessId: string, bookingId: string): Promise<BookingRecord | null> {
+    return bookingDal.findForBusiness(businessId, bookingId);
+  }
+
+  /**
+   * What a customer must pay online to confirm this booking, or null. Only
+   * asked when the platform takes payments and the business's Stripe
+   * account accepts charges.
+   */
+  public async paymentRequirement(
+    booking: BookingRecord,
+    client: DbClient = prisma,
+  ): Promise<PaymentRequirement | null> {
+    if (!paymentsEnabled() || !booking.serviceId) return null;
+
+    const [account, service] = await Promise.all([
+      paymentDal.findAccount(booking.businessId, client),
+      paymentDal.findServicePayment(client, booking.businessId, booking.serviceId),
+    ]);
+
+    if (!account?.chargesEnabled || !service) return null;
+
+    const due = amountDue(service.paymentMode, booking.priceMinor, service.depositMinor);
+
+    return due ? { ...due, stripeAccountId: account.stripeAccountId, depositMinor: service.depositMinor } : null;
+  }
+
+  /**
+   * Confirms a booking whose payment came through. Returns confirmed: false
+   * when the booking lost its time (or was cancelled) first; the caller then
+   * refunds the payment.
+   */
+  public async confirmPaidBooking(
+    booking: BookingRecord,
+  ): Promise<{ booking: BookingRecord; confirmed: boolean }> {
+    const settled = (status: BookingStatus) =>
+      status === "CONFIRMED" || status === "PENDING" || status === "CHECKED_IN" || status === "COMPLETED";
+
+    if (booking.status !== "PENDING_PAYMENT") return { booking, confirmed: settled(booking.status) };
+
+    const actor: BookingActor = booking.userId ? { type: "CUSTOMER", userId: booking.userId } : { type: "SYSTEM", userId: null };
+
+    return this.mapBookingErrors(() =>
+      prisma.$transaction(async (transaction) => {
+        const current = await this.lockAndReload(transaction, booking);
+
+        if (current.status !== "PENDING_PAYMENT") return { booking: current, confirmed: settled(current.status) };
+
+        const now = new Date();
+        const lapsed = current.holdExpiresAt !== null && current.holdExpiresAt <= now;
+
+        if (lapsed && !(await this.slotStillFree(transaction, current, now))) {
+          const expired = await bookingDal.transition(transaction, current, "EXPIRE", { type: "SYSTEM", userId: null });
+
+          return { booking: expired, confirmed: false };
+        }
+
+        const policy = resolveBookingPolicy(current.business.settings, current.service?.policyOverrides);
+        const confirmed = await bookingDal.transition(
+          transaction,
+          current,
+          policy.autoConfirmBookings ? "CONFIRM" : "REQUEST_APPROVAL",
+          actor,
+          { holdExpiresAt: null },
+        );
+
+        return { booking: confirmed, confirmed: true };
+      }),
     );
   }
 
@@ -324,7 +410,9 @@ export class BookingService {
     actor: BookingActor,
     extraPatch: { chatSessionId?: string } = {},
   ): Promise<BookingRecord> {
-    if (booking.status === "CONFIRMED" || booking.status === "PENDING") return booking;
+    if (booking.status === "CONFIRMED" || booking.status === "PENDING" || booking.status === "PENDING_PAYMENT") {
+      return booking;
+    }
 
     if (booking.status !== "HELD") this.throwTransitionNotAllowed();
 
@@ -344,6 +432,18 @@ export class BookingService {
           });
 
           return { booking: expired, expired: true };
+        }
+
+        // Customers pay any deposit first; the time stays held while they do.
+        const payment = actor.type === "CUSTOMER" ? await this.paymentRequirement(current, transaction) : null;
+
+        if (payment) {
+          const awaiting = await bookingDal.transition(transaction, current, "REQUIRE_PAYMENT", actor, {
+            holdExpiresAt: new Date(now.getTime() + PAYMENT_CONSTANTS.PAYMENT_HOLD_MINUTES * 60_000),
+            ...extraPatch,
+          });
+
+          return { booking: awaiting, expired: false };
         }
 
         const policy = resolveBookingPolicy(
@@ -1032,6 +1132,7 @@ export class BookingService {
       rescheduleCount: booking.rescheduleCount,
       canCancel: this.customerCanCancel(booking, now),
       canReschedule: this.customerCanReschedule(booking, now),
+      payment: this.toPaymentSummary(booking, now),
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
     };
@@ -1060,8 +1161,31 @@ export class BookingService {
       rescheduleCount: booking.rescheduleCount,
       checkedInAt: booking.checkedInAt,
       completedAt: booking.completedAt,
+      payment: this.toPaymentSummary(booking, new Date()),
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
+    };
+  }
+
+  /** The latest payment; its Checkout link only while the booking still waits on it. */
+  private toPaymentSummary(booking: BookingRecord, now: Date): BookingPaymentSummary | null {
+    const payment = booking.payments[0];
+
+    if (!payment) return null;
+
+    const open =
+      payment.status === "PENDING" && booking.status === "PENDING_PAYMENT" && payment.checkoutExpiresAt > now;
+
+    return {
+      id: payment.id,
+      kind: payment.kind,
+      status: payment.status,
+      amountMinor: payment.amountMinor,
+      currency: payment.currency,
+      refundedMinor: payment.refundedMinor,
+      checkoutUrl: open ? payment.checkoutUrl : null,
+      checkoutExpiresAt: payment.checkoutExpiresAt,
+      paidAt: payment.paidAt,
     };
   }
 

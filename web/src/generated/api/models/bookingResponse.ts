@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BookingActorType } from './bookingActorType';
+import type { BookingPaymentSummary } from './bookingPaymentSummary';
 import type { BookingReference } from './bookingReference';
 import type { BookingResponseCustomer } from './bookingResponseCustomer';
 import type { BookingSource } from './bookingSource';
@@ -44,6 +45,8 @@ export interface BookingResponse {
   checkedInAt: string | null;
   /** @nullable */
   completedAt: string | null;
+  /** The deposit or prepayment, when the service asks for one. */
+  payment: BookingPaymentSummary | null;
   createdAt: string;
   updatedAt: string;
 }

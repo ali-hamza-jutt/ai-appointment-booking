@@ -80,6 +80,15 @@ const environmentSchema = z.object({
   MICROSOFT_CLIENT_ID: optionalNonEmptyString,
   MICROSOFT_CLIENT_SECRET: optionalNonEmptyString,
   MICROSOFT_TENANT_ID: z.string().trim().min(1).default("common"),
+  /** Stripe platform secret key (sk_…); online payments are off without it and the webhook secret. */
+  STRIPE_SECRET_KEY: optionalNonEmptyString,
+  /**
+   * Webhook signing secrets (whsec_…), comma-separated: one for the account
+   * endpoint (checkout and refunds) and one for the Connect endpoint (account updates).
+   */
+  STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
+  /** BookWise's cut of each payment, in percent. */
+  STRIPE_PLATFORM_FEE_PERCENT: z.coerce.number().min(0).max(50).default(0),
   /** Exposes Prometheus metrics for the API on this port (e.g. 9464). */
   METRICS_PORT: z.coerce.number().int().min(1).max(65_535).optional(),
   /** Exposes Prometheus metrics for the worker on this port (e.g. 9465). */

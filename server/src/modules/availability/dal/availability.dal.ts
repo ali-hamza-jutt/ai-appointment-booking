@@ -225,6 +225,8 @@ export class AvailabilityDal {
         occupiedUntil: { gt: from },
         NOT: [
           { status: "HELD", holdExpiresAt: { lte: now } },
+          // An unpaid booking lets go of its time when its payment window closes, like a hold.
+          { status: "PENDING_PAYMENT", holdExpiresAt: { lte: now } },
           ...(excludeBookingId ? [{ id: excludeBookingId }] : []),
         ],
       },
@@ -261,6 +263,8 @@ export class AvailabilityDal {
         service: { resources: { some: { resourceId: { in: resourceIds } } } },
         NOT: [
           { status: "HELD", holdExpiresAt: { lte: now } },
+          // An unpaid booking lets go of its time when its payment window closes, like a hold.
+          { status: "PENDING_PAYMENT", holdExpiresAt: { lte: now } },
           ...(excludeBookingId ? [{ id: excludeBookingId }] : []),
         ],
       },

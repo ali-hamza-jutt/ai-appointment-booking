@@ -1,4 +1,5 @@
 import type { EmailAddress } from "../../auth/dto/auth.dto.js";
+import type { BookingPaymentRecord, BookingPaymentSummary } from "../../payments/dto/payment.dto.js";
 
 export type BookingStatus =
   | "HELD"
@@ -70,6 +71,8 @@ export interface AppointmentResponse {
   canCancel: boolean;
   /** Whether the business's policy still lets the customer reschedule. */
   canReschedule: boolean;
+  /** The deposit or prepayment, when the service asks for one. */
+  payment: BookingPaymentSummary | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -137,6 +140,8 @@ export interface BookingResponse {
   rescheduleCount: number;
   checkedInAt: Date | null;
   completedAt: Date | null;
+  /** The deposit or prepayment, when the service asks for one. */
+  payment: BookingPaymentSummary | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -239,6 +244,8 @@ export interface BookingRecord {
   customer: { id: string; name: string; email: string | null; phone: string | null };
   staff: { id: string; displayName: string } | null;
   service: { policyOverrides: unknown } | null;
+  /** At most one: the latest payment. */
+  payments: BookingPaymentRecord[];
 }
 
 export interface NewBookingData {

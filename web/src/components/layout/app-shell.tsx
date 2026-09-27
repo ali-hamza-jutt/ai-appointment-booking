@@ -65,6 +65,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/customers", icon: ContactIcon, label: "Customers" },
   { href: "/business/knowledge", icon: BookIcon, label: "Knowledge base" },
   { href: "/business/notifications", icon: MailIcon, label: "Notifications" },
+  { href: "/business/payments", icon: TagIcon, label: "Payments" },
   { href: "/business/handoffs", icon: ChatIcon, label: "Chat handoffs" },
 ];
 
@@ -83,6 +84,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/customers", "Customers"],
   ["/business/knowledge", "Knowledge base"],
   ["/business/notifications", "Notifications"],
+  ["/business/payments", "Payments"],
   ["/business/handoffs", "Chat handoffs"],
 ];
 

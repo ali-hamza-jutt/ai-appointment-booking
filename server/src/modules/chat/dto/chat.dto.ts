@@ -146,6 +146,17 @@ export interface ChatConfirmPart {
   action: ChatAction;
 }
 
+/** A link to Stripe Checkout for a booking waiting on its deposit or prepayment. */
+export interface ChatPaymentLinkPart {
+  type: "payment_link";
+  label: string;
+  url: string;
+  amountMinor: number;
+  currency: string;
+  /** The link, and the held time, lapse together. */
+  expiresAt: string;
+}
+
 /** Structured pieces of an assistant reply that the web renders as components. */
 export type ChatMessagePart =
   | ChatTextPart
@@ -153,7 +164,8 @@ export type ChatMessagePart =
   | ChatSlotPickerPart
   | ChatBookingSummaryPart
   | ChatBookingListPart
-  | ChatConfirmPart;
+  | ChatConfirmPart
+  | ChatPaymentLinkPart;
 
 export interface ChatMessageMetadata {
   intent?: "BOOK_APPOINTMENT" | "UNKNOWN";

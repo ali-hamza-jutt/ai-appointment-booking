@@ -4,12 +4,14 @@ import {
   CUSTOMER_PROFILE_CONSTANTS,
   KNOWLEDGE_CONSTANTS,
   NOTIFICATION_CONSTANTS,
+  PAYMENT_CONSTANTS,
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
 import { calendarSyncService } from "../calendar/calendar-sync.service.js";
 import { customerProfileService } from "../customers/customer-profile.service.js";
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import { notificationService } from "../notifications/notification.service.js";
+import { paymentService } from "../payments/payment.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
 const BOOKING_EVENT_PREFIX = "booking.";
@@ -86,6 +88,15 @@ export const calendarEventsConsumer: OutboxConsumer = {
   },
 };
 
+const PAYMENT_EVENTS = new Set<string>(Object.values(PAYMENT_CONSTANTS.EVENTS));
+
+/** Refunds cancelled bookings by the cancellation policy and closes Checkout on bookings that ended unpaid. */
+export const paymentsConsumer: OutboxConsumer = {
+  name: "payments",
+  handles: (type) => PAYMENT_EVENTS.has(type),
+  handle: (message) => paymentService.handleBookingEvent(message),
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
@@ -94,4 +105,5 @@ export const outboxConsumers: readonly OutboxConsumer[] = [
   customerPreferencesConsumer,
   bookingNotificationsConsumer,
   calendarEventsConsumer,
+  paymentsConsumer,
 ];

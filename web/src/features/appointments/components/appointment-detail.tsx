@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,19 @@ import {
 } from "@/components/ui/icons";
 import { AppointmentActions } from "@/features/appointments/components/appointment-actions";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
+import { AppointmentPayment } from "@/features/payments/components/appointment-payment";
+import { PAYMENT_UI_CONSTANTS } from "@/features/payments/constants/payment-ui.constants";
 import { useGetAppointment } from "@/generated/api/appointments/appointments";
 import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
 
 export function AppointmentDetail({ appointmentId }: { appointmentId: string }) {
   const appointmentQuery = useGetAppointment(appointmentId, {
-    query: { retry: false },
+    query: {
+      retry: false,
+      // After paying, Stripe's confirmation arrives within seconds; keep checking until it has.
+      refetchInterval: (query) =>
+        query.state.data?.status === "PENDING_PAYMENT" ? PAYMENT_UI_CONSTANTS.CONFIRMATION_POLL_MS : false,
+    },
   });
 
   if (appointmentQuery.isPending) {
@@ -97,6 +104,10 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
         </header>
 
         <AppointmentActions appointment={appointmentQuery.data} />
+
+        <Suspense fallback={null}>
+          <AppointmentPayment appointment={appointmentQuery.data} />
+        </Suspense>
 
         <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
           <DetailItem icon={<CalendarIcon className="size-[18px]" />} label="Date" value={appointment.date} />

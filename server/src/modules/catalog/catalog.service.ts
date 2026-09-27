@@ -118,6 +118,7 @@ export class CatalogService {
       durationMinutes: request.durationMinutes,
       priceMinor: request.priceMinor,
       depositMinor: request.depositMinor ?? null,
+      paymentMode: request.paymentMode ?? "NONE",
       bufferBeforeMin: request.bufferBeforeMin ?? 0,
       bufferAfterMin: request.bufferAfterMin ?? 0,
       isActive: true,
@@ -163,6 +164,7 @@ export class CatalogService {
       priceMinor: request.priceMinor ?? current.priceMinor,
       depositMinor:
         request.depositMinor !== undefined ? request.depositMinor : current.depositMinor,
+      paymentMode: request.paymentMode ?? current.paymentMode,
       bufferBeforeMin: request.bufferBeforeMin ?? current.bufferBeforeMin,
       bufferAfterMin: request.bufferAfterMin ?? current.bufferAfterMin,
       isActive: request.isActive ?? current.isActive,
@@ -251,6 +253,7 @@ export class CatalogService {
       priceMinor: service.priceMinor,
       currency: service.currency,
       depositMinor: service.depositMinor,
+      paymentMode: service.paymentMode,
       bufferBeforeMin: service.bufferBeforeMin,
       bufferAfterMin: service.bufferAfterMin,
       isActive: service.isActive,
@@ -302,6 +305,14 @@ export class CatalogService {
         input.depositMinor > input.priceMinor)
     ) {
       throwRequestValidationError("depositMinor", VALIDATION_MESSAGES.SERVICE_DEPOSIT);
+    }
+
+    if (input.paymentMode === "DEPOSIT" && !(input.depositMinor && input.depositMinor > 0)) {
+      throwRequestValidationError("paymentMode", VALIDATION_MESSAGES.SERVICE_PAYMENT_DEPOSIT);
+    }
+
+    if (input.paymentMode === "FULL" && input.priceMinor <= 0) {
+      throwRequestValidationError("paymentMode", VALIDATION_MESSAGES.SERVICE_PAYMENT_PRICE);
     }
 
     for (const field of ["bufferBeforeMin", "bufferAfterMin"] as const) {

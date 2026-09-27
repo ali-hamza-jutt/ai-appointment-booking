@@ -571,6 +571,11 @@ function BookingExperience({
           setIsConfirmed(true);
           setIsConfirmOpen(false);
           setIsStructuredFormOpen(false);
+
+          // A deposit is taken on Stripe's page; the booking is confirmed when it goes through.
+          const checkoutUrl = response.appointment.payment?.checkoutUrl;
+
+          if (checkoutUrl) window.location.assign(checkoutUrl);
           void Promise.all([
             queryClient.invalidateQueries({
               queryKey: getListAppointmentsQueryKey(),
