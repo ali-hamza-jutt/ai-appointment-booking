@@ -73,7 +73,8 @@ describe("booking agent", () => {
   beforeEach(async () => {
     await resetDatabase();
     provider.requests.length = 0;
-    setup = await createBookableSetup();
+    // Tapping a service shows the next 7 days, so the working day must fall inside them.
+    setup = await createBookableSetup({ daysAhead: 2 });
     customer = await createTestUser();
 
     const session = await request(app)
