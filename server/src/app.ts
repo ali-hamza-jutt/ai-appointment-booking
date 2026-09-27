@@ -6,6 +6,7 @@ import helmet from "helmet";
 import { env } from "./config/env.js";
 import { swaggerRouter } from "./docs/swagger.js";
 import { RegisterRoutes } from "./generated/routes.js";
+import { createCalendarRouter } from "./modules/calendar/controllers/calendar.routes.js";
 import { createChatStreamRouter } from "./modules/chat/controllers/chat-stream.routes.js";
 import { createTwilioWebhookRouter } from "./modules/notifications/controllers/twilio-webhook.routes.js";
 import { invalidateAvailabilityOnWrite } from "./middleware/availability-invalidation.js";
@@ -68,6 +69,7 @@ app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 // Streaming and webhook routes are plain Express and must run before the tsoa routes.
 app.use(createChatStreamRouter());
 app.use(createTwilioWebhookRouter());
+app.use(createCalendarRouter());
 RegisterRoutes(app);
 
 app.use(notFoundHandler);

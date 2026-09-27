@@ -119,6 +119,21 @@ enum ChatMessageRole {
   @@map("chat_message_role")
 }
 
+enum CalendarProvider {
+  GOOGLE
+  MICROSOFT
+
+  @@map("calendar_provider")
+}
+
+enum CalendarConnectionStatus {
+  ACTIVE
+  /// The provider refused our tokens; the staff member must connect again.
+  NEEDS_RECONNECT
+
+  @@map("calendar_connection_status")
+}
+
 enum NotificationChannel {
   EMAIL
   SMS
@@ -268,6 +283,8 @@ model Business {
   resources        Resource[]
   workingHours     WorkingHours[]
   timeOff          TimeOff[]
+  calendarConnections CalendarConnection[]
+  externalBusy        ExternalBusy[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
   knowledgeChunks  KnowledgeChunk[]
@@ -369,6 +386,8 @@ model Staff {
   timeOff      TimeOff[]
   bookings     Booking[]
   chatDrafts   ChatSession[]     @relation("ChatDraftStaff")
+  calendarConnection CalendarConnection?
+  externalBusy       ExternalBusy[]
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -450,6 +469,58 @@ model WorkingHours {
 
   @@index([businessId, staffId, weekday], map: "working_hours_business_id_staff_id_weekday_idx")
   @@map("working_hours")
+}
+
+/// A staff member's Google or Microsoft calendar, linked through OAuth.
+model CalendarConnection {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  businessId            String                   @map("business_id") @db.Uuid
+  staffId               String                   @unique(map: "calendar_connections_staff_id_key") @map("staff_id") @db.Uuid
+  provider              CalendarProvider
+  status                CalendarConnectionStatus @default(ACTIVE)
+  /// The account the staff member signed in with, shown in the dashboard.
+  accountEmail          String                   @map("account_email") @db.VarChar(254)
+  /// Tokens are AES-256-GCM encrypted with TOKEN_ENCRYPTION_KEY.
+  refreshTokenEncrypted String                   @map("refresh_token_encrypted") @db.Text
+  accessTokenEncrypted  String?                  @map("access_token_encrypted") @db.Text
+  accessTokenExpiresAt  DateTime?                @map("access_token_expires_at") @db.Timestamptz(3)
+  /// Push channel (Google) or subscription (Microsoft) that reports changes.
+  channelId             String?                  @unique(map: "calendar_connections_channel_id_key") @map("channel_id") @db.VarChar(200)
+  channelResourceId     String?                  @map("channel_resource_id") @db.VarChar(200)
+  /// SHA-256 of the secret the provider echoes back on each notification.
+  channelTokenHash      String?                  @map("channel_token_hash") @db.Char(64)
+  channelExpiresAt      DateTime?                @map("channel_expires_at") @db.Timestamptz(3)
+  /// Fingerprint of the busy times last stored, to skip writes when nothing changed.
+  busyHash              String?                  @map("busy_hash") @db.Char(64)
+  lastSyncedAt          DateTime?                @map("last_synced_at") @db.Timestamptz(3)
+  lastError             String?                  @map("last_error") @db.VarChar(500)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business              Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff                 Staff                    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  externalBusy          ExternalBusy[]
+  bookings              Booking[]
+
+  @@index([businessId], map: "calendar_connections_business_id_idx")
+  @@map("calendar_connections")
+}
+
+/// A busy time from a staff member's own calendar; availability treats it like time off.
+model ExternalBusy {
+  id           String             @id @default(uuid()) @db.Uuid
+  businessId   String             @map("business_id") @db.Uuid
+  staffId      String             @map("staff_id") @db.Uuid
+  connectionId String             @map("connection_id") @db.Uuid
+  startsAt     DateTime           @map("starts_at") @db.Timestamptz(3)
+  endsAt       DateTime           @map("ends_at") @db.Timestamptz(3)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  business     Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff        Staff              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  connection   CalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, startsAt], map: "external_busy_staff_id_starts_at_idx")
+  @@index([connectionId], map: "external_busy_connection_id_idx")
+  @@map("external_busy")
 }
 
 model TimeOff {
@@ -590,8 +661,12 @@ model Booking {
   cancelledAt     DateTime?         @map("cancelled_at") @db.Timestamptz(3)
   checkedInAt     DateTime?         @map("checked_in_at") @db.Timestamptz(3)
   completedAt     DateTime?         @map("completed_at") @db.Timestamptz(3)
+  /// The event written to the provider's calendar, and the connection it lives in.
+  calendarEventId      String?             @map("calendar_event_id") @db.VarChar(1024)
+  calendarConnectionId String?             @map("calendar_connection_id") @db.Uuid
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  calendarConnection   CalendarConnection? @relation(fields: [calendarConnectionId], references: [id], onDelete: SetNull)
   business        Business          @relation(fields: [businessId], references: [id], onDelete: Restrict)
   user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)

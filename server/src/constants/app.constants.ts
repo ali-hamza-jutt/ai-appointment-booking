@@ -143,6 +143,7 @@ export const JOB_CONSTANTS = {
     OUTBOX: "outbox-events",
     MAINTENANCE: "booking-maintenance",
     NOTIFICATIONS: "notifications",
+    CALENDAR: "calendar-sync",
   },
   MAINTENANCE_JOBS: {
     EXPIRE_HOLDS: "expire-holds",
@@ -221,6 +222,9 @@ export const TENANT_SCOPE_FIELDS = {
   // Delivery callbacks find a message by the provider's id alone.
   Notification: ["businessId", "providerMessageId"],
   NotificationPreference: ["businessId", "customerId"],
+  // Provider notifications find a connection by its channel id alone.
+  CalendarConnection: ["businessId", "staffId", "channelId"],
+  ExternalBusy: ["businessId", "staffId", "connectionId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -345,6 +349,48 @@ export const NOTIFICATION_CONSTANTS = {
   BOOKING_LOG_LIMIT: 50,
 } as const;
 
+export const CALENDAR_CONSTANTS = {
+  SYNC_JOB: "sync-connection",
+  SWEEP_JOB: "sync-all-calendars",
+  /** Safety net for missed push notifications. */
+  SWEEP_EVERY_MS: 15 * 60_000,
+  /** How far ahead busy times are imported. */
+  HORIZON_DAYS: 90,
+  /** Busy times that began this long ago still count (a meeting running over). */
+  LOOKBACK_MINUTES: 60,
+  /** Refresh an access token this long before it expires. */
+  ACCESS_TOKEN_SKEW_SECONDS: 60,
+  /** How long a started connection may take to come back from the provider. */
+  STATE_TTL_MINUTES: 10,
+  GOOGLE_CHANNEL_TTL_MINUTES: 7 * 24 * 60,
+  /** Graph allows at most 4,230 minutes for event subscriptions. */
+  MICROSOFT_SUBSCRIPTION_TTL_MINUTES: 4_200,
+  RENEW_CHANNEL_BEFORE_MINUTES: 24 * 60,
+  /** Upcoming bookings written to a newly connected calendar per sync. */
+  BACKFILL_LIMIT: 200,
+  MAX_PAGES: 20,
+  REQUEST_TIMEOUT_MS: 15_000,
+  /** Collapses a burst of provider notifications into one sync. */
+  PUSH_SYNC_DELAY_MS: 5_000,
+  GOOGLE_SCOPES: "openid email https://www.googleapis.com/auth/calendar.events",
+  GOOGLE_API_URL: "https://www.googleapis.com/calendar/v3",
+  GOOGLE_REVOKE_URL: "https://oauth2.googleapis.com/revoke",
+  MICROSOFT_LOGIN_URL: "https://login.microsoftonline.com",
+  MICROSOFT_GRAPH_URL: "https://graph.microsoft.com/v1.0",
+  MICROSOFT_SCOPES: "offline_access openid email User.Read Calendars.ReadWrite",
+  CALLBACK_PATH: "/api/calendar/oauth/callback",
+  GOOGLE_WEBHOOK_PATH: "/api/webhooks/calendar/google",
+  MICROSOFT_WEBHOOK_PATH: "/api/webhooks/calendar/microsoft",
+  /** Where the dashboard lands after connecting. */
+  RETURN_PATH: "/business/staff",
+  /** Linked from each calendar event. */
+  BOOKINGS_PATH: "/business/bookings",
+  /** Marks events BookWise wrote, so they are never read back as busy time. */
+  EVENT_PROPERTY: "bookwiseBookingId",
+  BOOKING_EVENTS: ["booking.confirmed", "booking.rescheduled", "booking.cancelled"],
+  MAX_ERROR_LENGTH: 500,
+} as const;
+
 export const CHAT_MEMORY_CONSTANTS = {
   /** Chats longer than this carry a summary of what fell out of the history window. */
   SUMMARY_THRESHOLD_MESSAGES: 20,
@@ -458,6 +504,9 @@ export const ERROR_CODES = {
   CUSTOMER_NOT_FOUND: "CUSTOMER_NOT_FOUND",
   CUSTOMER_PREFERENCE_NOT_FOUND: "CUSTOMER_PREFERENCE_NOT_FOUND",
   NOTIFICATION_TEMPLATE_NOT_FOUND: "NOTIFICATION_TEMPLATE_NOT_FOUND",
+  CALENDAR_NOT_CONFIGURED: "CALENDAR_NOT_CONFIGURED",
+  CALENDAR_CONNECTION_NOT_FOUND: "CALENDAR_CONNECTION_NOT_FOUND",
+  CALENDAR_NOT_YOUR_STAFF_PROFILE: "CALENDAR_NOT_YOUR_STAFF_PROFILE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
   CHAT_BOOKING_CONTEXT_INCOMPLETE: "CHAT_BOOKING_CONTEXT_INCOMPLETE",
   CHAT_SESSION_CLOSED: "CHAT_SESSION_CLOSED",
@@ -531,6 +580,9 @@ export const ERROR_MESSAGES = {
   CUSTOMER_NOT_FOUND: "Customer was not found",
   CUSTOMER_PREFERENCE_NOT_FOUND: "Preference was not found",
   NOTIFICATION_TEMPLATE_NOT_FOUND: "There is no such message template",
+  CALENDAR_NOT_CONFIGURED: "Calendar sync with this provider is not available",
+  CALENDAR_CONNECTION_NOT_FOUND: "This staff member has no connected calendar",
+  CALENDAR_NOT_YOUR_STAFF_PROFILE: "Only owners, managers or the staff member themselves can change this calendar",
   CHAT_MESSAGE_ALREADY_EXISTS:
     "A message with this client message ID already exists",
   CHAT_BOOKING_CONTEXT_INCOMPLETE:

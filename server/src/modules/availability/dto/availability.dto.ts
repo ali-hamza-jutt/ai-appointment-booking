@@ -153,6 +153,8 @@ export interface AvailabilityStaffRecord {
     location: { timeZone: string } | null;
   }[];
   timeOff: { startsAt: Date; endsAt: Date }[];
+  /** Busy times imported from the staff member's connected calendar. */
+  externalBusy: { startsAt: Date; endsAt: Date }[];
 }
 
 export interface BookingLoadRecord {

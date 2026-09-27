@@ -181,6 +181,10 @@ export class AvailabilityDal {
           where: { startsAt: { lt: to }, endsAt: { gt: from } },
           select: { startsAt: true, endsAt: true },
         },
+        externalBusy: {
+          where: { startsAt: { lt: to }, endsAt: { gt: from } },
+          select: { startsAt: true, endsAt: true },
+        },
       },
     });
   }
