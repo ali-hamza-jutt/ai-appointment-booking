@@ -11,6 +11,18 @@ export function nextIsoWeekday(isoWeekday: number, minDaysAhead = 2): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Today's date in UTC, YYYY-MM-DD. */
+export function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** The ISO weekday (1 = Monday … 7 = Sunday) of a YYYY-MM-DD date. */
+export function isoWeekdayOf(localDate: string): number {
+  const weekday = new Date(`${localDate}T00:00:00Z`).getUTCDay();
+
+  return weekday === 0 ? 7 : weekday;
+}
+
 export function addDays(localDate: string, days: number): string {
   const date = new Date(`${localDate}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);

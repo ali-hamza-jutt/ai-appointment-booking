@@ -3,28 +3,36 @@ import request from "supertest";
 import { app } from "../../src/app.js";
 import { authHeader, createTestUser, type TestUser } from "./auth.js";
 import { createTestBusiness, createTestService, type TestBusiness } from "./business.js";
-import { nextIsoWeekday } from "./dates.js";
+import { addDays, isoWeekdayOf, nextIsoWeekday, todayUtc } from "./dates.js";
 
 export interface BookableSetup {
   owner: TestUser;
   business: TestBusiness;
   serviceId: string;
   staffId: string;
-  /** A future Tuesday (UTC) on which the staff member works 09:00–17:00. */
+  /** A future date (UTC) on which the staff member works 09:00–17:00. */
   day: string;
   at: (time: string) => string;
 }
 
 /**
- * A UTC business with one service and one staff member working Tuesdays
- * 09:00–17:00, hourly slots and no minimum notice.
+ * A UTC business with one service and one staff member working 09:00–17:00
+ * on one weekday, with hourly slots and no minimum notice. The working day is
+ * the next Tuesday at least two days out, or `daysAhead` days from today.
  */
 export async function createBookableSetup(
   options: {
     service?: Record<string, unknown>;
     settings?: Record<string, unknown>;
+    /**
+     * Work on the day this many days from today instead of the next Tuesday.
+     * The next Tuesday can be up to 8 days away, so tests that look at "the
+     * next 7 days" (tapping a service card) need a fixed distance instead.
+     */
+    daysAhead?: number;
   } = {},
 ): Promise<BookableSetup> {
+  const day = options.daysAhead === undefined ? nextIsoWeekday(2) : addDays(todayUtc(), options.daysAhead);
   const owner = await createTestUser();
   const business = await createTestBusiness(owner, { timeZone: "UTC", currency: "USD" });
 
@@ -49,10 +57,8 @@ export async function createBookableSetup(
   await request(app)
     .put(`/api/businesses/${business.id}/staff/${staff.body.id}/working-hours`)
     .set(...authHeader(owner))
-    .send({ items: [{ weekday: 2, startTime: "09:00", endTime: "17:00" }] })
+    .send({ items: [{ weekday: isoWeekdayOf(day), startTime: "09:00", endTime: "17:00" }] })
     .expect(200);
-
-  const day = nextIsoWeekday(2);
 
   return {
     owner,

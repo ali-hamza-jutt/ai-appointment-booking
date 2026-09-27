@@ -70,7 +70,8 @@ describe("customer profile and memory", () => {
   beforeEach(async () => {
     await resetDatabase();
     provider.requests.length = 0;
-    setup = await createBookableSetup();
+    // Tapping a service shows the next 7 days, so the working day must fall inside them.
+    setup = await createBookableSetup({ daysAhead: 2 });
     customer = await createTestUser({ fullName: "Ali Hamza" });
 
     const session = await request(app)
