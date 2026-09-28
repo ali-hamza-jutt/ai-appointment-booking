@@ -19,6 +19,7 @@ import { AppointmentActions } from "@/features/appointments/components/appointme
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
 import { AppointmentPayment } from "@/features/payments/components/appointment-payment";
 import { PAYMENT_UI_CONSTANTS } from "@/features/payments/constants/payment-ui.constants";
+import { AppointmentReview } from "@/features/reviews/components/appointment-review";
 import { useGetAppointment } from "@/generated/api/appointments/appointments";
 import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
 
@@ -108,6 +109,8 @@ export function AppointmentDetail({ appointmentId }: { appointmentId: string }) 
         <Suspense fallback={null}>
           <AppointmentPayment appointment={appointmentQuery.data} />
         </Suspense>
+
+        <AppointmentReview appointment={appointmentQuery.data} />
 
         <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
           <DetailItem icon={<CalendarIcon className="size-[18px]" />} label="Date" value={appointment.date} />

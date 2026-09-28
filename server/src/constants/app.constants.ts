@@ -231,6 +231,8 @@ export const TENANT_SCOPE_FIELDS = {
   // A customer's own waitlist is read across businesses by their user id.
   WaitlistEntry: ["businessId", "userId"],
   WaitlistOffer: ["businessId", "bookingId"],
+  // A customer's reviews are read across businesses by their user id.
+  Review: ["businessId", "userId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -316,6 +318,7 @@ export const REALTIME_CONSTANTS = {
     FORGET_PREFERENCE: "Updating your preferences…",
     SUMMARIZE: "Catching up on our conversation…",
     JOIN_WAITLIST: "Adding you to the waitlist…",
+    GET_REVIEWS: "Reading what customers say…",
   },
 } as const;
 
@@ -337,8 +340,11 @@ export const NOTIFICATION_CONSTANTS = {
     REQUESTED: "booking.pending_approval",
     RESCHEDULED: "booking.rescheduled",
     CANCELLED: "booking.cancelled",
+    /** Plans the message asking the customer to rate the visit. */
+    COMPLETED: "booking.completed",
   },
   REMINDER_JOB: "send-reminder",
+  REVIEW_REQUEST_JOB: "send-review-request",
   MAX_SUBJECT_LENGTH: 200,
   MAX_EMAIL_BODY_LENGTH: 4_000,
   /** Three SMS segments. */
@@ -433,6 +439,20 @@ export const WAITLIST_CONSTANTS = {
   ACCEPTING_EVENTS: ["booking.confirmed", "booking.payment_required", "booking.pending_approval"],
   LIST_LIMIT: 100,
   PARTS_OF_DAY: ["morning", "afternoon", "evening"],
+} as const;
+
+export const REVIEW_CONSTANTS = {
+  /** How long after a visit ends the customer is asked to rate it. */
+  REQUEST_DELAY_MINUTES: 120,
+  /** How long after a visit it can still be reviewed. */
+  WINDOW_DAYS: 30,
+  /** Ratings at or below this tell the owners straight away. */
+  LOW_RATING: 2,
+  SUBMITTED_EVENT: "review.submitted",
+  AGGREGATE_TYPE: "review",
+  LIST_LIMIT: 100,
+  /** Published reviews shown on the booking page and to the assistant. */
+  PUBLIC_LIMIT: 20,
 } as const;
 
 export const CHAT_MEMORY_CONSTANTS = {
@@ -555,6 +575,9 @@ export const ERROR_CODES = {
   REFUND_NOT_ALLOWED: "REFUND_NOT_ALLOWED",
   WAITLIST_ENTRY_NOT_FOUND: "WAITLIST_ENTRY_NOT_FOUND",
   WAITLIST_LIMIT_REACHED: "WAITLIST_LIMIT_REACHED",
+  REVIEW_NOT_FOUND: "REVIEW_NOT_FOUND",
+  REVIEW_NOT_ALLOWED: "REVIEW_NOT_ALLOWED",
+  REVIEW_ALREADY_EXISTS: "REVIEW_ALREADY_EXISTS",
   CALENDAR_CONNECTION_NOT_FOUND: "CALENDAR_CONNECTION_NOT_FOUND",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "CALENDAR_NOT_YOUR_STAFF_PROFILE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
@@ -637,6 +660,9 @@ export const ERROR_MESSAGES = {
   REFUND_NOT_ALLOWED: "Nothing on this booking can be refunded",
   WAITLIST_ENTRY_NOT_FOUND: "Waitlist entry was not found",
   WAITLIST_LIMIT_REACHED: "You are already waiting for several times here. Leave one of them first.",
+  REVIEW_NOT_FOUND: "Review was not found",
+  REVIEW_NOT_ALLOWED: "Only a visit that finished in the last 30 days can be reviewed",
+  REVIEW_ALREADY_EXISTS: "You have already reviewed this visit",
   CALENDAR_CONNECTION_NOT_FOUND: "This staff member has no connected calendar",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "Only owners, managers or the staff member themselves can change this calendar",
   CHAT_MESSAGE_ALREADY_EXISTS:

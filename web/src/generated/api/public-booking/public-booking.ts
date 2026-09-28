@@ -27,6 +27,7 @@ import type {
   ListPublicServicesParams,
   ListPublicStaffParams,
   PublicBusinessResponse,
+  PublicReviewListResponse,
   PublicServiceListResponse,
   PublicStaffListResponse
 } from '../models';
@@ -155,6 +156,103 @@ export function useListPublicStaff<TData = Awaited<ReturnType<typeof listPublicS
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListPublicStaffQueryOptions(slug,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListPublicReviewsUrl = (slug: string,) => {
+
+
+
+
+  return `/public/${slug}/reviews`
+}
+
+/**
+ * Published reviews, newest first, with their average rating.
+ */
+export const listPublicReviews = async (slug: string, options?: Parameters<typeof apiFetch>[1]): Promise<PublicReviewListResponse> => {
+
+  return apiFetch<PublicReviewListResponse>(getListPublicReviewsUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublicReviewsQueryKey = (slug: string,) => {
+    return [
+    `/public/${slug}/reviews`
+    ] as const;
+    }
+
+
+export const getListPublicReviewsQueryOptions = <TData = Awaited<ReturnType<typeof listPublicReviews>>, TError = ErrorType<ApiErrorResponse>>(slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublicReviewsQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublicReviews>>> = ({ signal }) => listPublicReviews(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPublicReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof listPublicReviews>>>
+export type ListPublicReviewsQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useListPublicReviews<TData = Awaited<ReturnType<typeof listPublicReviews>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPublicReviews>>,
+          TError,
+          Awaited<ReturnType<typeof listPublicReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPublicReviews<TData = Awaited<ReturnType<typeof listPublicReviews>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPublicReviews>>,
+          TError,
+          Awaited<ReturnType<typeof listPublicReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPublicReviews<TData = Awaited<ReturnType<typeof listPublicReviews>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListPublicReviews<TData = Awaited<ReturnType<typeof listPublicReviews>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPublicReviews>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPublicReviewsQueryOptions(slug,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -13,6 +13,7 @@ export const NOTIFICATION_KINDS: NotificationKind[] = [
   "BOOKING_CANCELLED",
   "BOOKING_REMINDER",
   "WAITLIST_OFFER",
+  "REVIEW_REQUEST",
 ];
 
 export const TEMPLATE_VARIABLES = [
@@ -66,6 +67,10 @@ export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationK
       subject: "A time opened up: {{serviceName}} on {{date}} at {{time}}",
       body: "Hi {{customerName}},\n\nA time you were waiting for has opened up. {{serviceName}} with {{staffName}} on {{date}} at {{time}} ({{timeZone}}) is held for you until {{heldUntil}}.\n\nConfirm it here before then: {{link}}\n\nIf you don't, it goes to the next person on the waitlist.\n\n{{businessName}}",
     },
+    REVIEW_REQUEST: {
+      subject: "How was your {{serviceName}}?",
+      body: "Hi {{customerName}},\n\nThanks for visiting {{businessName}}. How was your {{serviceName}} with {{staffName}}?\n\nRate it from 1 to 5 stars, it takes a moment: {{link}}\n\n{{businessName}}",
+    },
   },
   SMS: {
     BOOKING_CONFIRMED: {
@@ -91,6 +96,10 @@ export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationK
     WAITLIST_OFFER: {
       subject: null,
       body: "{{businessName}}: {{serviceName}} on {{date}} at {{time}} opened up and is held for you until {{heldUntil}}. Confirm: {{link}}",
+    },
+    REVIEW_REQUEST: {
+      subject: null,
+      body: "Thanks for visiting {{businessName}}! How was your {{serviceName}}? Rate it from 1 to 5: {{link}}",
     },
   },
 };

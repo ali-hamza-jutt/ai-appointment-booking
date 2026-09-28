@@ -9,7 +9,8 @@ export type NotificationKind =
   | "BOOKING_RESCHEDULED"
   | "BOOKING_CANCELLED"
   | "BOOKING_REMINDER"
-  | "WAITLIST_OFFER";
+  | "WAITLIST_OFFER"
+  | "REVIEW_REQUEST";
 
 export type NotificationStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED" | "SKIPPED";
 
@@ -165,6 +166,14 @@ export interface ReminderJobData {
   /** The start the reminder was planned for; a moved booking makes it stale. */
   scheduledAt: string;
 }
+
+/** Asks the customer to rate a finished visit. */
+export interface ReviewRequestJobData {
+  bookingId: string;
+  businessId: string;
+}
+
+export type NotificationJobData = ReminderJobData | ReviewRequestJobData;
 
 export interface PlannedReminder {
   offsetMinutes: number;

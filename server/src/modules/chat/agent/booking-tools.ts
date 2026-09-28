@@ -104,6 +104,13 @@ export const bookingTools: BookingTool[] = [
     handler: (args, context) => bookingAssistantService.joinWaitlist(context, args),
   }),
   tool({
+    name: "get_reviews",
+    description:
+      "Read this business's average rating and latest published customer reviews, when the customer asks what others think of it, a service or a provider.",
+    schema: z.object({}),
+    handler: (_args, context) => bookingAssistantService.getReviews(context),
+  }),
+  tool({
     name: "remember_preference",
     description:
       "Save a lasting preference the customer stated explicitly, for their next bookings here. value is the staffId for provider, the serviceId for service, or morning, afternoon or evening for part_of_day. Never save something you inferred.",

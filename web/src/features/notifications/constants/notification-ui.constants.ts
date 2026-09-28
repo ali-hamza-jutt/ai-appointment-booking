@@ -13,6 +13,7 @@ export const NOTIFICATION_UI_CONSTANTS = {
     BOOKING_CANCELLED: "Booking cancelled",
     BOOKING_REMINDER: "Reminder",
     WAITLIST_OFFER: "Waitlist: a time opened up",
+    REVIEW_REQUEST: "Review request (2 hours after a visit)",
   } satisfies Record<NotificationKind, string>,
   CHANNEL_LABELS: {
     EMAIL: "Email",

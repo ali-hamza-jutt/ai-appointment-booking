@@ -40,6 +40,13 @@ class FakeScheduler implements ReminderScheduler {
     this.cancelled.push({ bookingId: booking.bookingId, offsets: [...offsets] });
     return Promise.resolve();
   }
+
+  public reviewRequests: Array<{ bookingId: string; sendAt: string }> = [];
+
+  public scheduleReviewRequest(booking: { bookingId: string }, sendAt: Date): Promise<void> {
+    this.reviewRequests.push({ bookingId: booking.bookingId, sendAt: sendAt.toISOString() });
+    return Promise.resolve();
+  }
 }
 
 describe("booking notifications", () => {
@@ -327,6 +334,42 @@ describe("booking notifications", () => {
     expect(emails).toHaveLength(1);
   });
 
+  it("asks for a review two hours after a visit, once, and not after the customer left one", async () => {
+    const bookingId = await bookWithPhone();
+    const base = `/api/businesses/${setup.business.id}/bookings/${bookingId}`;
+    const job = { bookingId, businessId: setup.business.id };
+
+    // Not before the visit is over.
+    await service.sendReviewRequest(job);
+    expect(emails).toHaveLength(0);
+
+    await request(app).post(`${base}/check-in`).set(...authHeader(setup.owner)).expect(200);
+    await request(app).post(`${base}/complete`).set(...authHeader(setup.owner)).expect(200);
+
+    const completed = await eventFor(bookingId, "booking.completed");
+
+    expect(bookingNotificationsConsumer.handles("booking.completed")).toBe(true);
+    await service.handleBookingEvent(completed);
+    expect(scheduler.reviewRequests).toEqual([
+      { bookingId, sendAt: new Date(new Date(completed.createdAt).getTime() + 2 * 60 * 60_000).toISOString() },
+    ]);
+    expect(emails).toHaveLength(0);
+
+    await service.sendReviewRequest(job);
+    await service.sendReviewRequest(job);
+
+    expect(emails).toHaveLength(1);
+    expect(emails[0]).toMatchObject({ to: customer.email, subject: "How was your Haircut?" });
+    expect(emails[0]?.text).toContain(`/appointments/${bookingId}`);
+    expect(texts[0]?.text).toMatch(/How was your Haircut\? Rate it from 1 to 5: /);
+
+    // A customer who already reviewed the visit isn't asked again.
+    await prisma.notification.deleteMany({ where: { businessId: setup.business.id, bookingId } });
+    await request(app).post(`/api/appointments/${bookingId}/review`).set(...authHeader(customer)).send({ rating: 5 }).expect(201);
+    await service.sendReviewRequest(job);
+    expect(emails).toHaveLength(1);
+  });
+
   it("uses the business's own wording and rejects unknown placeholders", async () => {
     const base = `/api/businesses/${setup.business.id}/notification-templates`;
 
@@ -347,8 +390,8 @@ describe("booking notifications", () => {
 
     const listed = await request(app).get(base).set(...authHeader(setup.owner)).expect(200);
 
-    // Six kinds of message, each by email and SMS.
-    expect(listed.body.items).toHaveLength(12);
+    // Seven kinds of message, each by email and SMS.
+    expect(listed.body.items).toHaveLength(14);
     expect(listed.body.items.filter((item: { isCustom: boolean }) => item.isCustom)).toEqual([
       expect.objectContaining({ channel: "EMAIL", kind: "BOOKING_CONFIRMED", subject: "See you {{date}}!" }),
     ]);
@@ -454,6 +497,19 @@ describe("reminder queue", () => {
       await scheduler.cancel(booking, [1_440, 120]);
 
       expect(await queue.getJob(id)).toBeUndefined();
+
+      // One review request per booking, however often the visit's event arrives.
+      const reviewAt = new Date("2026-10-05T14:00:00Z");
+
+      await scheduler.scheduleReviewRequest(booking, reviewAt, now);
+      await scheduler.scheduleReviewRequest(booking, reviewAt, now);
+
+      const reviewJob = await queue.getJob(`review-request-${booking.bookingId}`);
+
+      expect(reviewJob?.name).toBe(NOTIFICATION_CONSTANTS.REVIEW_REQUEST_JOB);
+      expect(reviewJob?.data).toEqual({ bookingId: booking.bookingId, businessId: booking.businessId });
+      expect(reviewJob?.opts.delay).toBe(2 * 60 * 60 * 1_000);
+      expect(await queue.getDelayedCount()).toBe(1);
     } finally {
       await scheduler.close();
       await queue.close();
