@@ -16,6 +16,7 @@ import { notFoundHandler } from "./middleware/not-found.js";
 import {
   authRateLimiter,
   chatRateLimiter,
+  publicRateLimiter,
   refreshRateLimiter,
   sensitiveAuthRateLimiter,
 } from "./middleware/rate-limit.js";
@@ -42,6 +43,7 @@ app.post(
     "/api/auth/phone/sign-in",
     "/api/auth/phone/link/verify",
     "/api/auth/password/reset",
+    "/api/public/:slug/guest/verify",
   ],
   authRateLimiter,
 );
@@ -51,9 +53,11 @@ app.post(
     "/api/auth/email/verification",
     "/api/auth/phone/link/code",
     "/api/auth/phone/sign-in/code",
+    "/api/public/:slug/guest/code",
   ],
   sensitiveAuthRateLimiter,
 );
+app.use("/api/public", publicRateLimiter);
 app.post("/api/auth/refresh", refreshRateLimiter);
 app.post(
   [

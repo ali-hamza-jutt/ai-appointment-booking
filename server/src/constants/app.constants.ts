@@ -233,6 +233,7 @@ export const TENANT_SCOPE_FIELDS = {
   WaitlistOffer: ["businessId", "bookingId"],
   // A customer's reviews are read across businesses by their user id.
   Review: ["businessId", "userId"],
+  AllowedOrigin: ["businessId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -441,6 +442,17 @@ export const WAITLIST_CONSTANTS = {
   PARTS_OF_DAY: ["morning", "afternoon", "evening"],
 } as const;
 
+export const PUBLIC_BOOKING_CONSTANTS = {
+  GUEST_CODE_TTL_MINUTES: 10,
+  GUEST_CODE_MAX_ATTEMPTS: 5,
+  GUEST_CODE_RESEND_SECONDS: 60,
+  /** Sites one business may embed its widget on. */
+  MAX_ALLOWED_ORIGINS: 20,
+  /** Requests per IP to the public booking API. */
+  RATE_LIMIT_WINDOW_MS: 60_000,
+  RATE_LIMIT_MAX_REQUESTS: 120,
+} as const;
+
 export const REVIEW_CONSTANTS = {
   /** How long after a visit ends the customer is asked to rate it. */
   REQUEST_DELAY_MINUTES: 120,
@@ -531,6 +543,11 @@ export const ERROR_CODES = {
   INVALID_PHONE_NUMBER: "INVALID_PHONE_NUMBER",
   PHONE_ALREADY_IN_USE: "PHONE_ALREADY_IN_USE",
   PHONE_CODE_RECENTLY_SENT: "PHONE_CODE_RECENTLY_SENT",
+  INVALID_GUEST_CODE: "INVALID_GUEST_CODE",
+  GUEST_BOOKING_DISABLED: "GUEST_BOOKING_DISABLED",
+  GUEST_CODE_RECENTLY_SENT: "GUEST_CODE_RECENTLY_SENT",
+  ALLOWED_ORIGIN_NOT_FOUND: "ALLOWED_ORIGIN_NOT_FOUND",
+  ALLOWED_ORIGIN_LIMIT_REACHED: "ALLOWED_ORIGIN_LIMIT_REACHED",
   SMS_NOT_CONFIGURED: "SMS_NOT_CONFIGURED",
   GOOGLE_NOT_CONFIGURED: "GOOGLE_NOT_CONFIGURED",
   CROSS_SITE_REQUEST: "CROSS_SITE_REQUEST",
@@ -612,6 +629,11 @@ export const ERROR_MESSAGES = {
   INVALID_PHONE_NUMBER: "Enter the number in international format, for example +447700900123",
   PHONE_ALREADY_IN_USE: "This phone number is linked to another account",
   PHONE_CODE_RECENTLY_SENT: "A code was sent recently. Please wait a minute before asking again",
+  INVALID_GUEST_CODE: "The code is incorrect or has expired",
+  GUEST_BOOKING_DISABLED: "This business asks you to sign in or create an account to book",
+  GUEST_CODE_RECENTLY_SENT: "A code was sent recently. Please wait a minute before asking again",
+  ALLOWED_ORIGIN_NOT_FOUND: "That website is not on the list",
+  ALLOWED_ORIGIN_LIMIT_REACHED: "A business can allow at most 20 websites",
   SMS_NOT_CONFIGURED: "Text message delivery is not available yet",
   GOOGLE_NOT_CONFIGURED: "Google sign-in is not available",
   CROSS_SITE_REQUEST: "This request must come from the BookWise app",

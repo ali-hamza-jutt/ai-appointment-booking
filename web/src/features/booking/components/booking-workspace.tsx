@@ -96,12 +96,18 @@ function createWelcomeMessage(firstName: string): ChatMessageViewModel {
 
 interface BookingWorkspaceProps {
   businessSlug?: string;
+  /** Fits the chat to a small frame, such as the booking widget. */
+  embedded?: boolean;
   initialSessionId?: string;
   onSessionCreated?: (sessionId: string) => void;
+  /** Starts a fresh chat in place instead of going to /book. */
+  onStartNew?: () => void;
 }
 
 interface BookingExperienceProps {
   businessSlug: string;
+  embedded?: boolean | undefined;
+  onStartNew?: (() => void) | undefined;
   initialMessageCursor?: string;
   initialMessages?: ChatMessageResponse[];
   initialSession?: ChatSessionResponse;
@@ -111,8 +117,10 @@ interface BookingExperienceProps {
 
 export function BookingWorkspace({
   businessSlug = BOOKING_UI_CONSTANTS.DEMO_BUSINESS_SLUG,
+  embedded,
   initialSessionId,
   onSessionCreated,
+  onStartNew,
 }: BookingWorkspaceProps) {
   const isResuming = Boolean(initialSessionId);
   const timeZone = useBrowserTimeZone();
@@ -128,8 +136,10 @@ export function BookingWorkspace({
     return (
       <BookingExperience
         businessSlug={businessSlug}
+        embedded={embedded}
         initialTimeZone={timeZone}
         onSessionCreated={onSessionCreated}
+        onStartNew={onStartNew}
       />
     );
   }
@@ -169,17 +179,21 @@ export function BookingWorkspace({
   return (
     <BookingExperience
       businessSlug={sessionQuery.data.business.slug}
+      embedded={embedded}
       initialMessageCursor={messagesQuery.data.pages.at(-1)?.nextCursor}
       initialMessages={initialMessages}
       initialSession={sessionQuery.data}
       initialTimeZone={timeZone}
       key={`${sessionQuery.data.id}:${timeZone}`}
+      onStartNew={onStartNew}
     />
   );
 }
 
 function BookingExperience({
   businessSlug,
+  embedded = false,
+  onStartNew,
   initialMessageCursor,
   initialMessages = [],
   initialSession,
@@ -595,14 +609,28 @@ function BookingExperience({
   function startAnotherBooking() {
     if (isStartingNew) return;
 
+    if (onStartNew) {
+      onStartNew();
+      return;
+    }
+
     startNewTransition(() => {
       router.replace(`/book?new=${crypto.randomUUID()}`);
     });
   }
 
   return (
-    <div className="grid xl:h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px] xl:overflow-hidden">
-      <section className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col bg-surface">
+    <div
+      className={
+        embedded ? "grid" : "grid xl:h-[calc(100dvh-4rem)] xl:grid-cols-[minmax(0,1fr)_372px] xl:overflow-hidden"
+      }
+    >
+      <section
+        className={cn(
+          "flex min-h-0 flex-col bg-surface",
+          embedded ? "h-[calc(100dvh-6.5rem)]" : "h-[calc(100dvh-4rem)]",
+        )}
+      >
         <div className="border-b border-border px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-[10px] bg-brand-soft text-brand">

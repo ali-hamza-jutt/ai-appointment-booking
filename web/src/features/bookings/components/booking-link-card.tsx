@@ -15,7 +15,7 @@ export function BookingLinkCard({ slug }: { slug: string }) {
     () => "",
   );
   const [copied, setCopied] = useState(false);
-  const link = `${origin}/book?business=${encodeURIComponent(slug)}`;
+  const link = `${origin}/b/${encodeURIComponent(slug)}`;
 
   async function copyLink() {
     try {

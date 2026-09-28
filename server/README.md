@@ -79,6 +79,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/me/waitlist`: a customer's waits (join, list, leave); `/api/businesses/{businessId}/waitlist` shows staff who is waiting.
 - `/api/appointments/{appointmentId}/review`: the customer's rating of a finished visit; `/api/businesses/{businessId}/reviews` lets staff publish, hide and answer reviews; `/api/public/{slug}/reviews` lists the published ones.
 - `/api/businesses/{businessId}/chat-handoffs/{sessionId}` (and `/messages`): a handed-off chat in full, and staff replies as the business; `PUT /api/businesses/{businessId}/customers/{customerId}/notes` keeps private team notes.
+- `/api/public/{slug}/guest/code` and `/guest/verify`: guest booking by emailed code; `/api/public/{slug}/embed` and `/api/businesses/{businessId}/allowed-origins`: where the booking widget may be embedded.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -208,6 +209,12 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **A freed time is offered in turn.** When a booking is cancelled or a hold expires, an outbox consumer walks the waiting customers for that service in the order they joined and picks the first whose dates and part of day (in their own time zone) and provider suit the time. It holds the time for them as a `WAITLIST` booking for 15 minutes and emails or texts them a link to confirm it (`WAITLIST_OFFER`, rewordable like other messages). A deposit, if the service asks for one, is taken when they confirm.
 - **If they don't take it, it moves on.** A lapsed or released hold marks the offer `LAPSED` or `DECLINED`, puts the customer back in line and offers the time to the next person; nobody is offered the same time twice. Confirming marks the entry `BOOKED`.
 - **When the time can't be held,** because it was taken again, is now too soon, or is outside the booking window, the search stops, since no one else could book it either.
+
+## Public booking and the widget
+
+- **Guests.** On a business's public page or widget, someone without an account enters their name, email and (optionally) phone, and gets a 6-digit code by email (10 minutes, 5 guesses, one per minute). Confirming it signs them in with a browser-session login, creating an account the first time; an existing account is signed in as it is, since the code proves the email. The phone number is saved on their customer record at that business. From there they use the same holds, confirmation and chat as any signed-in customer. A business with `allowGuestBooking` off refuses guest codes (403).
+- **Limits.** Everything under `/api/public` has its own per-IP limit (120 a minute); asking for a code uses the stricter limit of other code-sending endpoints.
+- **Widget.** `widget.js` (served by the web app) adds a button that opens `/embed/<slug>` in an iframe. The web app's proxy sets `Content-Security-Policy: frame-ancestors 'self' <allowed origins>` on that page from `GET /api/public/{slug}/embed`; every other page may only be framed by BookWise itself. The frame sends the host page nothing but a close request.
 
 ## Business dashboard
 

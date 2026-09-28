@@ -2,6 +2,10 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CROSS_SITE_REQUEST: "Please sign in again from the BookWise app.",
   GOOGLE_NOT_CONFIGURED: "Google sign-in isn't available right now.",
   INVALID_AUTH_LINK: "This link is invalid or has expired.",
+  GUEST_BOOKING_DISABLED: "This business asks you to sign in or create an account to book.",
+  GUEST_CODE_RECENTLY_SENT: "We just sent a code. Please wait a minute before asking for another.",
+  INVALID_GUEST_CODE: "That code is incorrect or has expired. Check it or ask for a new one.",
+  ALLOWED_ORIGIN_LIMIT_REACHED: "You can allow at most 20 websites. Remove one first.",
   INVALID_PHONE_CODE: "That code is incorrect or has expired. Check it or send a new one.",
   INVALID_PHONE_NUMBER: "Enter the number with its country code, for example +44 7700 900123.",
   PHONE_ALREADY_IN_USE: "This phone number is already linked to another account.",
@@ -76,6 +80,9 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 export const API_FIELD_ERROR_MESSAGES: Readonly<
   Record<string, Readonly<Record<string, string>>>
 > = {
+  INVALID_GUEST_CODE: {
+    code: "That code is incorrect or has expired. Check it or ask for a new one.",
+  },
   INVALID_FULL_NAME: {
     fullName: "Full name must contain at least 2 characters.",
   },

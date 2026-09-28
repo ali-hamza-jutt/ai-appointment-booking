@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/form-controls";
 import { useAuth } from "@/features/auth/auth-context";
+import { getNextPath } from "@/features/auth/utils/next-path";
 import { AlternativeSignIn } from "@/features/auth/components/alternative-sign-in";
 import { AUTH_LINK_CLASS, AuthCard } from "@/features/auth/components/auth-card";
 import { PasswordToggle } from "@/features/auth/components/password-toggle";
@@ -81,7 +82,7 @@ export function LoginForm() {
         },
         onSuccess: (response) => {
           completeAuthentication(response);
-          startTransition(() => router.replace("/book"));
+          startTransition(() => router.replace(getNextPath()));
         },
       },
     );

@@ -25,6 +25,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddAllowedOriginRequest,
+  AllowedOriginListResponse,
+  AllowedOriginResponse,
   ApiErrorResponse,
   BusinessListResponse,
   BusinessResponse,
@@ -61,7 +64,238 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
-export const getListLocationsUrl = (businessId: string,) => {
+export const getListAllowedOriginsUrl = (businessId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/allowed-origins`
+}
+
+/**
+ * Websites allowed to embed the booking widget.
+ */
+export const listAllowedOrigins = async (businessId: string, options?: Parameters<typeof apiFetch>[1]): Promise<AllowedOriginListResponse> => {
+
+  return apiFetch<AllowedOriginListResponse>(getListAllowedOriginsUrl(businessId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAllowedOriginsQueryKey = (businessId: string,) => {
+    return [
+    `/businesses/${businessId}/allowed-origins`
+    ] as const;
+    }
+
+
+export const getListAllowedOriginsQueryOptions = <TData = Awaited<ReturnType<typeof listAllowedOrigins>>, TError = ErrorType<unknown>>(businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAllowedOriginsQueryKey(businessId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllowedOrigins>>> = ({ signal }) => listAllowedOrigins(businessId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListAllowedOriginsQueryResult = NonNullable<Awaited<ReturnType<typeof listAllowedOrigins>>>
+export type ListAllowedOriginsQueryError = ErrorType<unknown>
+
+
+export function useListAllowedOrigins<TData = Awaited<ReturnType<typeof listAllowedOrigins>>, TError = ErrorType<unknown>>(
+ businessId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAllowedOrigins>>,
+          TError,
+          Awaited<ReturnType<typeof listAllowedOrigins>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAllowedOrigins<TData = Awaited<ReturnType<typeof listAllowedOrigins>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAllowedOrigins>>,
+          TError,
+          Awaited<ReturnType<typeof listAllowedOrigins>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListAllowedOrigins<TData = Awaited<ReturnType<typeof listAllowedOrigins>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListAllowedOrigins<TData = Awaited<ReturnType<typeof listAllowedOrigins>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllowedOrigins>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListAllowedOriginsQueryOptions(businessId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getAddAllowedOriginUrl = (businessId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/allowed-origins`
+}
+
+/**
+ * Allows a website to embed the booking widget. Adding one twice returns the first.
+ */
+export const addAllowedOrigin = async (businessId: string,
+    addAllowedOriginRequest: AddAllowedOriginRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AllowedOriginResponse> => {
+
+  return apiFetch<AllowedOriginResponse>(getAddAllowedOriginUrl(businessId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(addAllowedOriginRequest)
+  }
+);}
+
+
+
+
+
+export const getAddAllowedOriginMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAllowedOrigin>>, TError,{businessId: string;data: BodyType<AddAllowedOriginRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addAllowedOrigin>>, TError,{businessId: string;data: BodyType<AddAllowedOriginRequest>}, TContext> => {
+
+const mutationKey = ['addAllowedOrigin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addAllowedOrigin>>, {businessId: string;data: BodyType<AddAllowedOriginRequest>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  addAllowedOrigin(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddAllowedOriginMutationResult = NonNullable<Awaited<ReturnType<typeof addAllowedOrigin>>>
+    export type AddAllowedOriginMutationBody = BodyType<AddAllowedOriginRequest>
+    export type AddAllowedOriginMutationError = ErrorType<ApiErrorResponse>
+
+    export const useAddAllowedOrigin = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAllowedOrigin>>, TError,{businessId: string;data: BodyType<AddAllowedOriginRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addAllowedOrigin>>,
+        TError,
+        {businessId: string;data: BodyType<AddAllowedOriginRequest>},
+        TContext
+      > => {
+      return useMutation(getAddAllowedOriginMutationOptions(options), queryClient);
+    }
+    export const getRemoveAllowedOriginUrl = (businessId: string,
+    originId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/allowed-origins/${originId}`
+}
+
+export const removeAllowedOrigin = async (businessId: string,
+    originId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getRemoveAllowedOriginUrl(businessId,originId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveAllowedOriginMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAllowedOrigin>>, TError,{businessId: string;originId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeAllowedOrigin>>, TError,{businessId: string;originId: string}, TContext> => {
+
+const mutationKey = ['removeAllowedOrigin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeAllowedOrigin>>, {businessId: string;originId: string}> = (props) => {
+          const {businessId,originId} = props ?? {};
+
+          return  removeAllowedOrigin(businessId,originId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveAllowedOriginMutationResult = NonNullable<Awaited<ReturnType<typeof removeAllowedOrigin>>>
+
+    export type RemoveAllowedOriginMutationError = ErrorType<ApiErrorResponse>
+
+    export const useRemoveAllowedOrigin = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAllowedOrigin>>, TError,{businessId: string;originId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeAllowedOrigin>>,
+        TError,
+        {businessId: string;originId: string},
+        TContext
+      > => {
+      return useMutation(getRemoveAllowedOriginMutationOptions(options), queryClient);
+    }
+    export const getListLocationsUrl = (businessId: string,) => {
 
 
 

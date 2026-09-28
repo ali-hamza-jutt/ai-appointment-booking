@@ -6,6 +6,7 @@ import {
   CHAT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
+  PUBLIC_BOOKING_CONSTANTS,
 } from "../constants/app.constants.js";
 import { env } from "../config/env.js";
 import { getRedis, redisKey } from "../infrastructure/redis/redis.js";
@@ -67,6 +68,13 @@ export const refreshRateLimiter = createRateLimiter(
   "auth-refresh",
   AUTH_CONSTANTS.REFRESH_RATE_LIMIT_WINDOW_MS,
   AUTH_CONSTANTS.REFRESH_RATE_LIMIT_MAX_REQUESTS,
+);
+
+/** Everything under /api/public, which anyone can call without signing in. */
+export const publicRateLimiter = createRateLimiter(
+  "public",
+  PUBLIC_BOOKING_CONSTANTS.RATE_LIMIT_WINDOW_MS,
+  PUBLIC_BOOKING_CONSTANTS.RATE_LIMIT_MAX_REQUESTS,
 );
 
 export const chatRateLimiter = createRateLimiter(

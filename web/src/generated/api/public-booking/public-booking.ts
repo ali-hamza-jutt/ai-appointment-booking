@@ -6,24 +6,32 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   ApiErrorResponse,
+  AuthResponse,
   AvailabilityResponse,
+  EmbedPolicyResponse,
   GetPublicAvailabilityParams,
+  GuestCodeRequest,
+  GuestVerifyRequest,
   ListPublicServicesParams,
   ListPublicStaffParams,
   PublicBusinessResponse,
@@ -33,7 +41,7 @@ import type {
 } from '../models';
 
 import { apiFetch } from '../../../lib/api/api-fetch';
-import type { ErrorType } from '../../../lib/api/api-fetch';
+import type { ErrorType , BodyType } from '../../../lib/api/api-fetch';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -253,6 +261,240 @@ export function useListPublicReviews<TData = Awaited<ReturnType<typeof listPubli
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListPublicReviewsQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getSendGuestCodeUrl = (slug: string,) => {
+
+
+
+
+  return `/public/${slug}/guest/code`
+}
+
+/**
+ * Emails a 6-digit code so someone without an account can book as a guest.
+ */
+export const sendGuestCode = async (slug: string,
+    guestCodeRequest: GuestCodeRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getSendGuestCodeUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(guestCodeRequest)
+  }
+);}
+
+
+
+
+
+export const getSendGuestCodeMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendGuestCode>>, TError,{slug: string;data: BodyType<GuestCodeRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendGuestCode>>, TError,{slug: string;data: BodyType<GuestCodeRequest>}, TContext> => {
+
+const mutationKey = ['sendGuestCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendGuestCode>>, {slug: string;data: BodyType<GuestCodeRequest>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  sendGuestCode(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendGuestCodeMutationResult = NonNullable<Awaited<ReturnType<typeof sendGuestCode>>>
+    export type SendGuestCodeMutationBody = BodyType<GuestCodeRequest>
+    export type SendGuestCodeMutationError = ErrorType<ApiErrorResponse>
+
+    export const useSendGuestCode = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendGuestCode>>, TError,{slug: string;data: BodyType<GuestCodeRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof sendGuestCode>>,
+        TError,
+        {slug: string;data: BodyType<GuestCodeRequest>},
+        TContext
+      > => {
+      return useMutation(getSendGuestCodeMutationOptions(options), queryClient);
+    }
+    export const getVerifyGuestUrl = (slug: string,) => {
+
+
+
+
+  return `/public/${slug}/guest/verify`
+}
+
+/**
+ * Confirms the emailed code and signs the guest in, creating an account
+ * for a new email. The session ends with the browser session.
+ */
+export const verifyGuest = async (slug: string,
+    guestVerifyRequest: GuestVerifyRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AuthResponse> => {
+
+  return apiFetch<AuthResponse>(getVerifyGuestUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(guestVerifyRequest)
+  }
+);}
+
+
+
+
+
+export const getVerifyGuestMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyGuest>>, TError,{slug: string;data: BodyType<GuestVerifyRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyGuest>>, TError,{slug: string;data: BodyType<GuestVerifyRequest>}, TContext> => {
+
+const mutationKey = ['verifyGuest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyGuest>>, {slug: string;data: BodyType<GuestVerifyRequest>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  verifyGuest(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyGuestMutationResult = NonNullable<Awaited<ReturnType<typeof verifyGuest>>>
+    export type VerifyGuestMutationBody = BodyType<GuestVerifyRequest>
+    export type VerifyGuestMutationError = ErrorType<ApiErrorResponse>
+
+    export const useVerifyGuest = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyGuest>>, TError,{slug: string;data: BodyType<GuestVerifyRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof verifyGuest>>,
+        TError,
+        {slug: string;data: BodyType<GuestVerifyRequest>},
+        TContext
+      > => {
+      return useMutation(getVerifyGuestMutationOptions(options), queryClient);
+    }
+    export const getGetEmbedPolicyUrl = (slug: string,) => {
+
+
+
+
+  return `/public/${slug}/embed`
+}
+
+/**
+ * The websites allowed to embed this business's booking widget.
+ */
+export const getEmbedPolicy = async (slug: string, options?: Parameters<typeof apiFetch>[1]): Promise<EmbedPolicyResponse> => {
+
+  return apiFetch<EmbedPolicyResponse>(getGetEmbedPolicyUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmbedPolicyQueryKey = (slug: string,) => {
+    return [
+    `/public/${slug}/embed`
+    ] as const;
+    }
+
+
+export const getGetEmbedPolicyQueryOptions = <TData = Awaited<ReturnType<typeof getEmbedPolicy>>, TError = ErrorType<ApiErrorResponse>>(slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmbedPolicyQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmbedPolicy>>> = ({ signal }) => getEmbedPolicy(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetEmbedPolicyQueryResult = NonNullable<Awaited<ReturnType<typeof getEmbedPolicy>>>
+export type GetEmbedPolicyQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetEmbedPolicy<TData = Awaited<ReturnType<typeof getEmbedPolicy>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEmbedPolicy>>,
+          TError,
+          Awaited<ReturnType<typeof getEmbedPolicy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEmbedPolicy<TData = Awaited<ReturnType<typeof getEmbedPolicy>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEmbedPolicy>>,
+          TError,
+          Awaited<ReturnType<typeof getEmbedPolicy>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEmbedPolicy<TData = Awaited<ReturnType<typeof getEmbedPolicy>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetEmbedPolicy<TData = Awaited<ReturnType<typeof getEmbedPolicy>>, TError = ErrorType<ApiErrorResponse>>(
+ slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEmbedPolicy>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetEmbedPolicyQueryOptions(slug,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
