@@ -63,6 +63,15 @@ export async function authorizeScopes(
     throwBusinessNotFound();
   }
 
+  // A suspended business's team can still look, but not change anything.
+  if (
+    membership.business.suspendedAt &&
+    !isPlatformAdmin &&
+    businessScopes.some((scope) => scope !== AUTHORIZATION_SCOPES.BUSINESS_READ)
+  ) {
+    throw new AppError(403, ERROR_CODES.BUSINESS_SUSPENDED, ERROR_MESSAGES.BUSINESS_SUSPENDED);
+  }
+
   const grantedScopes: readonly string[] = ROLE_SCOPES[membership.role];
 
   if (

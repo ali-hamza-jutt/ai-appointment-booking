@@ -8,6 +8,7 @@ import { Alert, Spinner } from "@/components/ui/feedback";
 import { BuildingIcon, PlusIcon, RefreshIcon } from "@/components/ui/icons";
 import { PageContainer } from "@/components/ui/page-header";
 import { useActiveBusiness } from "@/features/business-settings/context/active-business-context";
+import { useGetBusiness } from "@/generated/api/businesses/businesses";
 import type { BusinessSummaryResponse } from "@/generated/api/models";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
@@ -62,5 +63,27 @@ export function BusinessRequired({ children }: BusinessRequiredProps) {
     );
   }
 
-  return <>{children(activeBusiness)}</>;
+  return (
+    <>
+      <SuspensionNotice businessId={activeBusiness.id} />
+      {children(activeBusiness)}
+    </>
+  );
+}
+
+/** Tells the team their business was suspended, and what that means. */
+function SuspensionNotice({ businessId }: { businessId: string }) {
+  const businessQuery = useGetBusiness(businessId);
+  const suspension = businessQuery.data?.suspension;
+
+  if (!suspension) return null;
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+      <Alert tone="warning">
+        BookWise has suspended this business{suspension.reason ? `: ${suspension.reason}` : ""}. Customers can&apos;t book or chat,
+        and you can look but not make changes. Contact BookWise support to sort it out.
+      </Alert>
+    </div>
+  );
 }

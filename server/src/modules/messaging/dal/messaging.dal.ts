@@ -36,7 +36,11 @@ export class MessagingDal {
   }
 
   public findBusiness(businessId: string) {
-    return prisma.business.findUnique({ where: { id: businessId }, select: { id: true, slug: true, timeZone: true } });
+    // Messages to a suspended business get no answer.
+    return prisma.business.findUnique({
+      where: { id: businessId, suspendedAt: null },
+      select: { id: true, slug: true, timeZone: true },
+    });
   }
 
   /** The cards and buttons of the assistant's latest message in a chat, for reading a numbered reply. */

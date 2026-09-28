@@ -2,6 +2,8 @@ export const API_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CROSS_SITE_REQUEST: "Please sign in again from the BookWise app.",
   GOOGLE_NOT_CONFIGURED: "Google sign-in isn't available right now.",
   INVALID_AUTH_LINK: "This link is invalid or has expired.",
+  BUSINESS_SUSPENDED: "This business is suspended, so changes are paused. Contact BookWise support.",
+  CANNOT_IMPERSONATE_ADMIN: "Other platform admins can't be signed in as.",
   MESSAGING_NUMBER_TAKEN: "This number is already connected to another business.",
   GUEST_BOOKING_DISABLED: "This business asks you to sign in or create an account to book.",
   GUEST_CODE_RECENTLY_SENT: "We just sent a code. Please wait a minute before asking for another.",

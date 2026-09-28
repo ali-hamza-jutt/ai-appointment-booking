@@ -32,6 +32,8 @@ export function toAuthUserResponse(user: PublicUserRecord): AuthUserResponse {
     emailVerified: user.emailVerifiedAt !== null,
     phone: user.phone,
     hasPassword: user.passwordHash !== null,
+    platformRole: user.platformRole,
+    impersonatedBy: null,
   };
 }
 

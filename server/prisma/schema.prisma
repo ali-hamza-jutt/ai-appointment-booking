@@ -282,6 +282,7 @@ model User {
   customers          Customer[]
   waitlistEntries    WaitlistEntry[]
   reviews            Review[]
+  adminAuditLogs     AdminAuditLog[]
   invitations        BusinessInvitation[]
   staff              Staff[]
 
@@ -354,6 +355,39 @@ model MessagingNumber {
   @@map("messaging_numbers")
 }
 
+/// Model calls made for one business on one (UTC) day, for the admin's spend view.
+model LlmUsage {
+  id           String   @id @default(uuid()) @db.Uuid
+  businessId   String   @map("business_id") @db.Uuid
+  date         DateTime @db.Date
+  model        String   @db.VarChar(80)
+  requests     Int      @default(0)
+  inputTokens  BigInt   @default(0) @map("input_tokens")
+  outputTokens BigInt   @default(0) @map("output_tokens")
+  /// Estimated from list prices; null pricing leaves it at zero.
+  costUsd      Float    @default(0) @map("cost_usd")
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, date, model], map: "llm_usage_business_id_date_model_key")
+  @@map("llm_usage")
+}
+
+/// What platform admins did: impersonation, suspensions and replayed jobs.
+model AdminAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String   @db.VarChar(60)
+  targetType String   @map("target_type") @db.VarChar(30)
+  targetId   String?  @map("target_id") @db.VarChar(120)
+  details    Json?    @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt], map: "admin_audit_logs_created_at_idx")
+  @@index([targetType, targetId], map: "admin_audit_logs_target_type_target_id_idx")
+  @@map("admin_audit_logs")
+}
+
 /// One number about one local day at a business, computed nightly for the analytics page.
 model DailyMetric {
   id         String   @id @default(uuid()) @db.Uuid
@@ -407,6 +441,9 @@ model Business {
   timeZone         String               @map("time_zone") @db.VarChar(100)
   currency         String               @db.Char(3)
   settings         Json                 @default("{}") @db.JsonB
+  /// Set by a platform admin; a suspended business can't take bookings and its team can only read.
+  suspendedAt      DateTime?            @map("suspended_at") @db.Timestamptz(3)
+  suspendedReason  String?              @map("suspended_reason") @db.VarChar(500)
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   locations        Location[]
@@ -431,6 +468,7 @@ model Business {
   allowedOrigins      AllowedOrigin[]
   messagingNumbers    MessagingNumber[]
   dailyMetrics        DailyMetric[]
+  llmUsage            LlmUsage[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]

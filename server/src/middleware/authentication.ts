@@ -6,6 +6,7 @@ import {
   ERROR_MESSAGES,
 } from "../constants/app.constants.js";
 import type { AuthenticatedUser } from "../models/authenticated-user.js";
+import { adminAuditDal } from "../modules/admin/dal/admin-audit.dal.js";
 import { AppError } from "./app-error.js";
 import { authorizeScopes } from "./authorization.js";
 import {
@@ -44,6 +45,7 @@ export async function expressAuthentication(
     user = {
       id: claims.subject,
       email: claims.email,
+      ...(claims.impersonatorId ? { impersonatorId: claims.impersonatorId } : {}),
     };
   } catch {
     throw new AppError(
@@ -51,6 +53,17 @@ export async function expressAuthentication(
       ERROR_CODES.INVALID_TOKEN,
       ERROR_MESSAGES.INVALID_TOKEN,
     );
+  }
+
+  // Everything an admin changes while acting as someone is written to the audit log.
+  if (user.impersonatorId && request.method !== "GET" && request.method !== "HEAD") {
+    adminAuditDal.recordInBackground({
+      adminId: user.impersonatorId,
+      action: "impersonation.request",
+      targetType: "user",
+      targetId: user.id,
+      details: { method: request.method, path: request.originalUrl.split("?")[0] ?? request.originalUrl },
+    });
   }
 
   return scopes.length > 0 ? authorizeScopes(request, user, scopes) : user;

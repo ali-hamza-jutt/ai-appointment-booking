@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { AuthUserResponsePlatformRole } from './authUserResponsePlatformRole';
 
 export interface AuthUserResponse {
   id: string;
@@ -18,4 +19,10 @@ export interface AuthUserResponse {
   phone: string | null;
   /** False for accounts that only sign in with Google. */
   hasPassword: boolean;
+  platformRole: AuthUserResponsePlatformRole;
+  /**
+     * The platform admin acting as this user, when this is an impersonation session.
+     * @nullable
+     */
+  impersonatedBy: string | null;
 }

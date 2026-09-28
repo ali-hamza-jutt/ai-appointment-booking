@@ -12,6 +12,7 @@ const userSelect = {
   emailVerifiedAt: true,
   phone: true,
   passwordHash: true,
+  platformRole: true,
 } as const;
 
 const googleUserSelect = { ...userSelect, googleSubject: true } as const;

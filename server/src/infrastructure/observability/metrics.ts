@@ -87,7 +87,8 @@ export function resetMetricInstruments(): void {
   instruments = undefined;
 }
 
-function llmCostUsd(model: string, inputTokens: number, outputTokens: number): number | null {
+/** Estimated from list prices; null for a model without a price. */
+export function llmCostUsd(model: string, inputTokens: number, outputTokens: number): number | null {
   const pricing = OBSERVABILITY_CONSTANTS.LLM_PRICING_USD_PER_MILLION.find((entry) =>
     model.startsWith(entry.prefix),
   );

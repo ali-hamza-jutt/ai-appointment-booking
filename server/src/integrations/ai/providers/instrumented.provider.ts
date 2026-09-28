@@ -1,4 +1,5 @@
 import { OBSERVABILITY_CONSTANTS } from "../../../constants/app.constants.js";
+import { llmUsageRecorder } from "../../../infrastructure/observability/llm-usage.js";
 import { llmMetrics } from "../../../infrastructure/observability/metrics.js";
 import { withSpan } from "../../../infrastructure/observability/tracing.js";
 import type {
@@ -79,6 +80,14 @@ export class InstrumentedAiProvider implements AiProvider {
               ? { inputTokens: response.usage.promptTokens, outputTokens: response.usage.completionTokens }
               : {}),
           });
+          if (request.businessId && response.usage) {
+            llmUsageRecorder.recordInBackground({
+              businessId: request.businessId,
+              model: response.model,
+              inputTokens: response.usage.promptTokens,
+              outputTokens: response.usage.completionTokens,
+            });
+          }
 
           return response;
         } catch (error) {
