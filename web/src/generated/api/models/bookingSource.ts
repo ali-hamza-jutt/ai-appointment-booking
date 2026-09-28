@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * WAITLIST: held for a customer on the waitlist when a time opened up.
+ */
 export type BookingSource = typeof BookingSource[keyof typeof BookingSource];
 
 
@@ -13,4 +16,5 @@ export const BookingSource = {
   FORM: 'FORM',
   CHAT: 'CHAT',
   STAFF: 'STAFF',
+  WAITLIST: 'WAITLIST',
 } as const;

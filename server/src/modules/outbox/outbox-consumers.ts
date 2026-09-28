@@ -5,6 +5,7 @@ import {
   KNOWLEDGE_CONSTANTS,
   NOTIFICATION_CONSTANTS,
   PAYMENT_CONSTANTS,
+  WAITLIST_CONSTANTS,
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
 import { calendarSyncService } from "../calendar/calendar-sync.service.js";
@@ -12,6 +13,7 @@ import { customerProfileService } from "../customers/customer-profile.service.js
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import { notificationService } from "../notifications/notification.service.js";
 import { paymentService } from "../payments/payment.service.js";
+import { waitlistService } from "../waitlist/waitlist.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
 const BOOKING_EVENT_PREFIX = "booking.";
@@ -97,6 +99,15 @@ export const paymentsConsumer: OutboxConsumer = {
   handle: (message) => paymentService.handleBookingEvent(message),
 };
 
+const WAITLIST_EVENTS = new Set<string>([...WAITLIST_CONSTANTS.FREEING_EVENTS, ...WAITLIST_CONSTANTS.ACCEPTING_EVENTS]);
+
+/** Offers times that bookings give back to the waitlist, and settles offers customers take up or let go. */
+export const waitlistConsumer: OutboxConsumer = {
+  name: "waitlist",
+  handles: (type) => WAITLIST_EVENTS.has(type),
+  handle: (message) => waitlistService.handleBookingEvent(message),
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
@@ -106,4 +117,5 @@ export const outboxConsumers: readonly OutboxConsumer[] = [
   bookingNotificationsConsumer,
   calendarEventsConsumer,
   paymentsConsumer,
+  waitlistConsumer,
 ];

@@ -17,6 +17,7 @@ import { APPOINTMENT_UI_CONSTANTS } from "@/features/appointments/constants/appo
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
+import { MyWaitlist } from "@/features/waitlist/components/my-waitlist";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
 export function AppointmentsList() {
@@ -129,6 +130,8 @@ export function AppointmentsList() {
           </div>
         )}
       </section>
+
+      <MyWaitlist />
     </div>
   );
 }

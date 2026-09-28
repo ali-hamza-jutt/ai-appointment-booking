@@ -100,13 +100,24 @@ export interface RescheduleBookingAction {
   slotToken: string;
 }
 
+/** Waits for a time to open up between two local dates. */
+export interface JoinWaitlistAction {
+  type: "join_waitlist";
+  serviceId: string;
+  staffId?: string | undefined;
+  fromDate: string;
+  toDate: string;
+  partOfDay?: "morning" | "afternoon" | "evening" | undefined;
+}
+
 /** What a tap on a card or button asks for; handled without the AI. */
 export type ChatAction =
   | SelectServiceAction
   | SelectSlotAction
   | ConfirmBookingAction
   | CancelBookingAction
-  | RescheduleBookingAction;
+  | RescheduleBookingAction
+  | JoinWaitlistAction;
 
 export interface ChatTextPart {
   type: "text";

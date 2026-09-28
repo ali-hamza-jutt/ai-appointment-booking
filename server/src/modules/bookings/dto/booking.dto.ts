@@ -15,7 +15,8 @@ export type BookingStatus =
 /** Kept for the customer-facing API, which still calls bookings appointments. */
 export type AppointmentStatus = BookingStatus;
 
-export type BookingSource = "FORM" | "CHAT" | "STAFF";
+/** WAITLIST: held for a customer on the waitlist when a time opened up. */
+export type BookingSource = "FORM" | "CHAT" | "STAFF" | "WAITLIST";
 
 /** Kept for the customer-facing API. */
 export type AppointmentSource = BookingSource;
@@ -329,4 +330,6 @@ export interface PlaceBookingInput {
   mode: "CUSTOMER" | "STAFF";
   /** HELD for a customer hold; CONFIRMED for staff bookings. */
   initialStatus: "HELD" | "CONFIRMED";
+  /** How long a hold lasts, instead of the business's usual hold time. */
+  holdMinutes?: number;
 }

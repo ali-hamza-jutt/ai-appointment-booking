@@ -8,7 +8,8 @@ export type NotificationKind =
   | "BOOKING_REQUESTED"
   | "BOOKING_RESCHEDULED"
   | "BOOKING_CANCELLED"
-  | "BOOKING_REMINDER";
+  | "BOOKING_REMINDER"
+  | "WAITLIST_OFFER";
 
 export type NotificationStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED" | "SKIPPED";
 
@@ -88,6 +89,8 @@ export interface BookingNotificationContext {
   timeZone: string;
   serviceName: string;
   rescheduleCount: number;
+  /** When a held time is released, for waitlist offers. */
+  holdExpiresAt: Date | null;
   staffName: string | null;
   location: { name: string; address: string | null } | null;
   business: { name: string; slug: string; settings: BusinessSettings };
@@ -110,6 +113,7 @@ export interface BookingNotificationContextRecord {
   timeZone: string;
   serviceName: string;
   rescheduleCount: number;
+  holdExpiresAt: Date | null;
   staff: { displayName: string } | null;
   service: { location: { name: string; address: string | null } | null } | null;
   business: {

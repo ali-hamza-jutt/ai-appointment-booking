@@ -228,6 +228,9 @@ export const TENANT_SCOPE_FIELDS = {
   PaymentAccount: ["businessId", "stripeAccountId"],
   Payment: ["businessId", "checkoutSessionId", "paymentIntentId"],
   ExternalBusy: ["businessId", "staffId", "connectionId"],
+  // A customer's own waitlist is read across businesses by their user id.
+  WaitlistEntry: ["businessId", "userId"],
+  WaitlistOffer: ["businessId", "bookingId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -312,6 +315,7 @@ export const REALTIME_CONSTANTS = {
     REMEMBER_PREFERENCE: "Saving that for next time…",
     FORGET_PREFERENCE: "Updating your preferences…",
     SUMMARIZE: "Catching up on our conversation…",
+    JOIN_WAITLIST: "Adding you to the waitlist…",
   },
 } as const;
 
@@ -412,6 +416,23 @@ export const PAYMENT_CONSTANTS = {
     EXPIRED: "booking.expired",
   },
   BOOKING_LOG_LIMIT: 20,
+} as const;
+
+export const WAITLIST_CONSTANTS = {
+  /** How long a freed time is held for the customer it is offered to. */
+  OFFER_HOLD_MINUTES: 15,
+  /** Longest range of dates one entry may cover. */
+  MAX_RANGE_DAYS: 60,
+  /** Waiting entries one customer may have at a business. */
+  MAX_ACTIVE_ENTRIES: 5,
+  /** Waiting customers tried in turn for one freed time before giving up. */
+  MAX_CANDIDATES: 20,
+  /** Booking events that can free a time. */
+  FREEING_EVENTS: ["booking.cancelled", "booking.expired", "booking.rescheduled"],
+  /** Booking events that show the customer took up an offer. */
+  ACCEPTING_EVENTS: ["booking.confirmed", "booking.payment_required", "booking.pending_approval"],
+  LIST_LIMIT: 100,
+  PARTS_OF_DAY: ["morning", "afternoon", "evening"],
 } as const;
 
 export const CHAT_MEMORY_CONSTANTS = {
@@ -532,6 +553,8 @@ export const ERROR_CODES = {
   PAYMENT_NOT_REQUIRED: "PAYMENT_NOT_REQUIRED",
   PAYMENT_PROVIDER_ERROR: "PAYMENT_PROVIDER_ERROR",
   REFUND_NOT_ALLOWED: "REFUND_NOT_ALLOWED",
+  WAITLIST_ENTRY_NOT_FOUND: "WAITLIST_ENTRY_NOT_FOUND",
+  WAITLIST_LIMIT_REACHED: "WAITLIST_LIMIT_REACHED",
   CALENDAR_CONNECTION_NOT_FOUND: "CALENDAR_CONNECTION_NOT_FOUND",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "CALENDAR_NOT_YOUR_STAFF_PROFILE",
   CHAT_MESSAGE_ALREADY_EXISTS: "CHAT_MESSAGE_ALREADY_EXISTS",
@@ -612,6 +635,8 @@ export const ERROR_MESSAGES = {
   PAYMENT_NOT_REQUIRED: "This booking is not waiting for a payment",
   PAYMENT_PROVIDER_ERROR: "The payment provider could not be reached. Please try again.",
   REFUND_NOT_ALLOWED: "Nothing on this booking can be refunded",
+  WAITLIST_ENTRY_NOT_FOUND: "Waitlist entry was not found",
+  WAITLIST_LIMIT_REACHED: "You are already waiting for several times here. Leave one of them first.",
   CALENDAR_CONNECTION_NOT_FOUND: "This staff member has no connected calendar",
   CALENDAR_NOT_YOUR_STAFF_PROFILE: "Only owners, managers or the staff member themselves can change this calendar",
   CHAT_MESSAGE_ALREADY_EXISTS:

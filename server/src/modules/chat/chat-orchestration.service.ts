@@ -466,12 +466,17 @@ export class ChatOrchestrationService {
   /**
    * Several tool calls can show the same card; keep the last of each kind.
    * Once something is ready to confirm, the cards that led there are noise.
+   * The waitlist button is only for when nothing fits, so other times replace it.
    */
   private dedupeParts(parts: ChatMessagePart[]): ChatMessagePart[] {
-    const hasProposal = parts.some((part) => part.type === "confirm");
+    const isWaitlist = (part: ChatMessagePart) => part.type === "confirm" && part.action.type === "join_waitlist";
+    const hasProposal = parts.some((part) => part.type === "confirm" && !isWaitlist(part));
+    const hasSlots = parts.some((part) => part.type === "slot_picker");
     const kept = hasProposal
-      ? parts.filter((part) => part.type === "booking_summary" || part.type === "confirm")
-      : parts;
+      ? parts.filter((part) => part.type === "booking_summary" || (part.type === "confirm" && !isWaitlist(part)))
+      : hasSlots
+        ? parts.filter((part) => !isWaitlist(part))
+        : parts;
     const lastIndex = new Map(kept.map((part, index) => [part.type, index]));
 
     return kept.filter((part, index) => lastIndex.get(part.type) === index);

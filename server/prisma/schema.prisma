@@ -25,8 +25,32 @@ enum BookingSource {
   FORM
   CHAT
   STAFF
+  /// Held for a customer on the waitlist when a time opened up.
+  WAITLIST
 
   @@map("booking_source")
+}
+
+enum WaitlistStatus {
+  WAITING
+  /// A freed time is held for this customer right now.
+  OFFERED
+  BOOKED
+  /// The customer left the waitlist.
+  LEFT
+
+  @@map("waitlist_status")
+}
+
+enum WaitlistOfferStatus {
+  OPEN
+  ACCEPTED
+  /// The hold ran out without being confirmed.
+  LAPSED
+  /// The customer released the hold.
+  DECLINED
+
+  @@map("waitlist_offer_status")
 }
 
 enum BookingActorType {
@@ -177,6 +201,8 @@ enum NotificationKind {
   BOOKING_RESCHEDULED
   BOOKING_CANCELLED
   BOOKING_REMINDER
+  /// A freed time held for a customer on the waitlist.
+  WAITLIST_OFFER
 
   @@map("notification_kind")
 }
@@ -232,6 +258,7 @@ model User {
   chatSessions       ChatSession[]
   memberships        Membership[]
   customers          Customer[]
+  waitlistEntries    WaitlistEntry[]
   invitations        BusinessInvitation[]
   staff              Staff[]
 
@@ -315,6 +342,8 @@ model Business {
   calendarConnections CalendarConnection[]
   externalBusy        ExternalBusy[]
   paymentAccount      PaymentAccount?
+  waitlistEntries     WaitlistEntry[]
+  waitlistOffers      WaitlistOffer[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
@@ -392,6 +421,7 @@ model Service {
   resources       ServiceResource[]
   bookings        Booking[]
   chatDrafts      ChatSession[]      @relation("ChatDraftService")
+  waitlistEntries WaitlistEntry[]
 
   @@index([businessId, isActive, sortOrder], map: "services_business_id_is_active_sort_order_idx")
   @@index([categoryId], map: "services_category_id_idx")
@@ -421,6 +451,7 @@ model Staff {
   chatDrafts   ChatSession[]     @relation("ChatDraftStaff")
   calendarConnection CalendarConnection?
   externalBusy       ExternalBusy[]
+  waitlistEntries    WaitlistEntry[]
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -546,6 +577,59 @@ model Payment {
 }
 
 /// Stripe webhook events already handled; Stripe delivers each at least once.
+/// A customer waiting for a service to open up between two dates.
+model WaitlistEntry {
+  id         String         @id @default(uuid()) @db.Uuid
+  businessId String         @map("business_id") @db.Uuid
+  customerId String         @map("customer_id") @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  serviceId  String         @map("service_id") @db.Uuid
+  /// Only this provider will do; null means anyone.
+  staffId    String?        @map("staff_id") @db.Uuid
+  /// First and last local dates the customer could come, in their time zone.
+  fromDate   DateTime       @map("from_date") @db.Date
+  toDate     DateTime       @map("to_date") @db.Date
+  /// morning, afternoon or evening; null means any time of day.
+  partOfDay  String?        @map("part_of_day") @db.VarChar(10)
+  timeZone   String         @map("time_zone") @db.VarChar(100)
+  status     WaitlistStatus @default(WAITING)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service    Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staff      Staff?         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  offers     WaitlistOffer[]
+
+  /// Matching walks waiting entries for a service in the order they joined.
+  @@index([businessId, serviceId, status, createdAt], map: "waitlist_entries_business_id_service_id_status_created_at_idx")
+  @@index([userId, status], map: "waitlist_entries_user_id_status_idx")
+  @@map("waitlist_entries")
+}
+
+/// A freed time held for a waitlisted customer, as a HELD booking they can confirm.
+model WaitlistOffer {
+  id         String              @id @default(uuid()) @db.Uuid
+  businessId String              @map("business_id") @db.Uuid
+  entryId    String              @map("entry_id") @db.Uuid
+  bookingId  String              @unique(map: "waitlist_offers_booking_id_key") @map("booking_id") @db.Uuid
+  staffId    String?             @map("staff_id") @db.Uuid
+  startsAt   DateTime            @map("starts_at") @db.Timestamptz(3)
+  expiresAt  DateTime            @map("expires_at") @db.Timestamptz(3)
+  status     WaitlistOfferStatus @default(OPEN)
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  entry      WaitlistEntry       @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  booking    Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([entryId], map: "waitlist_offers_entry_id_idx")
+  /// Finds who was already offered a freed time, so it passes to the next person.
+  @@index([businessId, startsAt], map: "waitlist_offers_business_id_starts_at_idx")
+  @@map("waitlist_offers")
+}
+
 model StripeWebhookEvent {
   id         String   @id @db.VarChar(255)
   type       String   @db.VarChar(100)
@@ -680,6 +764,7 @@ model Customer {
   preferences CustomerPreference[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  waitlistEntries         WaitlistEntry[]
 
   @@unique([businessId, userId], map: "customers_business_id_user_id_key")
   @@unique([businessId, email], map: "customers_business_id_email_key")
@@ -761,6 +846,7 @@ model Booking {
   events          BookingEvent[]
   notifications   Notification[]
   payments        Payment[]
+  waitlistOffer   WaitlistOffer?
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")

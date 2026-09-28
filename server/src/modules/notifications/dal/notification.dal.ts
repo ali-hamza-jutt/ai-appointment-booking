@@ -31,6 +31,7 @@ export class NotificationDal {
         timeZone: true,
         serviceName: true,
         rescheduleCount: true,
+        holdExpiresAt: true,
         staff: { select: { displayName: true } },
         service: { select: { location: { select: { name: true, address: true } } } },
         business: {

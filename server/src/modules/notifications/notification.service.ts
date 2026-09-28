@@ -127,6 +127,15 @@ export class NotificationService {
     });
   }
 
+  /** Tells a waitlisted customer that a time is held for them and how long they have to confirm it. */
+  public async sendWaitlistOffer(businessId: string, bookingId: string): Promise<void> {
+    const context = await this.loadContext(businessId, bookingId);
+
+    if (!context || context.status !== "HELD") return;
+
+    await this.deliver(context, { kind: "WAITLIST_OFFER", dedupeBase: `waitlist:${bookingId}` });
+  }
+
   /** Applies a Twilio delivery report to the message it describes. */
   public async recordSmsStatus(providerMessageId: string, status: string, errorCode?: string): Promise<void> {
     const mapped =
@@ -282,6 +291,11 @@ export class NotificationService {
       timeZone: context.timeZone,
       location: this.describeLocation(context),
       link: this.manageLink(context),
+      heldUntil: context.holdExpiresAt
+        ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: context.timeZone }).format(
+            context.holdExpiresAt,
+          )
+        : "",
     };
   }
 
@@ -316,6 +330,7 @@ export class NotificationService {
       timeZone: record.timeZone,
       serviceName: record.serviceName,
       rescheduleCount: record.rescheduleCount,
+      holdExpiresAt: record.holdExpiresAt,
       staffName: record.staff?.displayName ?? null,
       location: record.service?.location ?? record.business.locations[0] ?? null,
       business: {

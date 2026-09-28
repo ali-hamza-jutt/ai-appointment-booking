@@ -14,11 +14,13 @@ import {
   getGetAppointmentQueryKey,
   getListAppointmentsQueryKey,
   useCancelAppointment,
+  useConfirmAppointment,
   useRescheduleAppointment,
 } from "@/generated/api/appointments/appointments";
 import type { AppointmentResponse, AvailableSlot } from "@/generated/api/models";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import {
+  formatDateTime,
   getCurrentLocalDate,
   getLocalDateTimeInputValues,
 } from "@/lib/utils/date-time";
@@ -30,11 +32,34 @@ interface AppointmentActionsProps {
 export function AppointmentActions({ appointment }: AppointmentActionsProps) {
   const queryClient = useQueryClient();
   const cancelMutation = useCancelAppointment();
+  const confirmMutation = useConfirmAppointment();
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const hasActions = appointment.canCancel || appointment.canReschedule;
+  // A held time, for example one the waitlist held for the customer, is booked from here.
+  const canConfirm = appointment.status === "HELD";
+  const hasActions = appointment.canCancel || appointment.canReschedule || canConfirm;
+
+  function confirmAppointment() {
+    if (confirmMutation.isPending) return;
+
+    confirmMutation.mutate(
+      { appointmentId: appointment.id },
+      {
+        onSuccess: (response) => {
+          // A deposit is paid on Stripe's page first.
+          if (response.payment?.checkoutUrl) {
+            window.location.assign(response.payment.checkoutUrl);
+            return;
+          }
+
+          updateAppointment(response);
+          setFeedback(response.status === "PENDING" ? "Request sent. The business will confirm it." : "Booked.");
+        },
+      },
+    );
+  }
 
   function updateAppointment(response: AppointmentResponse) {
     queryClient.setQueryData(getGetAppointmentQueryKey(appointment.id), response);
@@ -73,9 +98,25 @@ export function AppointmentActions({ appointment }: AppointmentActionsProps) {
   return (
     <div className="border-b border-border px-5 py-4 sm:px-6">
       {feedback ? <Alert tone="success">{feedback}</Alert> : null}
+      {confirmMutation.error ? (
+        <Alert tone="danger">
+          {getApiErrorMessage(confirmMutation.error, "This time could not be booked. It may have been released.")}
+        </Alert>
+      ) : null}
+      {canConfirm && appointment.holdExpiresAt ? (
+        <p className="mb-3 text-sm text-muted">
+          This time is held for you until {formatDateTime(appointment.holdExpiresAt, appointment.timeZone)}.
+          Confirm it to book it.
+        </p>
+      ) : null}
 
       {hasActions ? (
         <div className={feedback ? "mt-4 flex flex-wrap gap-2" : "flex flex-wrap gap-2"}>
+          {canConfirm ? (
+            <Button isLoading={confirmMutation.isPending} onClick={confirmAppointment}>
+              Confirm booking
+            </Button>
+          ) : null}
           {appointment.canReschedule ? (
             <Button
               leadingIcon={<CalendarIcon className="size-4" />}

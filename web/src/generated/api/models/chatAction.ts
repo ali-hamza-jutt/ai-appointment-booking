@@ -7,6 +7,7 @@
  */
 import type { CancelBookingAction } from './cancelBookingAction';
 import type { ConfirmBookingAction } from './confirmBookingAction';
+import type { JoinWaitlistAction } from './joinWaitlistAction';
 import type { RescheduleBookingAction } from './rescheduleBookingAction';
 import type { SelectServiceAction } from './selectServiceAction';
 import type { SelectSlotAction } from './selectSlotAction';
@@ -14,4 +15,4 @@ import type { SelectSlotAction } from './selectSlotAction';
 /**
  * What a tap on a card or button asks for; handled without the AI.
  */
-export type ChatAction = SelectServiceAction | SelectSlotAction | ConfirmBookingAction | CancelBookingAction | RescheduleBookingAction;
+export type ChatAction = SelectServiceAction | SelectSlotAction | ConfirmBookingAction | CancelBookingAction | RescheduleBookingAction | JoinWaitlistAction;

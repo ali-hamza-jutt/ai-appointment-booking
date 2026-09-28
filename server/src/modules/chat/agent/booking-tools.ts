@@ -91,6 +91,19 @@ export const bookingTools: BookingTool[] = [
     handler: (args, context) => bookingAssistantService.searchKnowledge(context, args.query),
   }),
   tool({
+    name: "join_waitlist",
+    description:
+      "Put the customer on the waitlist for a service between two dates, when no open time suits them and they agree to wait. If a time opens up it is held for them for 15 minutes and they get a message to confirm it.",
+    schema: z.object({
+      serviceId: uuid,
+      fromDate: localDate.describe("First local date they could come, YYYY-MM-DD"),
+      toDate: localDate.optional().describe("Last local date, YYYY-MM-DD; defaults to a week after fromDate"),
+      staffId: uuid.optional().describe("Only when they want this provider and nobody else"),
+      partOfDay: z.enum(["morning", "afternoon", "evening"]).optional(),
+    }),
+    handler: (args, context) => bookingAssistantService.joinWaitlist(context, args),
+  }),
+  tool({
     name: "remember_preference",
     description:
       "Save a lasting preference the customer stated explicitly, for their next bookings here. value is the staffId for provider, the serviceId for service, or morning, afternoon or evening for part_of_day. Never save something you inferred.",
