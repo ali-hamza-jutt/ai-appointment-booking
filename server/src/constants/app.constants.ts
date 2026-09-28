@@ -144,6 +144,7 @@ export const JOB_CONSTANTS = {
     MAINTENANCE: "booking-maintenance",
     NOTIFICATIONS: "notifications",
     CALENDAR: "calendar-sync",
+    CHANNELS: "messaging-channels",
   },
   MAINTENANCE_JOBS: {
     EXPIRE_HOLDS: "expire-holds",
@@ -234,6 +235,8 @@ export const TENANT_SCOPE_FIELDS = {
   // A customer's reviews are read across businesses by their user id.
   Review: ["businessId", "userId"],
   AllowedOrigin: ["businessId"],
+  // Inbound messages find their business by the number they were sent to.
+  MessagingNumber: ["businessId", "address"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -453,6 +456,23 @@ export const PUBLIC_BOOKING_CONSTANTS = {
   RATE_LIMIT_MAX_REQUESTS: 120,
 } as const;
 
+export const MESSAGING_CONSTANTS = {
+  /** Where Twilio posts incoming SMS and WhatsApp messages for every business. */
+  INBOUND_PATH: "/api/channels/twilio/inbound",
+  INBOUND_JOB: "handle-inbound-message",
+  /** Numbered options listed in one text reply. */
+  MAX_OPTIONS: 9,
+  /** Twilio splits long SMS; past this the reply is cut. */
+  SMS_MAX_LENGTH: 1_500,
+  WHATSAPP_MAX_LENGTH: 4_000,
+  /** Inbound text longer than a chat message is cut to fit. */
+  MAX_INBOUND_LENGTH: 4_000,
+  WHATSAPP_PREFIX: "whatsapp:",
+  /** Accounts made for people who only text: this address never receives mail. */
+  PLACEHOLDER_EMAIL_DOMAIN: "phone.bookwise.invalid",
+  YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
+} as const;
+
 export const REVIEW_CONSTANTS = {
   /** How long after a visit ends the customer is asked to rate it. */
   REQUEST_DELAY_MINUTES: 120,
@@ -547,6 +567,8 @@ export const ERROR_CODES = {
   GUEST_BOOKING_DISABLED: "GUEST_BOOKING_DISABLED",
   GUEST_CODE_RECENTLY_SENT: "GUEST_CODE_RECENTLY_SENT",
   ALLOWED_ORIGIN_NOT_FOUND: "ALLOWED_ORIGIN_NOT_FOUND",
+  MESSAGING_NUMBER_TAKEN: "MESSAGING_NUMBER_TAKEN",
+  MESSAGING_NUMBER_NOT_FOUND: "MESSAGING_NUMBER_NOT_FOUND",
   ALLOWED_ORIGIN_LIMIT_REACHED: "ALLOWED_ORIGIN_LIMIT_REACHED",
   SMS_NOT_CONFIGURED: "SMS_NOT_CONFIGURED",
   GOOGLE_NOT_CONFIGURED: "GOOGLE_NOT_CONFIGURED",
@@ -633,6 +655,8 @@ export const ERROR_MESSAGES = {
   GUEST_BOOKING_DISABLED: "This business asks you to sign in or create an account to book",
   GUEST_CODE_RECENTLY_SENT: "A code was sent recently. Please wait a minute before asking again",
   ALLOWED_ORIGIN_NOT_FOUND: "That website is not on the list",
+  MESSAGING_NUMBER_TAKEN: "This number is already connected to a business",
+  MESSAGING_NUMBER_NOT_FOUND: "That number is not connected",
   ALLOWED_ORIGIN_LIMIT_REACHED: "A business can allow at most 20 websites",
   SMS_NOT_CONFIGURED: "Text message delivery is not available yet",
   GOOGLE_NOT_CONFIGURED: "Google sign-in is not available",

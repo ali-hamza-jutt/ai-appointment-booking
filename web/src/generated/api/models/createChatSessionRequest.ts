@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateChatSessionRequestChannel } from './createChatSessionRequestChannel';
 
 export interface CreateChatSessionRequest {
   /** @maxLength 120 */
@@ -16,4 +17,6 @@ export interface CreateChatSessionRequest {
   businessSlug?: string;
   /** Abandons the active chat at this business before creating this session. */
   replaceActive?: boolean;
+  /** WIDGET for chats in the booking widget. Defaults to WEB. */
+  channel?: CreateChatSessionRequestChannel;
 }

@@ -8,6 +8,7 @@ import { swaggerRouter } from "./docs/swagger.js";
 import { RegisterRoutes } from "./generated/routes.js";
 import { createCalendarRouter } from "./modules/calendar/controllers/calendar.routes.js";
 import { createChatStreamRouter } from "./modules/chat/controllers/chat-stream.routes.js";
+import { createTwilioInboundRouter } from "./modules/messaging/controllers/twilio-inbound.routes.js";
 import { createTwilioWebhookRouter } from "./modules/notifications/controllers/twilio-webhook.routes.js";
 import { createStripeWebhookRouter } from "./modules/payments/controllers/stripe-webhook.routes.js";
 import { invalidateAvailabilityOnWrite } from "./middleware/availability-invalidation.js";
@@ -76,6 +77,7 @@ app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 // Streaming and webhook routes are plain Express and must run before the tsoa routes.
 app.use(createChatStreamRouter());
 app.use(createTwilioWebhookRouter());
+app.use(createTwilioInboundRouter());
 app.use(createCalendarRouter());
 RegisterRoutes(app);
 

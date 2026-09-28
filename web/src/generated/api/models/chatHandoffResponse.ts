@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChatHandoffMessage } from './chatHandoffMessage';
+import type { ChatHandoffResponseChannel } from './chatHandoffResponseChannel';
 import type { ChatHandoffResponseCustomer } from './chatHandoffResponseCustomer';
 
 /**
@@ -13,6 +14,9 @@ import type { ChatHandoffResponseCustomer } from './chatHandoffResponseCustomer'
  */
 export interface ChatHandoffResponse {
   sessionId: string;
+  /** Where the customer is chatting; replies to SMS and WhatsApp chats are also texted to them. */
+  channel: ChatHandoffResponseChannel;
+  /** email is null for people who have only texted. */
   customer: ChatHandoffResponseCustomer;
   /** @nullable */
   reason: string | null;

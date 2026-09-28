@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesChannel } from './pickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesChannel';
 import type { PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesCustomer } from './pickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesCustomer';
 
 /**
@@ -12,6 +13,9 @@ import type { PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessag
  */
 export interface PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessages {
   sessionId: string;
+  /** Where the customer is chatting; replies to SMS and WhatsApp chats are also texted to them. */
+  channel: PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesChannel;
+  /** email is null for people who have only texted. */
   customer: PickChatHandoffResponseExcludeKeyofChatHandoffResponseRecentMessagesCustomer;
   reason: string;
   requestedAt: string;

@@ -80,6 +80,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/appointments/{appointmentId}/review`: the customer's rating of a finished visit; `/api/businesses/{businessId}/reviews` lets staff publish, hide and answer reviews; `/api/public/{slug}/reviews` lists the published ones.
 - `/api/businesses/{businessId}/chat-handoffs/{sessionId}` (and `/messages`): a handed-off chat in full, and staff replies as the business; `PUT /api/businesses/{businessId}/customers/{customerId}/notes` keeps private team notes.
 - `/api/public/{slug}/guest/code` and `/guest/verify`: guest booking by emailed code; `/api/public/{slug}/embed` and `/api/businesses/{businessId}/allowed-origins`: where the booking widget may be embedded.
+- `POST /api/channels/twilio/inbound`: incoming SMS and WhatsApp messages (Twilio-signed); `/api/businesses/{businessId}/messaging-numbers`: the numbers a business takes them on.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -215,6 +216,16 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **Guests.** On a business's public page or widget, someone without an account enters their name, email and (optionally) phone, and gets a 6-digit code by email (10 minutes, 5 guesses, one per minute). Confirming it signs them in with a browser-session login, creating an account the first time; an existing account is signed in as it is, since the code proves the email. The phone number is saved on their customer record at that business. From there they use the same holds, confirmation and chat as any signed-in customer. A business with `allowGuestBooking` off refuses guest codes (403).
 - **Limits.** Everything under `/api/public` has its own per-IP limit (120 a minute); asking for a code uses the stricter limit of other code-sending endpoints.
 - **Widget.** `widget.js` (served by the web app) adds a button that opens `/embed/<slug>` in an iframe. The web app's proxy sets `Content-Security-Policy: frame-ancestors 'self' <allowed origins>` on that page from `GET /api/public/{slug}/embed`; every other page may only be framed by BookWise itself. The frame sends the host page nothing but a close request.
+
+## SMS and WhatsApp
+
+Customers can book by texting or WhatsApp-ing a business's Twilio number (`modules/messaging`).
+
+- **Routing.** Owners connect numbers (SMS, or a WhatsApp sender stored as `whatsapp:+…`). Every number's Twilio webhook points at `POST /api/channels/twilio/inbound`, which checks Twilio's signature, finds the business by the `To` number, queues the message on the `messaging-channels` queue (job id = Twilio's message id, so redeliveries queue nothing) and answers with empty TwiML at once.
+- **The turn.** The worker (one job at a time, so a customer's quick messages are answered in order) finds the account with that verified phone, or makes one: a phone-verified user with a stand-in `…@phone.bookwise.invalid` email that is never emailed or shown. It continues their active chat with the business (`chat_sessions.channel`, plus the addresses to reply between) and runs the same orchestration as the web, with Twilio's message id as the client message id.
+- **Text rendering.** Cards become text: offered times, services, or several buttons are listed as numbered options, and a reply with the number sends the same action a tap would. A single button becomes "Reply YES to …"; YES to a held time books it through the chat confirm flow. Payment links are written out. Refusals (for example a hold that lapsed) are texted back in plain words instead of failing the job.
+- **Staff.** Inbox replies in an SMS or WhatsApp chat are also texted to the customer, as "Name from Business: …".
+- **WhatsApp's 24-hour rule.** Replies always answer the customer's own message, so they fall inside WhatsApp's session window; booking notifications still go by SMS and email, so no WhatsApp templates are needed yet.
 
 ## Business dashboard
 

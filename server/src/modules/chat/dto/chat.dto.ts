@@ -5,6 +5,9 @@ import type {
 
 export type ChatSessionStatus = "ACTIVE" | "CLOSED" | "ABANDONED";
 
+/** Where a chat is happening: the web app, the booking widget, WhatsApp or SMS. */
+export type ChatChannel = "WEB" | "WIDGET" | "WHATSAPP" | "SMS";
+
 export type ChatMessageRole = "USER" | "ASSISTANT" | "SYSTEM";
 
 /**
@@ -210,6 +213,9 @@ export interface CreateChatSessionRequest {
 
   /** Abandons the active chat at this business before creating this session. */
   replaceActive?: boolean;
+
+  /** WIDGET for chats in the booking widget. Defaults to WEB. */
+  channel?: "WEB" | "WIDGET";
 }
 
 export interface CreateChatMessageRequest {
@@ -257,6 +263,7 @@ export interface ChatSessionResponse {
   business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
+  channel: ChatChannel;
   draft: ChatBookingDraft;
   /** Set when the assistant has asked staff to take over. */
   handoff: ChatHandoff | null;
@@ -329,6 +336,7 @@ export interface ChatSessionRecord {
   business: ChatSessionBusiness;
   title: string | null;
   status: ChatSessionStatus;
+  channel: ChatChannel;
   draftService: ChatDraftService | null;
   draftStaff: ChatDraftStaff | null;
   draftHold: ChatDraftHoldRecord | null;
@@ -366,6 +374,7 @@ export interface CreateChatSessionData {
   userId: string;
   title: string | null;
   replaceActive: boolean;
+  channel: ChatChannel;
 }
 
 export interface ChatSessionPageCursor {

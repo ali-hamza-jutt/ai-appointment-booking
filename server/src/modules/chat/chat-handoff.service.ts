@@ -1,6 +1,9 @@
 import { ERROR_CODES, ERROR_MESSAGES } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { assertUuid } from "../../utils/identifiers.js";
+import { isPlaceholderEmail } from "../../utils/placeholder-email.js";
+import { logger } from "../../config/logger.js";
+import { messagingService } from "../messaging/messaging.service.js";
 import { publishChatEvent } from "./chat-events.js";
 import { chatService } from "./chat.service.js";
 import { chatHandoffDal } from "./dal/chat-handoff.dal.js";
@@ -64,6 +67,13 @@ export class ChatHandoffService {
 
     publishChatEvent({ type: "message", sessionId: session.id, businessId, messageId: message.id, role: "ASSISTANT" });
 
+    try {
+      await messagingService.relayStaffReply(session, name, session.business.name, message.content);
+    } catch (error) {
+      // The reply is saved either way; the customer sees it next time they open the chat.
+      logger.warn({ err: error, sessionId: session.id }, "Texting a staff reply failed");
+    }
+
     return {
       id: message.id,
       role: message.role,
@@ -98,7 +108,12 @@ export class ChatHandoffService {
   private toThread(session: HandoffRecord): Omit<ChatHandoffResponse, "recentMessages"> & { messages: ChatHandoffMessage[] } {
     return {
       sessionId: session.id,
-      customer: { name: session.user.fullName, email: session.user.email, phone: session.user.phone },
+      channel: session.channel,
+      customer: {
+        name: session.user.fullName,
+        email: isPlaceholderEmail(session.user.email) ? null : session.user.email,
+        phone: session.user.phone,
+      },
       reason: session.handoffReason,
       requestedAt: session.handoffRequestedAt as Date,
       resolvedAt: session.handoffResolvedAt,

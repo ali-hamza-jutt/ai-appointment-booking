@@ -2,7 +2,12 @@ import { Worker, type Job } from "bullmq";
 
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import { CALENDAR_CONSTANTS, JOB_CONSTANTS, NOTIFICATION_CONSTANTS } from "./constants/app.constants.js";
+import {
+  CALENDAR_CONSTANTS,
+  JOB_CONSTANTS,
+  MESSAGING_CONSTANTS,
+  NOTIFICATION_CONSTANTS,
+} from "./constants/app.constants.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -21,6 +26,9 @@ import {
 import { bookingMaintenanceService } from "./modules/bookings/booking-maintenance.service.js";
 import { calendarSyncQueue } from "./modules/calendar/calendar-sync.queue.js";
 import { calendarSyncService } from "./modules/calendar/calendar-sync.service.js";
+import type { InboundMessageJobData } from "./modules/messaging/dto/messaging.dto.js";
+import { messagingQueue } from "./modules/messaging/messaging.queue.js";
+import { messagingService } from "./modules/messaging/messaging.service.js";
 import { calendarDal } from "./modules/calendar/dal/calendar.dal.js";
 import type { CalendarSyncJobData } from "./modules/calendar/dto/calendar.dto.js";
 import type {
@@ -128,6 +136,15 @@ async function runCalendarJob(job: Job<CalendarSyncJobData>): Promise<void> {
   );
 }
 
+/** Answers one incoming SMS or WhatsApp message. */
+function runChannelJob(job: Job<InboundMessageJobData>): Promise<void> {
+  if (job.name !== MESSAGING_CONSTANTS.INBOUND_JOB) {
+    return Promise.reject(new Error(`Unknown channel job ${job.name}`));
+  }
+
+  return observeJob(QUEUES.CHANNELS, job, () => messagingService.handleInbound(job.data));
+}
+
 /** Continues the trace and request id of the request that wrote the event. */
 function runOutboxJob(runner: OutboxConsumerRunner, job: Job<OutboxMessage>): Promise<string[]> {
   const message = job.data;
@@ -222,6 +239,14 @@ async function startWorker(): Promise<void> {
         prefix: QUEUE_PREFIX,
       }),
     );
+    watch(
+      // One at a time, so a customer's quick messages are answered in order.
+      new Worker<InboundMessageJobData>(QUEUES.CHANNELS, runChannelJob, {
+        connection: createRedisConnection(),
+        prefix: QUEUE_PREFIX,
+        concurrency: 1,
+      }),
+    );
     startRelay(new OutboxRelayService(new QueueOutboxPublisher(outboxQueue)));
 
     logger.info({ environment: env.NODE_ENV }, "BookWise worker started");
@@ -252,6 +277,7 @@ async function shutdown(exitCode = 0): Promise<void> {
     await Promise.all(workers.map((worker) => worker.close()));
     await reminderScheduler.close();
     await calendarSyncQueue.close();
+    await messagingQueue.close();
     await closeRedis();
     await disconnectDatabase();
     await Promise.allSettled([stopTelemetry(), flushErrorReporting()]);

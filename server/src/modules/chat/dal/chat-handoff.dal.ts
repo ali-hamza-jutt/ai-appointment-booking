@@ -14,6 +14,10 @@ const messageSelect = {
 const handoffSelect = {
   id: true,
   userId: true,
+  channel: true,
+  customerAddress: true,
+  businessAddress: true,
+  business: { select: { name: true } },
   handoffReason: true,
   handoffRequestedAt: true,
   handoffResolvedAt: true,

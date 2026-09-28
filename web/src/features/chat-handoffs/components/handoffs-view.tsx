@@ -117,6 +117,9 @@ function HandoffCard({
         <span className="flex flex-wrap items-center gap-2">
           {handoff.customer.name}
           <Badge tone="warning">Waiting</Badge>
+          {handoff.channel === "SMS" || handoff.channel === "WHATSAPP" ? (
+            <Badge tone="neutral">{handoff.channel === "SMS" ? "Text message" : "WhatsApp"}</Badge>
+          ) : null}
           <span className="text-xs font-normal text-muted">since {formatDateTime(handoff.requestedAt, timeZone)}</span>
         </span>
       }
@@ -127,9 +130,11 @@ function HandoffCard({
         </Alert>
       ) : null}
       <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-soft">
-        <a className="flex items-center gap-1.5 hover:text-brand" href={`mailto:${handoff.customer.email}`}>
-          <MailIcon className="size-4 text-brand" /> {handoff.customer.email}
-        </a>
+        {handoff.customer.email ? (
+          <a className="flex items-center gap-1.5 hover:text-brand" href={`mailto:${handoff.customer.email}`}>
+            <MailIcon className="size-4 text-brand" /> {handoff.customer.email}
+          </a>
+        ) : null}
         {handoff.customer.phone ? (
           <a className="flex items-center gap-1.5 hover:text-brand" href={`tel:${handoff.customer.phone}`}>
             <PhoneIcon className="size-4 text-brand" /> {handoff.customer.phone}
@@ -206,7 +211,7 @@ function ReplyForm({ businessId, sessionId }: { businessId: string; sessionId: s
   return (
     <form className="mt-4 space-y-2" onSubmit={handleSubmit}>
       <TextAreaField
-        hint="The customer sees this in their chat, under your first name."
+        hint="The customer sees this in their chat under your first name, and gets it as a text if they're chatting by SMS or WhatsApp."
         id={`reply-${sessionId}`}
         label="Reply as the business"
         maxLength={4_000}

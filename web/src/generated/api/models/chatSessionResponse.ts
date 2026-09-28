@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChatBookingDraft } from './chatBookingDraft';
+import type { ChatChannel } from './chatChannel';
 import type { ChatHandoff } from './chatHandoff';
 import type { ChatSessionBusiness } from './chatSessionBusiness';
 import type { ChatSessionStatus } from './chatSessionStatus';
@@ -16,6 +17,7 @@ export interface ChatSessionResponse {
   /** @nullable */
   title: string | null;
   status: ChatSessionStatus;
+  channel: ChatChannel;
   draft: ChatBookingDraft;
   /** Set when the assistant has asked staff to take over. */
   handoff: ChatHandoff | null;
