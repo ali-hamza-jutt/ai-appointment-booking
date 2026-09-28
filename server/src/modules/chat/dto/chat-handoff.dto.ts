@@ -10,7 +10,10 @@ export interface ChatHandoffMessage {
 /** A chat the assistant handed to staff. */
 export interface ChatHandoffResponse {
   sessionId: string;
-  customer: { name: string; email: string; phone: string | null };
+  /** Where the customer is chatting; replies to SMS and WhatsApp chats are also texted to them. */
+  channel: "WEB" | "WIDGET" | "WHATSAPP" | "SMS";
+  /** email is null for people who have only texted. */
+  customer: { name: string; email: string | null; phone: string | null };
   reason: string | null;
   requestedAt: Date;
   resolvedAt: Date | null;

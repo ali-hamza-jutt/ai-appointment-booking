@@ -7,6 +7,7 @@ import {
   type DbClient,
   type TransactionClient,
 } from "../../../infrastructure/database/prisma.js";
+import { isPlaceholderEmail } from "../../../utils/placeholder-email.js";
 import { currentOutboxMeta } from "../../outbox/outbox-meta.js";
 import { paymentSelect } from "../../payments/dal/payment.dal.js";
 import { BOOKING_TRANSITIONS, nextStatus } from "../booking-state.js";
@@ -398,7 +399,7 @@ export class BookingDal {
     }
 
     const created = await transaction.customer.create({
-      data: { businessId, userId: user.id, name: user.fullName, email: user.email },
+      data: { businessId, userId: user.id, name: user.fullName, email: isPlaceholderEmail(user.email) ? null : user.email },
       select: { id: true },
     });
 

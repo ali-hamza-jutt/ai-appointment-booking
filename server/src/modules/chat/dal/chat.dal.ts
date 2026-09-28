@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../infrastructure/database/prisma.js";
 import type {
+  ChatChannel,
   ChatDraftPatch,
   ChatMemoryState,
   ChatMessageRecord,
@@ -24,6 +25,7 @@ export const chatSessionSelect = {
   business: { select: { id: true, name: true, slug: true } },
   title: true,
   status: true,
+  channel: true,
   draftService: {
     select: { id: true, name: true, durationMinutes: true, priceMinor: true, currency: true },
   },
@@ -101,10 +103,21 @@ export class ChatDal {
           businessId: data.businessId,
           userId: data.userId,
           title: data.title,
+          channel: data.channel,
         },
         select: chatSessionSelect,
       });
     });
+  }
+
+  /** Records where the latest message came from, so replies go back the same way. */
+  public async setChannel(
+    businessId: string,
+    sessionId: string,
+    channel: ChatChannel,
+    addresses: { customerAddress: string | null; businessAddress: string | null },
+  ): Promise<void> {
+    await prisma.chatSession.updateMany({ where: { id: sessionId, businessId }, data: { channel, ...addresses } });
   }
 
   public findActiveSessionForUser(

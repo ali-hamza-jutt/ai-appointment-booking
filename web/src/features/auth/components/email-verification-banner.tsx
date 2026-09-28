@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { MailIcon } from "@/components/ui/icons";
 import { useAuth } from "@/features/auth/auth-context";
+import { isPlaceholderEmail } from "@/features/auth/utils/placeholder-email";
 import { useResendVerification } from "@/generated/api/authentication/authentication";
 
 /** Reminds signed-in people to confirm their email until they do. */
@@ -10,7 +11,8 @@ export function EmailVerificationBanner() {
   const { user } = useAuth();
   const resendMutation = useResendVerification();
 
-  if (!user || user.emailVerified) return null;
+  // Accounts made from a text message have no real email to confirm.
+  if (!user || user.emailVerified || isPlaceholderEmail(user.email)) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-warning-border bg-warning-soft px-4 py-2.5 text-sm text-warning-strong sm:px-6">

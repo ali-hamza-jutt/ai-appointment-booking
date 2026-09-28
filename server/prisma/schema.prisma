@@ -70,6 +70,17 @@ enum BookingActorType {
   @@map("booking_actor_type")
 }
 
+/// Where a chat is happening.
+enum ChatChannel {
+  WEB
+  /// The booking widget on a business's own website.
+  WIDGET
+  WHATSAPP
+  SMS
+
+  @@map("chat_channel")
+}
+
 enum ChatSessionStatus {
   ACTIVE
   CLOSED
@@ -329,6 +340,20 @@ model GuestCode {
   @@map("guest_codes")
 }
 
+/// A Twilio number (SMS) or WhatsApp sender that customers message to book with the business.
+model MessagingNumber {
+  id         String      @id @default(uuid()) @db.Uuid
+  businessId String      @map("business_id") @db.Uuid
+  channel    ChatChannel
+  /// As Twilio writes it: +15550001111, or whatsapp:+15550001111.
+  address    String      @unique(map: "messaging_numbers_address_key") @db.VarChar(40)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId], map: "messaging_numbers_business_id_idx")
+  @@map("messaging_numbers")
+}
+
 /// A website allowed to embed the business's booking widget.
 model AllowedOrigin {
   id         String   @id @default(uuid()) @db.Uuid
@@ -388,6 +413,7 @@ model Business {
   reviews             Review[]
   guestCodes          GuestCode[]
   allowedOrigins      AllowedOrigin[]
+  messagingNumbers    MessagingNumber[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
@@ -994,6 +1020,11 @@ model ChatSession {
   /// How many of the oldest messages the summary covers.
   summarizedCount    Int               @default(0) @map("summarized_count")
   summaryUpdatedAt   DateTime?         @map("summary_updated_at") @db.Timestamptz(3)
+  /// Where the latest message came from; SMS and WhatsApp replies go back the same way.
+  channel            ChatChannel       @default(WEB)
+  /// For SMS and WhatsApp: the customer's address and the business number they wrote to.
+  customerAddress    String?           @map("customer_address") @db.VarChar(40)
+  businessAddress    String?           @map("business_address") @db.VarChar(40)
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   business           Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)

@@ -9,6 +9,7 @@ import {
 } from "../../infrastructure/messaging/sms-sender.js";
 import { buildCalendarInvite } from "../../utils/ics.js";
 import { toE164 } from "../../utils/phone.js";
+import { isPlaceholderEmail } from "../../utils/placeholder-email.js";
 import { parseStoredBusinessSettings } from "../businesses/business-settings.js";
 import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
 import { reviewDal } from "../reviews/dal/review.dal.js";
@@ -361,7 +362,8 @@ export class NotificationService {
       customer: {
         id: customer.id,
         name: customer.name,
-        email: customer.email ?? customer.user?.email ?? null,
+        // People who only text have a stand-in address that must never be emailed.
+        email: [customer.email, customer.user?.email].find((email) => email && !isPlaceholderEmail(email)) ?? null,
         phone: toE164(verifiedPhone) ?? toE164(customer.phone),
         optedOut: new Set(
           customer.notificationPreferences.filter((preference) => !preference.optedIn).map((preference) => preference.channel),

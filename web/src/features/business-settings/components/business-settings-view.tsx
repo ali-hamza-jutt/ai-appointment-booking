@@ -8,6 +8,7 @@ import { BookingPoliciesForm } from "@/features/business-settings/components/boo
 import { BusinessProfileForm } from "@/features/business-settings/components/business-profile-form";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
 import { LocationsPanel } from "@/features/business-settings/components/locations-panel";
+import { MessagingPanel } from "@/features/business-settings/components/messaging-panel";
 import { WidgetPanel } from "@/features/business-settings/components/widget-panel";
 import { canManageBusiness } from "@/features/business-settings/utils/business-permissions";
 import { useGetBusiness } from "@/generated/api/businesses/businesses";
@@ -63,6 +64,7 @@ function BusinessSettingsContent({ summary }: { summary: BusinessSummaryResponse
           <BookingPoliciesForm business={business} canEdit={canEdit} />
           <LocationsPanel business={business} canEdit={canEdit} />
           <WidgetPanel business={business} canEdit={canEdit} />
+          <MessagingPanel business={business} canEdit={canEdit} />
         </div>
       )}
     </PageContainer>

@@ -6,9 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * email is null for people who have only texted.
+ */
 export type ChatHandoffResponseCustomer = {
   /** @nullable */
   phone: string | null;
-  email: string;
+  /** @nullable */
+  email: string | null;
   name: string;
 };

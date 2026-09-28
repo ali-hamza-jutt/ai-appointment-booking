@@ -6,6 +6,8 @@ export interface SmsMessage {
   /** E.164, for example +447700900123. */
   to: string;
   text: string;
+  /** Send from this number (or whatsapp: sender) instead of the default one, for example to reply from the number a customer wrote to. */
+  from?: string;
   /** Where the provider reports delivery status. */
   statusCallback?: string;
 }
@@ -46,7 +48,11 @@ class TwilioSmsSender implements SmsSender {
     const body = new URLSearchParams({
       To: message.to,
       Body: message.text,
-      ...(this.from.startsWith("MG") ? { MessagingServiceSid: this.from } : { From: this.from }),
+      ...(message.from
+        ? { From: message.from }
+        : this.from.startsWith("MG")
+          ? { MessagingServiceSid: this.from }
+          : { From: this.from }),
       ...(message.statusCallback ? { StatusCallback: message.statusCallback } : {}),
     });
     let response: Response;
@@ -93,7 +99,7 @@ class LogSmsSender implements SmsSender {
   public readonly isAvailable = env.NODE_ENV !== "production";
 
   public send(message: SmsMessage): Promise<undefined> {
-    logger.info({ sms: { to: message.to, text: message.text } }, "SMS (not sent: no provider configured)");
+    logger.info({ sms: { to: message.to, from: message.from, text: message.text } }, "SMS (not sent: no provider configured)");
 
     return Promise.resolve(undefined);
   }

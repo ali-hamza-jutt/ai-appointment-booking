@@ -26,6 +26,7 @@ import type {
 
 import type {
   AddAllowedOriginRequest,
+  AddMessagingNumberRequest,
   AllowedOriginListResponse,
   AllowedOriginResponse,
   ApiErrorResponse,
@@ -36,6 +37,8 @@ import type {
   CreateLocationRequest,
   LocationListResponse,
   LocationResponse,
+  MessagingNumberListResponse,
+  MessagingNumberResponse,
   UpdateBusinessRequest,
   UpdateBusinessSettingsRequest,
   UpdateLocationRequest
@@ -294,6 +297,237 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getRemoveAllowedOriginMutationOptions(options), queryClient);
+    }
+    export const getListMessagingNumbersUrl = (businessId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/messaging-numbers`
+}
+
+/**
+ * Numbers customers can text or WhatsApp to book, and the webhook to set on them in Twilio.
+ */
+export const listMessagingNumbers = async (businessId: string, options?: Parameters<typeof apiFetch>[1]): Promise<MessagingNumberListResponse> => {
+
+  return apiFetch<MessagingNumberListResponse>(getListMessagingNumbersUrl(businessId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMessagingNumbersQueryKey = (businessId: string,) => {
+    return [
+    `/businesses/${businessId}/messaging-numbers`
+    ] as const;
+    }
+
+
+export const getListMessagingNumbersQueryOptions = <TData = Awaited<ReturnType<typeof listMessagingNumbers>>, TError = ErrorType<unknown>>(businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMessagingNumbersQueryKey(businessId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMessagingNumbers>>> = ({ signal }) => listMessagingNumbers(businessId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListMessagingNumbersQueryResult = NonNullable<Awaited<ReturnType<typeof listMessagingNumbers>>>
+export type ListMessagingNumbersQueryError = ErrorType<unknown>
+
+
+export function useListMessagingNumbers<TData = Awaited<ReturnType<typeof listMessagingNumbers>>, TError = ErrorType<unknown>>(
+ businessId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMessagingNumbers>>,
+          TError,
+          Awaited<ReturnType<typeof listMessagingNumbers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMessagingNumbers<TData = Awaited<ReturnType<typeof listMessagingNumbers>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMessagingNumbers>>,
+          TError,
+          Awaited<ReturnType<typeof listMessagingNumbers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMessagingNumbers<TData = Awaited<ReturnType<typeof listMessagingNumbers>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useListMessagingNumbers<TData = Awaited<ReturnType<typeof listMessagingNumbers>>, TError = ErrorType<unknown>>(
+ businessId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMessagingNumbers>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListMessagingNumbersQueryOptions(businessId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getAddMessagingNumberUrl = (businessId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/messaging-numbers`
+}
+
+/**
+ * Connects a Twilio SMS number or WhatsApp sender to the business.
+ */
+export const addMessagingNumber = async (businessId: string,
+    addMessagingNumberRequest: AddMessagingNumberRequest, options?: Parameters<typeof apiFetch>[1]): Promise<MessagingNumberResponse> => {
+
+  return apiFetch<MessagingNumberResponse>(getAddMessagingNumberUrl(businessId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(addMessagingNumberRequest)
+  }
+);}
+
+
+
+
+
+export const getAddMessagingNumberMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addMessagingNumber>>, TError,{businessId: string;data: BodyType<AddMessagingNumberRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addMessagingNumber>>, TError,{businessId: string;data: BodyType<AddMessagingNumberRequest>}, TContext> => {
+
+const mutationKey = ['addMessagingNumber'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addMessagingNumber>>, {businessId: string;data: BodyType<AddMessagingNumberRequest>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  addMessagingNumber(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddMessagingNumberMutationResult = NonNullable<Awaited<ReturnType<typeof addMessagingNumber>>>
+    export type AddMessagingNumberMutationBody = BodyType<AddMessagingNumberRequest>
+    export type AddMessagingNumberMutationError = ErrorType<ApiErrorResponse>
+
+    export const useAddMessagingNumber = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addMessagingNumber>>, TError,{businessId: string;data: BodyType<AddMessagingNumberRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addMessagingNumber>>,
+        TError,
+        {businessId: string;data: BodyType<AddMessagingNumberRequest>},
+        TContext
+      > => {
+      return useMutation(getAddMessagingNumberMutationOptions(options), queryClient);
+    }
+    export const getRemoveMessagingNumberUrl = (businessId: string,
+    numberId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/messaging-numbers/${numberId}`
+}
+
+export const removeMessagingNumber = async (businessId: string,
+    numberId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getRemoveMessagingNumberUrl(businessId,numberId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveMessagingNumberMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeMessagingNumber>>, TError,{businessId: string;numberId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeMessagingNumber>>, TError,{businessId: string;numberId: string}, TContext> => {
+
+const mutationKey = ['removeMessagingNumber'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeMessagingNumber>>, {businessId: string;numberId: string}> = (props) => {
+          const {businessId,numberId} = props ?? {};
+
+          return  removeMessagingNumber(businessId,numberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveMessagingNumberMutationResult = NonNullable<Awaited<ReturnType<typeof removeMessagingNumber>>>
+
+    export type RemoveMessagingNumberMutationError = ErrorType<ApiErrorResponse>
+
+    export const useRemoveMessagingNumber = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeMessagingNumber>>, TError,{businessId: string;numberId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeMessagingNumber>>,
+        TError,
+        {businessId: string;numberId: string},
+        TContext
+      > => {
+      return useMutation(getRemoveMessagingNumberMutationOptions(options), queryClient);
     }
     export const getListLocationsUrl = (businessId: string,) => {
 

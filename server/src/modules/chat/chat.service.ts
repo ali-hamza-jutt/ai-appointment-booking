@@ -25,6 +25,7 @@ import { chatDal } from "./dal/chat.dal.js";
 import type {
   AssistantTurnPersistenceResult,
   ChatBookingDraft,
+  ChatChannel,
   ChatBookingPersistenceResult,
   ChatDraftPatch,
   ChatMemoryState,
@@ -56,6 +57,7 @@ export class ChatService {
   public async createSession(
     userId: string,
     request: CreateChatSessionRequest,
+    channel: ChatChannel = request.channel ?? "WEB",
   ): Promise<ChatSessionResponse> {
     const title = request.title
       ? normalizeWhitespace(request.title) || null
@@ -79,6 +81,7 @@ export class ChatService {
         userId,
         title,
         replaceActive: request.replaceActive ?? false,
+        channel,
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
@@ -703,6 +706,7 @@ export class ChatService {
       business: session.business,
       title: session.title,
       status: session.status,
+      channel: session.channel,
       draft: this.toDraft(session),
       handoff: session.handoffRequestedAt
         ? {
