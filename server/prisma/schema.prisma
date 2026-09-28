@@ -42,6 +42,15 @@ enum WaitlistStatus {
   @@map("waitlist_status")
 }
 
+/// Reviews appear on the booking page only once staff publish them.
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+
+  @@map("review_status")
+}
+
 enum WaitlistOfferStatus {
   OPEN
   ACCEPTED
@@ -203,6 +212,8 @@ enum NotificationKind {
   BOOKING_REMINDER
   /// A freed time held for a customer on the waitlist.
   WAITLIST_OFFER
+  /// Asks the customer to rate a finished visit.
+  REVIEW_REQUEST
 
   @@map("notification_kind")
 }
@@ -259,6 +270,7 @@ model User {
   memberships        Membership[]
   customers          Customer[]
   waitlistEntries    WaitlistEntry[]
+  reviews            Review[]
   invitations        BusinessInvitation[]
   staff              Staff[]
 
@@ -344,6 +356,7 @@ model Business {
   paymentAccount      PaymentAccount?
   waitlistEntries     WaitlistEntry[]
   waitlistOffers      WaitlistOffer[]
+  reviews             Review[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
@@ -422,6 +435,7 @@ model Service {
   bookings        Booking[]
   chatDrafts      ChatSession[]      @relation("ChatDraftService")
   waitlistEntries WaitlistEntry[]
+  reviews         Review[]
 
   @@index([businessId, isActive, sortOrder], map: "services_business_id_is_active_sort_order_idx")
   @@index([categoryId], map: "services_category_id_idx")
@@ -452,6 +466,7 @@ model Staff {
   calendarConnection CalendarConnection?
   externalBusy       ExternalBusy[]
   waitlistEntries    WaitlistEntry[]
+  reviews            Review[]
 
   @@unique([businessId, userId], map: "staff_business_id_user_id_key")
   @@index([businessId, isActive, sortOrder], map: "staff_business_id_is_active_sort_order_idx")
@@ -630,6 +645,37 @@ model WaitlistOffer {
   @@map("waitlist_offers")
 }
 
+/// A customer's rating of one finished visit.
+model Review {
+  id         String       @id @default(uuid()) @db.Uuid
+  businessId String       @map("business_id") @db.Uuid
+  bookingId  String       @unique(map: "reviews_booking_id_key") @map("booking_id") @db.Uuid
+  customerId String       @map("customer_id") @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  serviceId  String?      @map("service_id") @db.Uuid
+  staffId    String?      @map("staff_id") @db.Uuid
+  /// 1 to 5 stars.
+  rating     Int          @db.SmallInt
+  comment    String?      @db.VarChar(2000)
+  status     ReviewStatus @default(PENDING)
+  /// The business's public answer.
+  reply      String?      @db.VarChar(2000)
+  repliedAt  DateTime?    @map("replied_at") @db.Timestamptz(3)
+  /// When the owners were told about a low rating, so they are told once.
+  alertedAt  DateTime?    @map("alerted_at") @db.Timestamptz(3)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  booking    Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service    Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  staff      Staff?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status, createdAt], map: "reviews_business_id_status_created_at_idx")
+  @@map("reviews")
+}
+
 model StripeWebhookEvent {
   id         String   @id @db.VarChar(255)
   type       String   @db.VarChar(100)
@@ -765,6 +811,7 @@ model Customer {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   waitlistEntries         WaitlistEntry[]
+  reviews                 Review[]
 
   @@unique([businessId, userId], map: "customers_business_id_user_id_key")
   @@unique([businessId, email], map: "customers_business_id_email_key")
@@ -847,6 +894,7 @@ model Booking {
   notifications   Notification[]
   payments        Payment[]
   waitlistOffer   WaitlistOffer?
+  review          Review?
 
   @@index([businessId, scheduledAt], map: "appointments_business_id_scheduled_at_idx")
   @@index([userId, createdAt, id], map: "appointments_user_id_created_at_id_idx")

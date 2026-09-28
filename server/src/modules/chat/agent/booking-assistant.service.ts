@@ -23,6 +23,7 @@ import { knowledgeService } from "../../knowledge/knowledge.service.js";
 import type { PublicServiceResponse } from "../../catalog/dto/catalog.dto.js";
 import { staffService } from "../../staff/staff.service.js";
 import type { WaitlistEntryResponse } from "../../waitlist/dto/waitlist.dto.js";
+import { reviewService } from "../../reviews/review.service.js";
 import { waitlistService } from "../../waitlist/waitlist.service.js";
 import { chatService } from "../chat.service.js";
 import type {
@@ -408,6 +409,29 @@ export class BookingAssistantService {
       data: {
         results: results.map((result) => ({ source: result.sourceTitle, kind: result.kind, text: result.content })),
         next: "Answer only from these passages and mention the source title. If they don't answer the question, say you don't know.",
+      },
+    };
+  }
+
+  /** What customers said in the reviews the business published. */
+  public async getReviews(context: AssistantContext): Promise<Result> {
+    const reviews = await reviewService.listPublished(context.business.id, 5);
+
+    if (reviews.count === 0) {
+      return { data: { count: 0, next: `${context.business.name} has no published reviews yet. Say so plainly.` } };
+    }
+
+    return {
+      data: {
+        average: reviews.average,
+        count: reviews.count,
+        latest: reviews.items.map((review) => ({
+          rating: review.rating,
+          service: review.serviceName,
+          comment: review.comment,
+          reply: review.reply,
+        })),
+        next: "Summarize honestly from these reviews only, with the average and count. Don't invent quotes.",
       },
     };
   }

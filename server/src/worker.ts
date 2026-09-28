@@ -23,7 +23,11 @@ import { calendarSyncQueue } from "./modules/calendar/calendar-sync.queue.js";
 import { calendarSyncService } from "./modules/calendar/calendar-sync.service.js";
 import { calendarDal } from "./modules/calendar/dal/calendar.dal.js";
 import type { CalendarSyncJobData } from "./modules/calendar/dto/calendar.dto.js";
-import type { ReminderJobData } from "./modules/notifications/dto/notification.dto.js";
+import type {
+  NotificationJobData,
+  ReminderJobData,
+  ReviewRequestJobData,
+} from "./modules/notifications/dto/notification.dto.js";
 import { notificationService, reminderScheduler } from "./modules/notifications/notification.service.js";
 import type { OutboxMessage } from "./modules/outbox/dto/outbox.dto.js";
 import { OutboxConsumerRunner } from "./modules/outbox/outbox-consumer.runner.js";
@@ -93,12 +97,17 @@ async function runMaintenanceJob(job: Job): Promise<number> {
   return changed;
 }
 
-function runNotificationJob(job: Job<ReminderJobData>): Promise<void> {
-  if (job.name !== NOTIFICATION_CONSTANTS.REMINDER_JOB) {
-    return Promise.reject(new Error(`Unknown notification job ${job.name}`));
+function runNotificationJob(job: Job<NotificationJobData>): Promise<void> {
+  switch (job.name) {
+    case NOTIFICATION_CONSTANTS.REMINDER_JOB:
+      return observeJob(QUEUES.NOTIFICATIONS, job, () => notificationService.sendReminder(job.data as ReminderJobData));
+    case NOTIFICATION_CONSTANTS.REVIEW_REQUEST_JOB:
+      return observeJob(QUEUES.NOTIFICATIONS, job, () =>
+        notificationService.sendReviewRequest(job.data as ReviewRequestJobData),
+      );
+    default:
+      return Promise.reject(new Error(`Unknown notification job ${job.name}`));
   }
-
-  return observeJob(QUEUES.NOTIFICATIONS, job, () => notificationService.sendReminder(job.data));
 }
 
 /** Syncs one calendar, or (every 15 minutes) queues a sync for every connected calendar. */
@@ -202,7 +211,7 @@ async function startWorker(): Promise<void> {
       }),
     );
     watch(
-      new Worker<ReminderJobData>(QUEUES.NOTIFICATIONS, runNotificationJob, {
+      new Worker<NotificationJobData>(QUEUES.NOTIFICATIONS, runNotificationJob, {
         connection: createRedisConnection(),
         prefix: QUEUE_PREFIX,
       }),

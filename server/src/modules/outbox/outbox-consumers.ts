@@ -5,6 +5,7 @@ import {
   KNOWLEDGE_CONSTANTS,
   NOTIFICATION_CONSTANTS,
   PAYMENT_CONSTANTS,
+  REVIEW_CONSTANTS,
   WAITLIST_CONSTANTS,
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
@@ -13,6 +14,7 @@ import { customerProfileService } from "../customers/customer-profile.service.js
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import { notificationService } from "../notifications/notification.service.js";
 import { paymentService } from "../payments/payment.service.js";
+import { reviewService } from "../reviews/review.service.js";
 import { waitlistService } from "../waitlist/waitlist.service.js";
 import type { OutboxConsumer } from "./dto/outbox.dto.js";
 
@@ -68,7 +70,7 @@ export const customerPreferencesConsumer: OutboxConsumer = {
 
 const NOTIFYING_EVENTS = new Set<string>(Object.values(NOTIFICATION_CONSTANTS.EVENTS));
 
-/** Emails and texts the customer about a confirmed, requested, moved or cancelled booking, and plans reminders. */
+/** Emails and texts the customer about a confirmed, requested, moved or cancelled booking, and plans reminders and the review request. */
 export const bookingNotificationsConsumer: OutboxConsumer = {
   name: "booking-notifications",
   handles: (type) => NOTIFYING_EVENTS.has(type),
@@ -108,6 +110,13 @@ export const waitlistConsumer: OutboxConsumer = {
   handle: (message) => waitlistService.handleBookingEvent(message),
 };
 
+/** Tells owners and managers about a low rating as soon as it comes in. */
+export const reviewAlertsConsumer: OutboxConsumer = {
+  name: "review-alerts",
+  handles: (type) => type === REVIEW_CONSTANTS.SUBMITTED_EVENT,
+  handle: (message) => reviewService.handleReviewEvent(message),
+};
+
 /** Every consumer the worker runs, in dispatch order. */
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
@@ -118,4 +127,5 @@ export const outboxConsumers: readonly OutboxConsumer[] = [
   calendarEventsConsumer,
   paymentsConsumer,
   waitlistConsumer,
+  reviewAlertsConsumer,
 ];

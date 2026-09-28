@@ -49,6 +49,8 @@ export function describeToolCall(name: string, args: unknown): string {
       return STATUS.FORGET_PREFERENCE;
     case "join_waitlist":
       return STATUS.JOIN_WAITLIST;
+    case "get_reviews":
+      return STATUS.GET_REVIEWS;
     default:
       return STATUS.THINKING;
   }

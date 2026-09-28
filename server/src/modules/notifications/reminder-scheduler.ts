@@ -2,12 +2,14 @@ import type { Queue } from "bullmq";
 
 import { JOB_CONSTANTS, NOTIFICATION_CONSTANTS } from "../../constants/app.constants.js";
 import { createQueue } from "../../infrastructure/queue/queues.js";
-import type { PlannedReminder, ReminderJobData } from "./dto/notification.dto.js";
+import type { NotificationJobData, PlannedReminder, ReviewRequestJobData } from "./dto/notification.dto.js";
 
 /** Puts reminders on (and takes them off) the notifications queue as delayed jobs. */
 export interface ReminderScheduler {
   schedule(booking: { bookingId: string; businessId: string; scheduledAt: Date }, reminders: PlannedReminder[], now: Date): Promise<void>;
   cancel(booking: { bookingId: string; scheduledAt: Date }, offsetsMinutes: readonly number[]): Promise<void>;
+  /** Asks the customer to rate a finished visit at `sendAt`; once per booking. */
+  scheduleReviewRequest(booking: ReviewRequestJobData, sendAt: Date, now: Date): Promise<void>;
 }
 
 /**
@@ -20,7 +22,7 @@ export function reminderJobId(bookingId: string, scheduledAt: Date, offsetMinute
 }
 
 export class QueueReminderScheduler implements ReminderScheduler {
-  private queue: Queue<ReminderJobData> | null = null;
+  private queue: Queue<NotificationJobData> | null = null;
 
   public async schedule(
     booking: { bookingId: string; businessId: string; scheduledAt: Date },
@@ -57,14 +59,22 @@ export class QueueReminderScheduler implements ReminderScheduler {
     );
   }
 
+  public async scheduleReviewRequest(booking: ReviewRequestJobData, sendAt: Date, now: Date): Promise<void> {
+    await this.getQueue().add(
+      NOTIFICATION_CONSTANTS.REVIEW_REQUEST_JOB,
+      { bookingId: booking.bookingId, businessId: booking.businessId },
+      { jobId: `review-request-${booking.bookingId}`, delay: Math.max(0, sendAt.getTime() - now.getTime()) },
+    );
+  }
+
   /** Releases the queue's Redis connection. */
   public async close(): Promise<void> {
     await this.queue?.close();
     this.queue = null;
   }
 
-  private getQueue(): Queue<ReminderJobData> {
-    this.queue ??= createQueue<ReminderJobData>(JOB_CONSTANTS.QUEUES.NOTIFICATIONS);
+  private getQueue(): Queue<NotificationJobData> {
+    this.queue ??= createQueue<NotificationJobData>(JOB_CONSTANTS.QUEUES.NOTIFICATIONS);
 
     return this.queue;
   }

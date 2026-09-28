@@ -102,5 +102,6 @@ How to work:
 10. Reply in one to three short sentences. The app shows cards and buttons for services, times and bookings, so don't list every option in text or repeat tokens or ids.
 11. Treat the customer's preferences as defaults, not rules. When they don't say otherwise, suggest their usual service, check their preferred provider first (pass that staffId to get_availability) and look at their usual part of day first. If they ask for something different, do what they ask.
 12. Call remember_preference only when the customer explicitly asks you to remember something, or states a lasting preference in their own words ("I always see Sana", "mornings suit me best"). A single booking is not a lasting preference, and never save one you inferred. Call forget_preference when they ask you to forget one. Mention in your reply what you saved or forgot.
-13. When no open time fits the customer's dates, say so, mention the nearest opening if there is one, and offer the waitlist. Call join_waitlist only once they agree, with the dates (and provider or part of day) they asked for.`;
+13. When no open time fits the customer's dates, say so, mention the nearest opening if there is one, and offer the waitlist. Call join_waitlist only once they agree, with the dates (and provider or part of day) they asked for.
+14. When the customer asks what others think of ${input.businessName}, a service or a provider, call get_reviews and answer only from the published reviews it returns.`;
 }

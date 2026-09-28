@@ -1,6 +1,6 @@
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
-import { NOTIFICATION_CONSTANTS } from "../../constants/app.constants.js";
+import { NOTIFICATION_CONSTANTS, REVIEW_CONSTANTS } from "../../constants/app.constants.js";
 import { mailer, type Mailer } from "../../infrastructure/messaging/mailer.js";
 import {
   smsSender,
@@ -11,6 +11,7 @@ import { buildCalendarInvite } from "../../utils/ics.js";
 import { toE164 } from "../../utils/phone.js";
 import { parseStoredBusinessSettings } from "../businesses/business-settings.js";
 import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
+import { reviewDal } from "../reviews/dal/review.dal.js";
 import { notificationDal } from "./dal/notification.dal.js";
 import type {
   BookingNotificationContext,
@@ -19,6 +20,7 @@ import type {
   NotificationKind,
   NotificationTemplateRecord,
   ReminderJobData,
+  ReviewRequestJobData,
 } from "./dto/notification.dto.js";
 import {
   DEFAULT_TEMPLATES,
@@ -103,9 +105,27 @@ export class NotificationService {
           ...(previousStatus === "CONFIRMED" ? { calendar: "CANCEL" as const } : {}),
         });
         return;
+      case EVENTS.COMPLETED: {
+        // Counted from when the visit was completed, not from when this event ran.
+        const completedAt = new Date(message.createdAt);
+        const sendAt = new Date(completedAt.getTime() + REVIEW_CONSTANTS.REQUEST_DELAY_MINUTES * 60_000);
+
+        await this.scheduler.scheduleReviewRequest(context, sendAt, now);
+        return;
+      }
       default:
         return;
     }
+  }
+
+  /** Asks the customer to rate a finished visit, unless they already have. */
+  public async sendReviewRequest(job: ReviewRequestJobData): Promise<void> {
+    const context = await this.loadContext(job.businessId, job.bookingId);
+
+    if (!context || context.status !== "COMPLETED") return;
+    if (await reviewDal.existsForBooking(context.businessId, context.bookingId)) return;
+
+    await this.deliver(context, { kind: "REVIEW_REQUEST", dedupeBase: `review-request:${job.bookingId}` });
   }
 
   /** Runs a reminder job, unless the booking has moved, ended or lost that reminder. */

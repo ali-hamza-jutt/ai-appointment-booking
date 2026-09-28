@@ -77,6 +77,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses/{businessId}/calendar-connections` and `/staff/{staffId}/calendar-connection`: connect (returns the provider's consent URL), sync or disconnect a staff member's Google or Microsoft 365 calendar. `/api/calendar/providers` says which providers are configured.
 - `/api/businesses/{businessId}/payments/account`: the business's Stripe account (onboarding link, status refresh, dashboard link); `/bookings/{bookingId}/payments` and `/refunds` show and refund a booking's payment. Customers reopen Checkout with `POST /api/appointments/{id}/payment`.
 - `/api/me/waitlist`: a customer's waits (join, list, leave); `/api/businesses/{businessId}/waitlist` shows staff who is waiting.
+- `/api/appointments/{appointmentId}/review`: the customer's rating of a finished visit; `/api/businesses/{businessId}/reviews` lets staff publish, hide and answer reviews; `/api/public/{slug}/reviews` lists the published ones.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -206,6 +207,15 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **A freed time is offered in turn.** When a booking is cancelled or a hold expires, an outbox consumer walks the waiting customers for that service in the order they joined and picks the first whose dates and part of day (in their own time zone) and provider suit the time. It holds the time for them as a `WAITLIST` booking for 15 minutes and emails or texts them a link to confirm it (`WAITLIST_OFFER`, rewordable like other messages). A deposit, if the service asks for one, is taken when they confirm.
 - **If they don't take it, it moves on.** A lapsed or released hold marks the offer `LAPSED` or `DECLINED`, puts the customer back in line and offers the time to the next person; nobody is offered the same time twice. Confirming marks the entry `BOOKED`.
 - **When the time can't be held,** because it was taken again, is now too soon, or is outside the booking window, the search stops, since no one else could book it either.
+
+## Reviews
+
+Customers rate finished visits from 1 to 5 stars, with an optional comment (`modules/reviews`).
+
+- **Asking.** When a visit is completed, the notifications consumer schedules a delayed `send-review-request` job for two hours after completion (one job per booking). It emails or texts a `REVIEW_REQUEST` message, rewordable like the others, linking to the appointment page, unless the customer has already reviewed the visit.
+- **Rating.** A customer can review a `COMPLETED` visit once, within 30 days (`POST /api/appointments/{id}/review`). Reviews start `PENDING`.
+- **Publishing.** Owners and managers publish or hide reviews and write a public reply (`PATCH /api/businesses/{businessId}/reviews/{reviewId}`). Only published reviews appear in `GET /api/public/{slug}/reviews` with their average, and the booking assistant's `get_reviews` tool reads the same list.
+- **Low ratings.** Saving a review writes a `review.submitted` outbox event; for 2 stars or fewer, a consumer emails every owner and manager once (claimed through `reviews.alerted_at`, released for a retry if sending fails).
 
 ## Calendar sync
 
