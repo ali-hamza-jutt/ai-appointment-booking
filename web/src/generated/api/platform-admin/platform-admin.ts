@@ -31,6 +31,7 @@ import type {
   AdminUserListResponse,
   ApiErrorResponse,
   FailedWorkResponse,
+  GrantPlanRequest,
   ImpersonationResponse,
   ListAdminBusinessesParams,
   ListAdminUsersParams,
@@ -392,6 +393,74 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUnsuspendBusinessMutationOptions(options), queryClient);
+    }
+    export const getGrantBusinessPlanUrl = (businessId: string,) => {
+
+
+
+
+  return `/admin/businesses/${businessId}/plan`
+}
+
+/**
+ * Puts the business on a plan for free, or back on Free. Not for businesses paying through Stripe.
+ */
+export const grantBusinessPlan = async (businessId: string,
+    grantPlanRequest: GrantPlanRequest, options?: Parameters<typeof apiFetch>[1]): Promise<AdminBusinessDetail> => {
+
+  return apiFetch<AdminBusinessDetail>(getGrantBusinessPlanUrl(businessId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(grantPlanRequest)
+  }
+);}
+
+
+
+
+
+export const getGrantBusinessPlanMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantBusinessPlan>>, TError,{businessId: string;data: BodyType<GrantPlanRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof grantBusinessPlan>>, TError,{businessId: string;data: BodyType<GrantPlanRequest>}, TContext> => {
+
+const mutationKey = ['grantBusinessPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof grantBusinessPlan>>, {businessId: string;data: BodyType<GrantPlanRequest>}> = (props) => {
+          const {businessId,data} = props ?? {};
+
+          return  grantBusinessPlan(businessId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GrantBusinessPlanMutationResult = NonNullable<Awaited<ReturnType<typeof grantBusinessPlan>>>
+    export type GrantBusinessPlanMutationBody = BodyType<GrantPlanRequest>
+    export type GrantBusinessPlanMutationError = ErrorType<ApiErrorResponse>
+
+    export const useGrantBusinessPlan = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof grantBusinessPlan>>, TError,{businessId: string;data: BodyType<GrantPlanRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof grantBusinessPlan>>,
+        TError,
+        {businessId: string;data: BodyType<GrantPlanRequest>},
+        TContext
+      > => {
+      return useMutation(getGrantBusinessPlanMutationOptions(options), queryClient);
     }
     export const getListAdminUsersUrl = (params?: ListAdminUsersParams,) => {
   const normalizedParams = new URLSearchParams();

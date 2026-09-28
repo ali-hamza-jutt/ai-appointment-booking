@@ -81,6 +81,15 @@ enum ChatChannel {
   @@map("chat_channel")
 }
 
+/// What a business pays BookWise for; each plan has its own limits.
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PRO
+
+  @@map("subscription_plan")
+}
+
 enum ChatSessionStatus {
   ACTIVE
   CLOSED
@@ -355,6 +364,41 @@ model MessagingNumber {
   @@map("messaging_numbers")
 }
 
+/// A business's BookWise plan: a Stripe subscription, or one a platform admin granted.
+model Subscription {
+  id                   String           @id @default(uuid()) @db.Uuid
+  businessId           String           @unique(map: "subscriptions_business_id_key") @map("business_id") @db.Uuid
+  plan                 SubscriptionPlan
+  /// Stripe's status (active, trialing, past_due, canceled, unpaid, incomplete…) or "complimentary".
+  status               String           @db.VarChar(30)
+  stripeCustomerId     String?          @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String?          @unique(map: "subscriptions_stripe_subscription_id_key") @map("stripe_subscription_id") @db.VarChar(255)
+  currentPeriodEnd     DateTime?        @map("current_period_end") @db.Timestamptz(3)
+  cancelAtPeriodEnd    Boolean          @default(false) @map("cancel_at_period_end")
+  /// The platform admin who granted a complimentary plan.
+  grantedById          String?          @map("granted_by_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  business             Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId], map: "subscriptions_stripe_customer_id_idx")
+  @@map("subscriptions")
+}
+
+/// How much of a monthly allowance a business has used (AI conversations, text messages).
+model UsageCounter {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  /// The first day of the (UTC) month.
+  month      DateTime @db.Date
+  metric     String   @db.VarChar(40)
+  count      Int      @default(0)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, month, metric], map: "usage_counters_business_id_month_metric_key")
+  @@map("usage_counters")
+}
+
 /// Model calls made for one business on one (UTC) day, for the admin's spend view.
 model LlmUsage {
   id           String   @id @default(uuid()) @db.Uuid
@@ -469,6 +513,8 @@ model Business {
   messagingNumbers    MessagingNumber[]
   dailyMetrics        DailyMetric[]
   llmUsage            LlmUsage[]
+  subscription        Subscription?
+  usageCounters       UsageCounter[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]

@@ -13,6 +13,8 @@ import { normalizeWhitespace } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { authDal } from "../auth/dal/auth.dal.js";
 import { toAuthUserResponse } from "../auth/session.service.js";
+import type { PlanId } from "../subscriptions/dto/subscription.dto.js";
+import { subscriptionService } from "../subscriptions/subscription.service.js";
 import { adminAuditDal } from "./dal/admin-audit.dal.js";
 import { adminDal } from "./dal/admin.dal.js";
 import type {
@@ -78,9 +80,11 @@ export class AdminService {
     }
 
     const total = [...models.values()].reduce((sum, model) => sum + model.costUsd, 0);
+    const billing = await subscriptionService.getBilling(business.id, now);
 
     return {
       ...this.toSummary(business, total),
+      plan: { id: billing.plan.id, source: billing.source, status: billing.status },
       team: business.memberships.map((membership) => ({
         userId: membership.user.id,
         fullName: membership.user.fullName,
@@ -109,6 +113,14 @@ export class AdminService {
     await this.findBusiness(businessId, now);
     await adminDal.setSuspended(businessId, null);
     await adminAuditDal.record({ adminId, action: "business.unsuspend", targetType: "business", targetId: businessId });
+
+    return this.getBusiness(businessId, now);
+  }
+
+  /** Puts a business on a plan without charging it (FREE takes a granted plan away). */
+  public async grantPlan(adminId: string, businessId: string, plan: PlanId, now: Date = new Date()): Promise<AdminBusinessDetail> {
+    await this.findBusiness(businessId, now);
+    await subscriptionService.grantPlan(adminId, businessId, plan);
 
     return this.getBusiness(businessId, now);
   }

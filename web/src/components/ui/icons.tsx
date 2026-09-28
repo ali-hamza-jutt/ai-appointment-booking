@@ -429,3 +429,12 @@ export function ChartIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function CardIcon(props: IconProps) {
+  return (
+    <svg aria-hidden="true" {...sharedProps} {...props}>
+      <rect height="14" rx="2" width="20" x="2" y="5" />
+      <path d="M2 10h20M6 15h4" />
+    </svg>
+  );
+}

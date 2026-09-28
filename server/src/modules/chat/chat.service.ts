@@ -3,6 +3,7 @@ import {
   CHAT_CONSTANTS,
   ERROR_CODES,
   ERROR_MESSAGES,
+  SUBSCRIPTION_CONSTANTS,
   VALIDATION_MESSAGES,
   VALIDATION_PATTERNS,
 } from "../../constants/app.constants.js";
@@ -20,6 +21,7 @@ import { throwRequestValidationError } from "../../utils/validation.js";
 import { businessService } from "../businesses/business.service.js";
 import { parseStoredParts } from "./chat-parts.schema.js";
 import { chatBookingDal } from "./dal/chat-booking.dal.js";
+import { entitlements } from "../subscriptions/entitlements.js";
 import { publishChatEvent } from "./chat-events.js";
 import { chatDal } from "./dal/chat.dal.js";
 import type {
@@ -72,6 +74,15 @@ export class ChatService {
         VALIDATION_MESSAGES.CHAT_SESSION_TITLE,
       );
     }
+
+    // Carrying on an open chat is free; starting one uses the plan's monthly allowance.
+    if (!request.replaceActive) {
+      const active = await chatDal.findActiveSessionForUser(userId, businessId);
+
+      if (active) return this.toSessionResponse(active);
+    }
+
+    await entitlements.consumeOrThrow(businessId, SUBSCRIPTION_CONSTANTS.METRICS.AI_CONVERSATIONS);
 
     let session: ChatSessionRecord;
 

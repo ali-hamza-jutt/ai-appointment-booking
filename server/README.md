@@ -83,6 +83,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `POST /api/channels/twilio/inbound`: incoming SMS and WhatsApp messages (Twilio-signed); `/api/businesses/{businessId}/messaging-numbers`: the numbers a business takes them on.
 - `GET /api/businesses/{businessId}/analytics?from=&to=`: booking and assistant analytics between two local dates (owners and managers).
 - `/api/admin/*`: the platform admin's tools (businesses, suspension, people, impersonation, failed jobs, audit log), for users with `platformRole = ADMIN`.
+- `/api/businesses/{businessId}/billing` (and `/checkout`, `/portal`): the business's BookWise plan, usage, Stripe Checkout and the billing portal.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -218,6 +219,21 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **Guests.** On a business's public page or widget, someone without an account enters their name, email and (optionally) phone, and gets a 6-digit code by email (10 minutes, 5 guesses, one per minute). Confirming it signs them in with a browser-session login, creating an account the first time; an existing account is signed in as it is, since the code proves the email. The phone number is saved on their customer record at that business. From there they use the same holds, confirmation and chat as any signed-in customer. A business with `allowGuestBooking` off refuses guest codes (403).
 - **Limits.** Everything under `/api/public` has its own per-IP limit (120 a minute); asking for a code uses the stricter limit of other code-sending endpoints.
 - **Widget.** `widget.js` (served by the web app) adds a button that opens `/embed/<slug>` in an iframe. The web app's proxy sets `Content-Security-Policy: frame-ancestors 'self' <allowed origins>` on that page from `GET /api/public/{slug}/embed`; every other page may only be framed by BookWise itself. The frame sends the host page nothing but a close request.
+
+## Plans and billing
+
+Businesses pay BookWise through Stripe Billing (`modules/subscriptions`). Plans are defined in `SUBSCRIPTION_CONSTANTS.PLANS`:
+
+| Plan | Providers | Assistant chats a month | Text messages a month |
+| --- | --- | --- | --- |
+| Free | 1 | 100 | 0 |
+| Starter | 3 | 1,000 | 300 |
+| Pro | 15 | 10,000 | 3,000 |
+
+- **Switching on.** Limits apply once `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER` and `STRIPE_PRICE_PRO` are all set; until then nothing is limited, though usage is still counted.
+- **Entitlements.** `entitlements.ts` is the one check. Adding or reactivating a provider needs a free seat. Starting a new chat (web, widget, SMS or WhatsApp; carrying on an open one is free) uses one assistant chat. Every SMS or WhatsApp message sent (notifications, assistant replies, staff relays) uses one text message. Monthly counts live in `usage_counters` and are claimed with a single conditional upsert, so two requests can't both take the last one. An SMS notification over the limit is recorded as failed with the reason; an incoming message over the chat limit gets no reply.
+- **Paying.** Owners start Stripe Checkout (`mode=subscription`, with the business id in the metadata) and manage the plan, card and cancellation in Stripe's billing portal. The existing Stripe webhook routes subscription events here: `checkout.session.completed` records the subscription, and `customer.subscription.created/updated/deleted` keep its plan (by price id), status, renewal date and cancellation in step. `past_due` keeps the paid plan while Stripe retries; `canceled`, `unpaid` and `incomplete` fall back to Free.
+- **Granted plans.** A platform admin can put a business on a plan at no charge (`POST /api/admin/businesses/{id}/plan`, audited), unless it already pays through Stripe.
 
 ## Platform admin
 

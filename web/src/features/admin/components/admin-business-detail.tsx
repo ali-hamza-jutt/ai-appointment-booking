@@ -18,11 +18,14 @@ import type { AdminBusinessDetail } from "@/generated/api/models";
 import {
   getGetAdminBusinessQueryKey,
   useGetAdminBusiness,
+  useGrantBusinessPlan,
   useSuspendBusiness,
   useUnsuspendBusiness,
 } from "@/generated/api/platform-admin/platform-admin";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { formatDateTime } from "@/lib/utils/date-time";
+
+const PLAN_NAMES = { FREE: "Free", STARTER: "Starter", PRO: "Pro" } as const;
 
 export function AdminBusinessDetailView({ businessId }: { businessId: string }) {
   const businessQuery = useGetAdminBusiness(businessId, { query: { retry: false } });
@@ -54,6 +57,7 @@ function BusinessDetail({ business }: { business: AdminBusinessDetail }) {
   const suspendMutation = useSuspendBusiness({ mutation: { onSuccess: onUpdated } });
   const unsuspendMutation = useUnsuspendBusiness({ mutation: { onSuccess: onUpdated } });
   const impersonation = useImpersonation();
+  const planMutation = useGrantBusinessPlan({ mutation: { onSuccess: onUpdated } });
 
   function suspend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,6 +108,39 @@ function BusinessDetail({ business }: { business: AdminBusinessDetail }) {
         {suspendMutation.error || unsuspendMutation.error ? (
           <Alert className="mt-3" tone="danger">
             {getApiErrorMessage(suspendMutation.error ?? unsuspendMutation.error, "That didn't work.")}
+          </Alert>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard
+        description={
+          business.plan.source === "stripe"
+            ? "This business pays for its plan through Stripe; its owner changes it there."
+            : "Give the business a plan at no charge, or put it back on Free."
+        }
+        title={`Plan: ${PLAN_NAMES[business.plan.id]}${business.plan.source === "complimentary" ? " (complimentary)" : ""}`}
+      >
+        {business.plan.source === "stripe" ? (
+          <p className="text-sm text-muted">Stripe status: {business.plan.status}</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {(["FREE", "STARTER", "PRO"] as const).map((plan) => (
+              <Button
+                disabled={plan === business.plan.id}
+                isLoading={planMutation.isPending && planMutation.variables?.data.plan === plan}
+                key={plan}
+                onClick={() => planMutation.mutate({ businessId: business.id, data: { plan } })}
+                size="sm"
+                variant={plan === business.plan.id ? "primary" : "secondary"}
+              >
+                {PLAN_NAMES[plan]}
+              </Button>
+            ))}
+          </div>
+        )}
+        {planMutation.error ? (
+          <Alert className="mt-3" tone="danger">
+            {getApiErrorMessage(planMutation.error, "The plan couldn't be changed.")}
           </Alert>
         ) : null}
       </SectionCard>

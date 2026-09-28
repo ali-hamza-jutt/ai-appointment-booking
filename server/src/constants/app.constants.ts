@@ -239,6 +239,9 @@ export const TENANT_SCOPE_FIELDS = {
   MessagingNumber: ["businessId", "address"],
   DailyMetric: ["businessId"],
   LlmUsage: ["businessId"],
+  // Stripe webhooks find a subscription by Stripe's ids.
+  Subscription: ["businessId", "stripeSubscriptionId", "stripeCustomerId"],
+  UsageCounter: ["businessId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -475,6 +478,24 @@ export const MESSAGING_CONSTANTS = {
   YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
 } as const;
 
+export const SUBSCRIPTION_CONSTANTS = {
+  /** What each plan includes. Prices are what the pricing page shows; Stripe charges the configured price. */
+  PLANS: {
+    FREE: { name: "Free", priceMonthlyUsd: 0, staffSeats: 1, aiConversations: 100, textMessages: 0 },
+    STARTER: { name: "Starter", priceMonthlyUsd: 29, staffSeats: 3, aiConversations: 1_000, textMessages: 300 },
+    PRO: { name: "Pro", priceMonthlyUsd: 99, staffSeats: 15, aiConversations: 10_000, textMessages: 3_000 },
+  },
+  /** Stripe statuses that keep a paid plan's limits; past_due while Stripe retries the card. */
+  ACTIVE_STATUSES: ["active", "trialing", "past_due", "complimentary"],
+  COMPLIMENTARY_STATUS: "complimentary",
+  METRICS: {
+    AI_CONVERSATIONS: "ai_conversations",
+    /** SMS and WhatsApp messages sent. */
+    TEXT_MESSAGES: "text_messages",
+  },
+  SUBSCRIPTION_EVENTS: ["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"],
+} as const;
+
 export const ADMIN_CONSTANTS = {
   /** An admin's session as another user ends after this long. */
   IMPERSONATION_TTL_SECONDS: 15 * 60,
@@ -591,6 +612,10 @@ export const ERROR_CODES = {
   ALLOWED_ORIGIN_NOT_FOUND: "ALLOWED_ORIGIN_NOT_FOUND",
   MESSAGING_NUMBER_TAKEN: "MESSAGING_NUMBER_TAKEN",
   BUSINESS_SUSPENDED: "BUSINESS_SUSPENDED",
+  PLAN_LIMIT_REACHED: "PLAN_LIMIT_REACHED",
+  BILLING_NOT_CONFIGURED: "BILLING_NOT_CONFIGURED",
+  BILLING_MANAGED_IN_PORTAL: "BILLING_MANAGED_IN_PORTAL",
+  NO_BILLING_ACCOUNT: "NO_BILLING_ACCOUNT",
   CANNOT_IMPERSONATE_ADMIN: "CANNOT_IMPERSONATE_ADMIN",
   JOB_NOT_FOUND: "JOB_NOT_FOUND",
   OUTBOX_EVENT_NOT_FOUND: "OUTBOX_EVENT_NOT_FOUND",
@@ -684,6 +709,10 @@ export const ERROR_MESSAGES = {
   ALLOWED_ORIGIN_NOT_FOUND: "That website is not on the list",
   MESSAGING_NUMBER_TAKEN: "This number is already connected to a business",
   BUSINESS_SUSPENDED: "This business is suspended. Its team can view it but not make changes",
+  PLAN_LIMIT_REACHED: "This business has reached its plan's limit",
+  BILLING_NOT_CONFIGURED: "Plans and billing are not set up on this server",
+  BILLING_MANAGED_IN_PORTAL: "This business already has a subscription; change it in the billing portal",
+  NO_BILLING_ACCOUNT: "This business has no billing account yet; choose a plan first",
   CANNOT_IMPERSONATE_ADMIN: "Platform admins can't be impersonated",
   JOB_NOT_FOUND: "That job is not in the failed list any more",
   OUTBOX_EVENT_NOT_FOUND: "That event was not found or was already delivered",

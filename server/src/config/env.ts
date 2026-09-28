@@ -87,6 +87,9 @@ const environmentSchema = z.object({
    * endpoint (checkout and refunds) and one for the Connect endpoint (account updates).
    */
   STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
+  /** Stripe Billing prices (price_…) for the Starter and Pro plans. With both set, plan limits apply. */
+  STRIPE_PRICE_STARTER: optionalNonEmptyString,
+  STRIPE_PRICE_PRO: optionalNonEmptyString,
   /** BookWise's cut of each payment, in percent. */
   STRIPE_PLATFORM_FEE_PERCENT: z.coerce.number().min(0).max(50).default(0),
   /** Exposes Prometheus metrics for the API on this port (e.g. 9464). */
