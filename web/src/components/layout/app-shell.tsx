@@ -27,6 +27,7 @@ import {
   MailIcon,
   MenuIcon,
   PlusIcon,
+  RefreshIcon,
   SettingsIcon,
   StarIcon,
   TagIcon,
@@ -34,6 +35,7 @@ import {
   UsersIcon,
   type IconProps,
 } from "@/components/ui/icons";
+import { useEndImpersonation } from "@/features/admin/hooks/use-impersonation";
 import { EmailVerificationBanner } from "@/features/auth/components/email-verification-banner";
 import { useAuth } from "@/features/auth/auth-context";
 import { getUserInitials } from "@/features/auth/utils/user-display";
@@ -49,6 +51,8 @@ interface NavigationItem {
   href: string;
   icon: ComponentType<IconProps>;
   label: string;
+  /** Highlight only on this exact path, not on pages below it. */
+  exact?: boolean;
 }
 
 const navigation: NavigationItem[] = [
@@ -76,11 +80,23 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/handoffs", icon: ChatIcon, label: "Inbox" },
 ];
 
+const adminNavigation: NavigationItem[] = [
+  { href: "/admin", icon: BuildingIcon, label: "Businesses", exact: true },
+  { href: "/admin/users", icon: UsersIcon, label: "People" },
+  { href: "/admin/jobs", icon: RefreshIcon, label: "Failed jobs" },
+  { href: "/admin/audit", icon: ListIcon, label: "Audit log" },
+];
+
 const setupNavigation: NavigationItem[] = [
   { href: "/business/setup", icon: BuildingIcon, label: "Set up your business" },
 ];
 
 const pageTitles: ReadonlyArray<[string, string]> = [
+  ["/admin/businesses", "Business (admin)"],
+  ["/admin/users", "People (admin)"],
+  ["/admin/jobs", "Failed jobs"],
+  ["/admin/audit", "Audit log"],
+  ["/admin", "Businesses (admin)"],
   ["/business/calendar", "Calendar"],
   ["/business/bookings", "Bookings"],
   ["/business/analytics", "Analytics"],
@@ -174,6 +190,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             />
           )}
         </div>
+
+        {user?.platformRole === "ADMIN" ? (
+          <div>
+            <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wide text-subtle">
+              Platform admin
+            </p>
+            <NavigationList items={adminNavigation} onNavigate={onNavigate} pathname={pathname} />
+          </div>
+        ) : null}
       </nav>
 
       <div className="border-t border-border p-3">
@@ -199,6 +224,26 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Reminds an admin signed in as someone else, and takes them back. */
+function ImpersonationBanner() {
+  const { user } = useAuth();
+  const endImpersonation = useEndImpersonation();
+
+  if (!user?.impersonatedBy) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warning-border bg-warning-soft px-4 py-2 text-sm text-warning-strong sm:px-6">
+      <span>
+        You&apos;re signed in as <strong>{user.fullName}</strong> ({user.email}). Changes are recorded as made by{" "}
+        {user.impersonatedBy}.
+      </span>
+      <Button onClick={() => void endImpersonation()} size="sm" variant="secondary">
+        Back to admin
+      </Button>
+    </div>
+  );
+}
+
 function NavigationList({
   items,
   onNavigate,
@@ -210,8 +255,8 @@ function NavigationList({
 }) {
   return (
     <div className="space-y-1">
-      {items.map(({ href, icon: Icon, label }) => {
-        const isActive = pathname === href || pathname.startsWith(`${href}/`);
+      {items.map(({ exact, href, icon: Icon, label }) => {
+        const isActive = pathname === href || (!exact && pathname.startsWith(`${href}/`));
 
         return (
           <Link
@@ -353,6 +398,7 @@ export function AppShell({ children }: AppShellProps) {
             {getPageTitle(pathname)}
           </h1>
         </header>
+        <ImpersonationBanner />
         <EmailVerificationBanner />
         <main id="main-content" tabIndex={-1}>{children}</main>
       </div>

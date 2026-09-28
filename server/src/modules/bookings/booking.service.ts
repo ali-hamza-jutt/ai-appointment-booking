@@ -120,6 +120,10 @@ export class BookingService {
     ]);
 
     if (!business) this.throwBusinessNotFound();
+    // Covers every way in: chats already open, staff bookings and reschedules.
+    if (business.suspendedAt) {
+      throw new AppError(403, ERROR_CODES.BUSINESS_SUSPENDED, ERROR_MESSAGES.BUSINESS_SUSPENDED);
+    }
     if (!service || (input.mode === "CUSTOMER" && !service.onlineBookable)) {
       this.throwServiceNotFound();
     }

@@ -298,6 +298,7 @@ export class BusinessService {
       currency: business.currency,
       settings: parseStoredBusinessSettings(business.settings),
       role,
+      suspension: business.suspendedAt ? { at: business.suspendedAt, reason: business.suspendedReason } : null,
       createdAt: business.createdAt,
       updatedAt: business.updatedAt,
     };

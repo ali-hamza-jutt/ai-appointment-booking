@@ -82,14 +82,16 @@ export class AuthService {
     });
   }
 
-  public async getCurrentUser(userId: string): Promise<AuthUserResponse> {
+  public async getCurrentUser(userId: string, impersonatorId?: string): Promise<AuthUserResponse> {
     const user = await authDal.findUserById(userId);
 
     if (!user) {
       throw new AppError(404, ERROR_CODES.USER_NOT_FOUND, ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
-    return toAuthUserResponse(user);
+    const impersonator = impersonatorId ? await authDal.findUserById(impersonatorId) : null;
+
+    return { ...toAuthUserResponse(user), impersonatedBy: impersonator?.fullName ?? null };
   }
 
   public async resendVerification(userId: string): Promise<void> {

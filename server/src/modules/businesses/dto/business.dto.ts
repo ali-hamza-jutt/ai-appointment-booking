@@ -117,6 +117,8 @@ export interface BusinessResponse {
   settings: BusinessSettings;
   /** Role of the requesting user in this business. */
   role: MembershipRole | null;
+  /** Set when a platform admin suspended the business: it takes no bookings and its team can only read. */
+  suspension: { at: Date; reason: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -236,6 +238,8 @@ export interface BusinessRecord {
   timeZone: string;
   currency: string;
   settings: unknown;
+  suspendedAt: Date | null;
+  suspendedReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -331,4 +335,5 @@ export interface CreateInvitationData {
 
 export interface AuthorizationMembershipRecord {
   role: MembershipRole;
+  business: { suspendedAt: Date | null };
 }

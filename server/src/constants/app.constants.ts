@@ -238,6 +238,7 @@ export const TENANT_SCOPE_FIELDS = {
   // Inbound messages find their business by the number they were sent to.
   MessagingNumber: ["businessId", "address"],
   DailyMetric: ["businessId"],
+  LlmUsage: ["businessId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -474,6 +475,16 @@ export const MESSAGING_CONSTANTS = {
   YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
 } as const;
 
+export const ADMIN_CONSTANTS = {
+  /** An admin's session as another user ends after this long. */
+  IMPERSONATION_TTL_SECONDS: 15 * 60,
+  LIST_LIMIT: 50,
+  AUDIT_LOG_LIMIT: 100,
+  FAILED_JOBS_PER_QUEUE: 50,
+  /** Spend shown for a business covers this many days. */
+  SPEND_DAYS: 30,
+} as const;
+
 export const ANALYTICS_CONSTANTS = {
   /** Longest range one analytics request may cover. */
   MAX_RANGE_DAYS: 92,
@@ -579,6 +590,11 @@ export const ERROR_CODES = {
   GUEST_CODE_RECENTLY_SENT: "GUEST_CODE_RECENTLY_SENT",
   ALLOWED_ORIGIN_NOT_FOUND: "ALLOWED_ORIGIN_NOT_FOUND",
   MESSAGING_NUMBER_TAKEN: "MESSAGING_NUMBER_TAKEN",
+  BUSINESS_SUSPENDED: "BUSINESS_SUSPENDED",
+  CANNOT_IMPERSONATE_ADMIN: "CANNOT_IMPERSONATE_ADMIN",
+  JOB_NOT_FOUND: "JOB_NOT_FOUND",
+  OUTBOX_EVENT_NOT_FOUND: "OUTBOX_EVENT_NOT_FOUND",
+  QUEUES_UNAVAILABLE: "QUEUES_UNAVAILABLE",
   MESSAGING_NUMBER_NOT_FOUND: "MESSAGING_NUMBER_NOT_FOUND",
   ALLOWED_ORIGIN_LIMIT_REACHED: "ALLOWED_ORIGIN_LIMIT_REACHED",
   SMS_NOT_CONFIGURED: "SMS_NOT_CONFIGURED",
@@ -667,6 +683,11 @@ export const ERROR_MESSAGES = {
   GUEST_CODE_RECENTLY_SENT: "A code was sent recently. Please wait a minute before asking again",
   ALLOWED_ORIGIN_NOT_FOUND: "That website is not on the list",
   MESSAGING_NUMBER_TAKEN: "This number is already connected to a business",
+  BUSINESS_SUSPENDED: "This business is suspended. Its team can view it but not make changes",
+  CANNOT_IMPERSONATE_ADMIN: "Platform admins can't be impersonated",
+  JOB_NOT_FOUND: "That job is not in the failed list any more",
+  OUTBOX_EVENT_NOT_FOUND: "That event was not found or was already delivered",
+  QUEUES_UNAVAILABLE: "Job queues are not configured (REDIS_URL is not set)",
   MESSAGING_NUMBER_NOT_FOUND: "That number is not connected",
   ALLOWED_ORIGIN_LIMIT_REACHED: "A business can allow at most 20 websites",
   SMS_NOT_CONFIGURED: "Text message delivery is not available yet",

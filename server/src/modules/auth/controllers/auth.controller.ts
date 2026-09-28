@@ -103,7 +103,9 @@ export class AuthController extends Controller {
   @Response<ApiErrorResponse>(401, "Access token is missing or invalid")
   @Response<ApiErrorResponse>(404, "User account was not found")
   public getCurrentUser(@Request() request: ExpressRequest): Promise<AuthUserResponse> {
-    return authService.getCurrentUser(getAuthenticatedUser(request).id);
+    const user = getAuthenticatedUser(request);
+
+    return authService.getCurrentUser(user.id, user.impersonatorId);
   }
 
   /** Optional sign-in methods available in this deployment. */

@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { BusinessResponseSuspension } from './businessResponseSuspension';
 import type { BusinessSettings } from './businessSettings';
 import type { BusinessVertical } from './businessVertical';
 import type { MembershipRole } from './membershipRole';
@@ -19,6 +20,11 @@ export interface BusinessResponse {
   settings: BusinessSettings;
   /** Role of the requesting user in this business. */
   role: MembershipRole | null;
+  /**
+     * Set when a platform admin suspended the business: it takes no bookings and its team can only read.
+     * @nullable
+     */
+  suspension: BusinessResponseSuspension;
   createdAt: string;
   updatedAt: string;
 }

@@ -82,6 +82,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/public/{slug}/guest/code` and `/guest/verify`: guest booking by emailed code; `/api/public/{slug}/embed` and `/api/businesses/{businessId}/allowed-origins`: where the booking widget may be embedded.
 - `POST /api/channels/twilio/inbound`: incoming SMS and WhatsApp messages (Twilio-signed); `/api/businesses/{businessId}/messaging-numbers`: the numbers a business takes them on.
 - `GET /api/businesses/{businessId}/analytics?from=&to=`: booking and assistant analytics between two local dates (owners and managers).
+- `/api/admin/*`: the platform admin's tools (businesses, suspension, people, impersonation, failed jobs, audit log), for users with `platformRole = ADMIN`.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -217,6 +218,16 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **Guests.** On a business's public page or widget, someone without an account enters their name, email and (optionally) phone, and gets a 6-digit code by email (10 minutes, 5 guesses, one per minute). Confirming it signs them in with a browser-session login, creating an account the first time; an existing account is signed in as it is, since the code proves the email. The phone number is saved on their customer record at that business. From there they use the same holds, confirmation and chat as any signed-in customer. A business with `allowGuestBooking` off refuses guest codes (403).
 - **Limits.** Everything under `/api/public` has its own per-IP limit (120 a minute); asking for a code uses the stricter limit of other code-sending endpoints.
 - **Widget.** `widget.js` (served by the web app) adds a button that opens `/embed/<slug>` in an iframe. The web app's proxy sets `Content-Security-Policy: frame-ancestors 'self' <allowed origins>` on that page from `GET /api/public/{slug}/embed`; every other page may only be framed by BookWise itself. The frame sends the host page nothing but a close request.
+
+## Platform admin
+
+Users with `platformRole = ADMIN` (set in the database) get `/api/admin/*` (`modules/admin`) and the web's `/admin` pages. Admins already pass every business permission check, so they can also open any business's dashboard.
+
+- **Tenants.** Every business with its owner, team size, bookings in the last 30 days and estimated model spend. Spend comes from `llm_usage`: the instrumented AI provider adds each chat model call's tokens and list-price cost to its business's row for the (UTC) day.
+- **Suspension.** A suspended business (`businesses.suspended_at`, with a reason its team sees) disappears from the public API, so no page, widget, chat, guest booking or new hold; incoming SMS and WhatsApp messages get no answer; and new bookings are refused wherever they come from. Its team can still read everything, but any request needing more than `business:read` gets 403 `BUSINESS_SUSPENDED`.
+- **Impersonation.** `POST /api/admin/users/{id}/impersonate` returns a 15-minute access token for that user carrying the admin's id (`imp` claim). There is no refresh token, so the admin's own session comes back when it ends; other admins can't be impersonated, and the borrowed session can't reach `/api/admin`. `/api/auth/me` reports `impersonatedBy`, and the web shows a banner with a way back.
+- **Audit log.** `admin_audit_logs` records impersonation starts, every non-GET request made while impersonating (method and path), suspensions, and retried or replayed work.
+- **Failed work.** Failed BullMQ jobs on every queue can be retried, and outbox events the relay gave up on (10 attempts) can be replayed; consumers are idempotent, so repeats are safe.
 
 ## Analytics
 

@@ -17,6 +17,8 @@ export const businessSelect = {
   timeZone: true,
   currency: true,
   settings: true,
+  suspendedAt: true,
+  suspendedReason: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -50,8 +52,9 @@ export class BusinessDal {
   }
 
   public findPublicBusinessBySlug(slug: string): Promise<PublicBusinessRecord | null> {
+    // A suspended business can't be booked, chatted with or embedded.
     return prisma.business.findUnique({
-      where: { slug },
+      where: { slug, suspendedAt: null },
       select: {
         id: true,
         slug: true,
@@ -103,7 +106,7 @@ export class BusinessDal {
   ): Promise<AuthorizationMembershipRecord | null> {
     return prisma.membership.findUnique({
       where: { userId_businessId: { userId, businessId } },
-      select: { role: true },
+      select: { role: true, business: { select: { suspendedAt: true } } },
     });
   }
 

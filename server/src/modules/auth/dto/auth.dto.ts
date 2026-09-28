@@ -20,6 +20,9 @@ export interface AuthUserResponse {
   phone: string | null;
   /** False for accounts that only sign in with Google. */
   hasPassword: boolean;
+  platformRole: "USER" | "ADMIN";
+  /** The platform admin acting as this user, when this is an impersonation session. */
+  impersonatedBy: string | null;
 }
 
 /**
@@ -109,6 +112,7 @@ export interface PublicUserRecord {
   emailVerifiedAt: Date | null;
   phone: string | null;
   passwordHash: string | null;
+  platformRole: "USER" | "ADMIN";
 }
 
 export interface GoogleUserRecord extends PublicUserRecord {
