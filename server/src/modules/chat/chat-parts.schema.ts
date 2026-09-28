@@ -28,6 +28,14 @@ export const chatActionSchema: z.ZodType<ChatAction> = z.discriminatedUnion("typ
     bookingId: z.uuid(),
     slotToken: z.string().min(10).max(1_000),
   }),
+  z.object({
+    type: z.literal("join_waitlist"),
+    serviceId: z.uuid(),
+    staffId: z.uuid().optional(),
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    partOfDay: z.enum(["morning", "afternoon", "evening"]).optional(),
+  }),
 ]);
 
 const partSchema: z.ZodType<ChatMessagePart> = z.discriminatedUnion("type", [

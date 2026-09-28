@@ -210,7 +210,7 @@ export class BookingService {
         notes: input.notes,
         holdExpiresAt:
           input.initialStatus === "HELD"
-            ? new Date(now.getTime() + policy.holdMinutes * MILLISECONDS_PER_MINUTE)
+            ? new Date(now.getTime() + (input.holdMinutes ?? policy.holdMinutes) * MILLISECONDS_PER_MINUTE)
             : null,
       },
       input.actor,
@@ -281,7 +281,8 @@ export class BookingService {
     userId: string;
     chatSessionId: string | null;
     notes: string | null;
-    source: "FORM" | "CHAT";
+    source: "FORM" | "CHAT" | "WAITLIST";
+    holdMinutes?: number;
   }): Promise<BookingRecord> {
     const user = await bookingDal.findUser(input.userId);
 
@@ -306,6 +307,7 @@ export class BookingService {
       mode: "CUSTOMER",
       initialStatus: "HELD",
       ...(input.staffId ? { staffId: input.staffId } : {}),
+      ...(input.holdMinutes ? { holdMinutes: input.holdMinutes } : {}),
     });
   }
 

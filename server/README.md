@@ -76,6 +76,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses/{businessId}/customers`: customer records with search and cursor pagination.
 - `/api/businesses/{businessId}/calendar-connections` and `/staff/{staffId}/calendar-connection`: connect (returns the provider's consent URL), sync or disconnect a staff member's Google or Microsoft 365 calendar. `/api/calendar/providers` says which providers are configured.
 - `/api/businesses/{businessId}/payments/account`: the business's Stripe account (onboarding link, status refresh, dashboard link); `/bookings/{bookingId}/payments` and `/refunds` show and refund a booking's payment. Customers reopen Checkout with `POST /api/appointments/{id}/payment`.
+- `/api/me/waitlist`: a customer's waits (join, list, leave); `/api/businesses/{businessId}/waitlist` shows staff who is waiting.
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -197,6 +198,14 @@ Services can ask for a deposit or the full price online (`paymentMode` `DEPOSIT`
 - **Confirmation comes from Stripe.** `POST /api/webhooks/stripe` checks Stripe's signature over the raw body and records each event once (`stripe_webhook_events`); a failed event is released so Stripe's retry runs it again. `checkout.session.completed` confirms the booking (or sends it for approval). A payment that arrives after the booking lost its time is refunded automatically.
 - **Unpaid bookings.** When the payment window closes, the booking expires like a hold, its time is freed, and its Checkout session is closed.
 - **Refunds.** When a paid booking is cancelled, an outbox consumer refunds it: in full when the business cancels or the customer cancels before the cancellation window, and less the service's deposit inside it. No-shows keep the payment. Staff with manage rights can refund all or part of a payment from the booking. Refunds made in Stripe are picked up from `charge.refunded`, and every refund uses an idempotency key so retries never refund twice.
+
+## Waitlist
+
+Customers who find nothing suitable can wait for a service between two dates, optionally for one provider or part of the day (`modules/waitlist`). They join from the booking chat (a "Join the waitlist" button when nothing is open, or the agent's `join_waitlist` tool once they agree) or through `POST /api/me/waitlist`. Joining the same wait twice returns the first entry, and a customer can have at most 5 waits at a business.
+
+- **A freed time is offered in turn.** When a booking is cancelled or a hold expires, an outbox consumer walks the waiting customers for that service in the order they joined and picks the first whose dates and part of day (in their own time zone) and provider suit the time. It holds the time for them as a `WAITLIST` booking for 15 minutes and emails or texts them a link to confirm it (`WAITLIST_OFFER`, rewordable like other messages). A deposit, if the service asks for one, is taken when they confirm.
+- **If they don't take it, it moves on.** A lapsed or released hold marks the offer `LAPSED` or `DECLINED`, puts the customer back in line and offers the time to the next person; nobody is offered the same time twice. Confirming marks the entry `BOOKED`.
+- **When the time can't be held,** because it was taken again, is now too soon, or is outside the booking window, the search stops, since no one else could book it either.
 
 ## Calendar sync
 

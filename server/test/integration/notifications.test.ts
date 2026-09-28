@@ -347,7 +347,8 @@ describe("booking notifications", () => {
 
     const listed = await request(app).get(base).set(...authHeader(setup.owner)).expect(200);
 
-    expect(listed.body.items).toHaveLength(10);
+    // Six kinds of message, each by email and SMS.
+    expect(listed.body.items).toHaveLength(12);
     expect(listed.body.items.filter((item: { isCustom: boolean }) => item.isCustom)).toEqual([
       expect.objectContaining({ channel: "EMAIL", kind: "BOOKING_CONFIRMED", subject: "See you {{date}}!" }),
     ]);

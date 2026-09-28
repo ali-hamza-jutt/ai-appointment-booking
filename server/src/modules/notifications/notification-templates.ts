@@ -12,6 +12,7 @@ export const NOTIFICATION_KINDS: NotificationKind[] = [
   "BOOKING_RESCHEDULED",
   "BOOKING_CANCELLED",
   "BOOKING_REMINDER",
+  "WAITLIST_OFFER",
 ];
 
 export const TEMPLATE_VARIABLES = [
@@ -24,6 +25,7 @@ export const TEMPLATE_VARIABLES = [
   { name: "timeZone", description: "The time zone the date and time are in" },
   { name: "location", description: "Where the appointment is" },
   { name: "link", description: "Where the customer can view, move or cancel it" },
+  { name: "heldUntil", description: "When a time held for a waitlisted customer is released (waitlist offers)" },
 ] as const satisfies readonly NotificationTemplateVariable[];
 
 export type TemplateVariableName = (typeof TEMPLATE_VARIABLES)[number]["name"];
@@ -60,6 +62,10 @@ export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationK
       subject: "Reminder: {{serviceName}} on {{date}} at {{time}}",
       body: `Hi {{customerName}},\n\nA reminder that your {{serviceName}} with {{staffName}} is on {{date}} at {{time}} ({{timeZone}}).\n\nWhere: {{location}}${EMAIL_SIGN_OFF}`,
     },
+    WAITLIST_OFFER: {
+      subject: "A time opened up: {{serviceName}} on {{date}} at {{time}}",
+      body: "Hi {{customerName}},\n\nA time you were waiting for has opened up. {{serviceName}} with {{staffName}} on {{date}} at {{time}} ({{timeZone}}) is held for you until {{heldUntil}}.\n\nConfirm it here before then: {{link}}\n\nIf you don't, it goes to the next person on the waitlist.\n\n{{businessName}}",
+    },
   },
   SMS: {
     BOOKING_CONFIRMED: {
@@ -81,6 +87,10 @@ export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationK
     BOOKING_REMINDER: {
       subject: null,
       body: "Reminder from {{businessName}}: {{serviceName}} with {{staffName}} on {{date}} at {{time}}. Manage it: {{link}}",
+    },
+    WAITLIST_OFFER: {
+      subject: null,
+      body: "{{businessName}}: {{serviceName}} on {{date}} at {{time}} opened up and is held for you until {{heldUntil}}. Confirm: {{link}}",
     },
   },
 };

@@ -7,6 +7,7 @@ const SOURCE_LABELS: Record<AppointmentResponse["source"], string> = {
   CHAT: "BookWise AI assistant",
   FORM: "Booking form",
   STAFF: "Booked by the business",
+  WAITLIST: "Waitlist",
 };
 
 export function toAppointmentViewModel(

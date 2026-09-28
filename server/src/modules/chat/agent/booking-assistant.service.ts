@@ -22,12 +22,15 @@ import type { CustomerPreferenceKey } from "../../customers/dto/customer-profile
 import { knowledgeService } from "../../knowledge/knowledge.service.js";
 import type { PublicServiceResponse } from "../../catalog/dto/catalog.dto.js";
 import { staffService } from "../../staff/staff.service.js";
+import type { WaitlistEntryResponse } from "../../waitlist/dto/waitlist.dto.js";
+import { waitlistService } from "../../waitlist/waitlist.service.js";
 import { chatService } from "../chat.service.js";
 import type {
   ChatAction,
   ChatBookingSummary,
   ChatMessagePart,
   ChatSlotOption,
+  JoinWaitlistAction,
 } from "../dto/chat.dto.js";
 
 /** Who and where a turn runs for; tools only ever act inside this. */
@@ -178,12 +181,25 @@ export class BookingAssistantService {
         exclude,
       );
 
+      const waitlist = this.waitlistButton({
+        serviceId: service.id,
+        fromDate: from,
+        toDate: addDaysToLocalDate(from, days - 1),
+        ...(staffId ? { staffId } : {}),
+        ...(input.partOfDay ? { partOfDay: input.partOfDay } : {}),
+      });
+
       return {
         data: {
           service: service.name,
           slots: [],
           nextAvailable: next[0] ? this.describeSlot(next[0], context.timeZone) : null,
+          // Rescheduling moves an existing booking, which the waitlist does not do.
+          ...(input.rescheduleBookingId
+            ? {}
+            : { waitlist: "The customer can join the waitlist for these dates (join_waitlist, or the button shown)." }),
         },
+        ...(input.rescheduleBookingId ? {} : { parts: [waitlist] }),
       };
     }
 
@@ -513,7 +529,63 @@ export class BookingAssistantService {
       }
       case "confirm_booking":
         throw new AppError(422, ERROR_CODES.REQUEST_VALIDATION_FAILED, "Confirm a held booking with the confirm endpoint");
+      case "join_waitlist": {
+        const entry = await waitlistService.joinAt(context.userId, context.business, {
+          ...action,
+          timeZone: context.timeZone,
+        });
+
+        return { content: this.waitlistMessage(entry), parts: [] };
+      }
     }
+  }
+
+  /** Puts the customer on the waitlist when no open time suits them. */
+  public async joinWaitlist(
+    context: AssistantContext,
+    input: {
+      serviceId: string;
+      fromDate: string;
+      toDate?: string | undefined;
+      staffId?: string | undefined;
+      partOfDay?: PartOfDay | undefined;
+    },
+  ): Promise<Result> {
+    const entry = await waitlistService.joinAt(context.userId, context.business, {
+      serviceId: input.serviceId,
+      fromDate: input.fromDate,
+      toDate: input.toDate ?? addDaysToLocalDate(input.fromDate, AGENT_CONSTANTS.MAX_AVAILABILITY_DAYS - 1),
+      staffId: input.staffId,
+      partOfDay: input.partOfDay,
+      timeZone: context.timeZone,
+    });
+
+    return {
+      data: {
+        joined: { service: entry.service.name, from: entry.fromDate, to: entry.toDate, partOfDay: entry.partOfDay },
+        next: "Tell the customer they are on the waitlist and will get a message with 15 minutes to confirm if a time opens up.",
+      },
+    };
+  }
+
+  private waitlistButton(action: Omit<JoinWaitlistAction, "type">): ChatMessagePart {
+    return {
+      type: "confirm",
+      label: "Join the waitlist",
+      description: "We'll hold the first time that opens up and let you know.",
+      tone: "primary",
+      action: { type: "join_waitlist", ...action },
+    };
+  }
+
+  private waitlistMessage(entry: WaitlistEntryResponse): string {
+    const day = (date: string) =>
+      new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(
+        new Date(`${date}T12:00:00Z`),
+      );
+    const range = entry.fromDate === entry.toDate ? day(entry.fromDate) : `${day(entry.fromDate)} to ${day(entry.toDate)}`;
+
+    return `You're on the waitlist for ${entry.service.name}${entry.staff ? ` with ${entry.staff.name}` : ""}, ${range}${entry.partOfDay ? ` (${entry.partOfDay}s)` : ""}. If a time opens up, I'll hold it for you for 15 minutes and send you a link to confirm.`;
   }
 
   /** Open times near a slot that could not be held, as a picker. */

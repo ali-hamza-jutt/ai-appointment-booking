@@ -20,6 +20,7 @@ const values: TemplateValues = {
   timeZone: "Europe/London",
   location: "Main studio, 12 High Street, Manchester",
   link: "https://bookwise.example/appointments/0c1b2a3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  heldUntil: "10:45 AM",
 };
 
 describe("notification templates", () => {
