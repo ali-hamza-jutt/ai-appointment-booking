@@ -34,3 +34,9 @@ ALTER TABLE "guest_codes" ADD CONSTRAINT "guest_codes_business_id_fkey" FOREIGN 
 -- AddForeignKey
 ALTER TABLE "allowed_origins" ADD CONSTRAINT "allowed_origins_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+-- Guests who booked with an emailed code have neither a password nor Google;
+-- their verified email is how they sign in (another code, or a password reset).
+ALTER TABLE "users" DROP CONSTRAINT "users_sign_in_method_check";
+ALTER TABLE "users" ADD CONSTRAINT "users_sign_in_method_check"
+  CHECK ("password_hash" IS NOT NULL OR "google_subject" IS NOT NULL OR "email_verified_at" IS NOT NULL);
