@@ -631,6 +631,11 @@ function BookingExperience({
                   key={message.id}
                 >
                   <div className="max-w-[82%]">
+                    {message.sentBy ? (
+                      <p className="mb-1 text-[11px] font-semibold text-muted">
+                        {message.sentBy} from {businessName}
+                      </p>
+                    ) : null}
                     <div
                       className={cn(
                         "px-4 py-3 text-sm leading-6",
@@ -948,6 +953,7 @@ function toBookingMessageViewModel(
       ? { parts: message.structuredData.parts }
       : {}),
     role: message.role === "USER" ? "user" : "assistant",
+    ...(message.structuredData?.sentBy ? { sentBy: message.structuredData.sentBy.name } : {}),
     text: message.content,
   };
 }

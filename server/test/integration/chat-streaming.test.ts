@@ -243,7 +243,7 @@ describe("chat streaming", () => {
 
       await addTestMember(setup.owner, setup.business, staff, "STAFF");
 
-      const stream = await listen(`/api/businesses/${setup.business.id}/chat-events`, staff);
+      const stream = await listen(`/api/businesses/${setup.business.id}/events`, staff);
 
       provider.script({ tools: [{ name: "handoff_to_human", args: { reason: "Wants a person" } }] }, { text: "Someone will follow up." });
       await postStream({ clientMessageId: randomUUID(), content: "Can I talk to someone?", timeZone: "UTC" }).expect(200);

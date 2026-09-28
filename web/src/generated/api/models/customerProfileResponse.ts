@@ -14,6 +14,11 @@ import type { CustomerVisitResponse } from './customerVisitResponse';
  */
 export interface CustomerProfileResponse {
   customer: CustomerResponse;
+  /**
+     * The team's private notes about the customer.
+     * @nullable
+     */
+  notes: string | null;
   preferences: CustomerPreferenceResponse[];
   completedVisits: number;
   noShows: number;

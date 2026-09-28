@@ -23,6 +23,11 @@ export interface CreateCustomerRequest {
   phone?: string;
 }
 
+export interface UpdateCustomerNotesRequest {
+  /** Private to the team; null or empty clears them. @maxLength 2000 */
+  notes: string | null;
+}
+
 export interface ListCustomersOptions {
   search?: string;
   cursor?: string;
@@ -35,6 +40,7 @@ export interface CustomerRecord {
   name: string;
   email: string | null;
   phone: string | null;
+  notes: string | null;
   createdAt: Date;
 }
 

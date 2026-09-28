@@ -21,6 +21,7 @@ import {
   CloseIcon,
   ContactIcon,
   ConversationsIcon,
+  ListIcon,
   LogoutIcon,
   MailIcon,
   MenuIcon,
@@ -57,7 +58,8 @@ const navigation: NavigationItem[] = [
 ];
 
 const businessNavigation: NavigationItem[] = [
-  { href: "/business/bookings", icon: CalendarIcon, label: "Bookings" },
+  { href: "/business/calendar", icon: CalendarIcon, label: "Calendar" },
+  { href: "/business/bookings", icon: ListIcon, label: "Bookings" },
   { href: "/business/services", icon: TagIcon, label: "Services" },
   { href: "/business/staff", icon: UserIcon, label: "Staff" },
   { href: "/business/availability", icon: ClockIcon, label: "Availability" },
@@ -69,7 +71,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/knowledge", icon: BookIcon, label: "Knowledge base" },
   { href: "/business/notifications", icon: MailIcon, label: "Notifications" },
   { href: "/business/payments", icon: TagIcon, label: "Payments" },
-  { href: "/business/handoffs", icon: ChatIcon, label: "Chat handoffs" },
+  { href: "/business/handoffs", icon: ChatIcon, label: "Inbox" },
 ];
 
 const setupNavigation: NavigationItem[] = [
@@ -77,6 +79,7 @@ const setupNavigation: NavigationItem[] = [
 ];
 
 const pageTitles: ReadonlyArray<[string, string]> = [
+  ["/business/calendar", "Calendar"],
   ["/business/bookings", "Bookings"],
   ["/business/setup", "Set up your business"],
   ["/business/services", "Services"],
@@ -90,7 +93,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/knowledge", "Knowledge base"],
   ["/business/notifications", "Notifications"],
   ["/business/payments", "Payments"],
-  ["/business/handoffs", "Chat handoffs"],
+  ["/business/handoffs", "Inbox"],
 ];
 
 function getPageTitle(pathname: string) {

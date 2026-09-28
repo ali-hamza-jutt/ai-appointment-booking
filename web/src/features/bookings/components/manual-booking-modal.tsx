@@ -30,6 +30,10 @@ type CustomerMode = "existing" | "new";
 interface ManualBookingModalProps {
   businessId: string;
   initialDate: string;
+  /** Pre-selects this provider, for example from a calendar column. */
+  initialStaffId?: string;
+  /** Pre-selects this time once it shows up among the open times. */
+  initialStartsAt?: string;
   onClose: () => void;
   onCreated: (booking: BookingResponse) => void;
   services: ServiceResponse[];
@@ -40,6 +44,8 @@ interface ManualBookingModalProps {
 export function ManualBookingModal({
   businessId,
   initialDate,
+  initialStaffId,
+  initialStartsAt,
   onClose,
   onCreated,
   services,
@@ -53,10 +59,17 @@ export function ManualBookingModal({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [staffId, setStaffId] = useState("");
+  const [serviceId, setServiceId] = useState(() => {
+    const provider = staff.find((member) => member.id === initialStaffId);
+    const offered = services.find((service) => provider?.services.some((item) => item.serviceId === service.id));
+
+    return (offered ?? services[0])?.id ?? "";
+  });
+  const [staffId, setStaffId] = useState(initialStaffId ?? "");
   const [date, setDate] = useState(initialDate);
-  const [slot, setSlot] = useState<AvailableSlot | null>(null);
+  const [picked, setPicked] = useState<AvailableSlot | null>(null);
+  // The clicked time counts as picked until the user changes the service, provider or date.
+  const [preferredStartsAt, setPreferredStartsAt] = useState(initialStartsAt ?? null);
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(
@@ -76,6 +89,16 @@ export function ManualBookingModal({
     ...(staffId ? { staffId } : {}),
   });
   const error = createMutation.error;
+  const slot =
+    picked ??
+    (preferredStartsAt
+      ? (daySlots.slots.find((open) => new Date(open.startsAt).getTime() === new Date(preferredStartsAt).getTime()) ?? null)
+      : null);
+
+  function setSlot(next: AvailableSlot | null) {
+    setPicked(next);
+    setPreferredStartsAt(null);
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

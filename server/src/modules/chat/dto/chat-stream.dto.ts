@@ -27,3 +27,14 @@ export type ChatRealtimeEvent =
   | { type: "message"; sessionId: string; businessId: string; messageId: string; role: "USER" | "ASSISTANT" }
   | { type: "session"; sessionId: string; businessId: string; status: string }
   | { type: "handoff"; sessionId: string; businessId: string; state: "requested" | "resolved" };
+
+/** A booking at the business changed; the dashboard refetches its calendar. */
+export interface BookingRealtimeEvent {
+  type: "booking";
+  businessId: string;
+  bookingId: string;
+  status: string;
+}
+
+/** Everything on a business's event stream. */
+export type BusinessRealtimeEvent = ChatRealtimeEvent | BookingRealtimeEvent;

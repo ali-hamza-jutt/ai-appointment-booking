@@ -34,6 +34,8 @@ export interface CustomerVisitResponse {
 /** A customer as the business sees them: preferences and visit history. */
 export interface CustomerProfileResponse {
   customer: CustomerResponse;
+  /** The team's private notes about the customer. */
+  notes: string | null;
   preferences: CustomerPreferenceResponse[];
   completedVisits: number;
   noShows: number;

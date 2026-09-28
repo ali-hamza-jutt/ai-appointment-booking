@@ -11,6 +11,7 @@ export const customerSelect = {
   name: true,
   email: true,
   phone: true,
+  notes: true,
   createdAt: true,
 } as const;
 
@@ -27,6 +28,13 @@ export class CustomerDal {
       where: { businessId, id: customerId },
       select: customerSelect,
     });
+  }
+
+  /** Replaces the team's notes; false when the customer isn't at this business. */
+  public async updateNotes(businessId: string, customerId: string, notes: string | null): Promise<boolean> {
+    const result = await prisma.customer.updateMany({ where: { businessId, id: customerId }, data: { notes } });
+
+    return result.count === 1;
   }
 
   public listCustomers(data: ListCustomersData): Promise<CustomerRecord[]> {

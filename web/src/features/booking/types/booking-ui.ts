@@ -10,6 +10,8 @@ export interface ChatMessageViewModel {
   /** Cards and buttons that come with an assistant reply. */
   parts?: ChatMessagePart[];
   role: ChatMessageRole;
+  /** First name of the staff member who wrote an assistant message, when a person did. */
+  sentBy?: string;
   text: string;
 }
 

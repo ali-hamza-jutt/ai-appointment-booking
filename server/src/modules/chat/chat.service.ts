@@ -48,6 +48,10 @@ import type {
   SaveChatSummaryData,
 } from "./dto/chat.dto.js";
 
+function isAuthor(value: unknown): value is { name: string } {
+  return typeof value === "object" && value !== null && typeof (value as { name?: unknown }).name === "string";
+}
+
 export class ChatService {
   public async createSession(
     userId: string,
@@ -591,6 +595,7 @@ export class ChatService {
         ? { confirmationRequired: metadata.confirmationRequired }
         : {}),
       ...(metadata.appointmentId !== undefined ? { appointmentId: metadata.appointmentId } : {}),
+      ...(metadata.sentBy ? { sentBy: { name: metadata.sentBy.name } } : {}),
     };
   }
 
@@ -617,6 +622,7 @@ export class ChatService {
       ...(typeof metadata.appointmentId === "string"
         ? { appointmentId: metadata.appointmentId }
         : {}),
+      ...(isAuthor(metadata.sentBy) ? { sentBy: { name: metadata.sentBy.name } } : {}),
     };
   }
 

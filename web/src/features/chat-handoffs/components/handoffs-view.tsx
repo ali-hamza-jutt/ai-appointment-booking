@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,15 +9,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { ChatIcon, CheckCircleIcon, MailIcon, PhoneIcon } from "@/components/ui/icons";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { TextAreaField } from "@/components/ui/form-controls";
 import { SectionCard } from "@/components/ui/section-card";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
-import { useBusinessChatEvents } from "@/features/chat-handoffs/hooks/use-business-chat-events";
+import { useBusinessEvents } from "@/features/business-settings/hooks/use-business-events";
 import {
+  getGetHandoffThreadQueryKey,
   getListHandoffsQueryKey,
+  useGetHandoffThread,
   useListHandoffs,
+  useReplyToHandoff,
   useResolveHandoff,
 } from "@/generated/api/chat-handoffs/chat-handoffs";
-import type { BusinessSummaryResponse, ChatHandoffResponse } from "@/generated/api/models";
+import type { BusinessSummaryResponse, ChatHandoffMessage, ChatHandoffResponse } from "@/generated/api/models";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
@@ -30,7 +35,7 @@ export function HandoffsView() {
 
 function HandoffsContent({ business }: { business: BusinessSummaryResponse }) {
   const timeZone = useBrowserTimeZone();
-  const isLive = useBusinessChatEvents(business.id);
+  const isLive = useBusinessEvents(business.id);
   const handoffsQuery = useListHandoffs(business.id, {
     // Poll only while the live channel is down.
     query: { refetchInterval: isLive ? false : HANDOFF_POLL_INTERVAL_MS },
@@ -46,8 +51,8 @@ function HandoffsContent({ business }: { business: BusinessSummaryResponse }) {
             {isLive ? "Live" : "Reconnecting"}
           </Badge>
         }
-        description="Chats where the assistant asked for a person. Get in touch with the customer, then mark it resolved."
-        title="Chat handoffs"
+        description="Chats where the assistant asked for a person. Reply in the chat as the business, or get in touch another way, then mark it resolved."
+        title="Inbox"
       />
 
       {handoffsQuery.error ? (
@@ -85,6 +90,9 @@ function HandoffCard({
 }) {
   const queryClient = useQueryClient();
   const resolveMutation = useResolveHandoff();
+  const [showWholeChat, setShowWholeChat] = useState(false);
+  const threadQuery = useGetHandoffThread(businessId, handoff.sessionId, { query: { enabled: showWholeChat } });
+  const messages = showWholeChat && threadQuery.data ? threadQuery.data.messages : handoff.recentMessages;
 
   return (
     <SectionCard
@@ -128,24 +136,90 @@ function HandoffCard({
           </a>
         ) : null}
       </div>
+      {showWholeChat ? null : (
+        <Button className="mb-3" isLoading={threadQuery.isFetching} onClick={() => setShowWholeChat(true)} size="sm" variant="ghost">
+          Show the whole chat
+        </Button>
+      )}
       <ol className="space-y-2">
-        {handoff.recentMessages.map((message, index) => (
-          <li
-            className={cn(
-              "max-w-[85%] rounded-xl px-3 py-2 text-sm",
-              message.role === "USER"
-                ? "ml-auto bg-brand-soft text-ink"
-                : "border border-border bg-surface-subtle text-ink-soft",
-            )}
-            key={index}
-          >
-            <span className="block text-[11px] font-semibold text-muted">
-              {message.role === "USER" ? handoff.customer.name : "Assistant"} · {formatDateTime(message.createdAt, timeZone)}
-            </span>
-            {message.content}
-          </li>
+        {messages.map((message) => (
+          <MessageBubble customerName={handoff.customer.name} key={message.id} message={message} timeZone={timeZone} />
         ))}
       </ol>
+      <ReplyForm businessId={businessId} sessionId={handoff.sessionId} />
     </SectionCard>
+  );
+}
+
+function MessageBubble({
+  customerName,
+  message,
+  timeZone,
+}: {
+  customerName: string;
+  message: ChatHandoffMessage;
+  timeZone: string;
+}) {
+  const author = message.role === "USER" ? customerName : message.sentBy ? `${message.sentBy} (team)` : "Assistant";
+
+  return (
+    <li
+      className={cn(
+        "max-w-[85%] rounded-xl px-3 py-2 text-sm",
+        message.role === "USER"
+          ? "ml-auto bg-brand-soft text-ink"
+          : message.sentBy
+            ? "border border-brand/30 bg-surface text-ink"
+            : "border border-border bg-surface-subtle text-ink-soft",
+      )}
+    >
+      <span className="block text-[11px] font-semibold text-muted">
+        {author} · {formatDateTime(message.createdAt, timeZone)}
+      </span>
+      <span className="whitespace-pre-wrap">{message.content}</span>
+    </li>
+  );
+}
+
+/** Replies in the customer's chat under the staff member's first name. */
+function ReplyForm({ businessId, sessionId }: { businessId: string; sessionId: string }) {
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState("");
+  const replyMutation = useReplyToHandoff({
+    mutation: {
+      onSuccess: () => {
+        setContent("");
+        void queryClient.invalidateQueries({ queryKey: getListHandoffsQueryKey(businessId) });
+        void queryClient.invalidateQueries({ queryKey: getGetHandoffThreadQueryKey(businessId, sessionId) });
+      },
+    },
+  });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmed = content.trim();
+
+    if (trimmed) replyMutation.mutate({ businessId, sessionId, data: { content: trimmed } });
+  }
+
+  return (
+    <form className="mt-4 space-y-2" onSubmit={handleSubmit}>
+      <TextAreaField
+        hint="The customer sees this in their chat, under your first name."
+        id={`reply-${sessionId}`}
+        label="Reply as the business"
+        maxLength={4_000}
+        onChange={(event) => setContent(event.target.value)}
+        rows={2}
+        value={content}
+      />
+      {replyMutation.error ? (
+        <Alert tone="danger">{getApiErrorMessage(replyMutation.error, "Your reply could not be sent.")}</Alert>
+      ) : null}
+      <Button disabled={!content.trim()} isLoading={replyMutation.isPending} size="sm" type="submit">
+        Send reply
+      </Button>
+    </form>
   );
 }

@@ -1,7 +1,7 @@
 import { logger } from "../../config/logger.js";
 import { REALTIME_CONSTANTS } from "../../constants/app.constants.js";
 import { realtimeBus } from "../../infrastructure/realtime/realtime-bus.js";
-import type { ChatRealtimeEvent } from "./dto/chat-stream.dto.js";
+import type { BookingRealtimeEvent, ChatRealtimeEvent } from "./dto/chat-stream.dto.js";
 
 export const chatChannels = {
   session: (sessionId: string) => `${REALTIME_CONSTANTS.SESSION_CHANNEL_PREFIX}:${sessionId}`,
@@ -20,4 +20,13 @@ export function publishChatEvent(event: ChatRealtimeEvent): void {
   ]).catch((error: unknown) => {
     logger.warn({ err: error, type: event.type }, "Chat event could not be published");
   });
+}
+
+/** Tells the business dashboard that a booking changed. */
+export async function publishBookingEvent(event: BookingRealtimeEvent): Promise<void> {
+  try {
+    await realtimeBus.publish(chatChannels.business(event.businessId), event);
+  } catch (error) {
+    logger.warn({ err: error, bookingId: event.bookingId }, "Booking event could not be published");
+  }
 }
