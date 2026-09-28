@@ -237,6 +237,7 @@ export const TENANT_SCOPE_FIELDS = {
   AllowedOrigin: ["businessId"],
   // Inbound messages find their business by the number they were sent to.
   MessagingNumber: ["businessId", "address"],
+  DailyMetric: ["businessId"],
 } as const;
 
 export const APPOINTMENT_CONSTANTS = {
@@ -471,6 +472,16 @@ export const MESSAGING_CONSTANTS = {
   /** Accounts made for people who only text: this address never receives mail. */
   PLACEHOLDER_EMAIL_DOMAIN: "phone.bookwise.invalid",
   YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
+} as const;
+
+export const ANALYTICS_CONSTANTS = {
+  /** Longest range one analytics request may cover. */
+  MAX_RANGE_DAYS: 92,
+  /** Days recomputed each night, so late check-ins, completions and cancellations are caught. */
+  RECOMPUTE_DAYS: 3,
+  NIGHTLY_JOB: "compute-daily-metrics",
+  /** 02:15 UTC every day. */
+  NIGHTLY_PATTERN: "15 2 * * *",
 } as const;
 
 export const REVIEW_CONSTANTS = {

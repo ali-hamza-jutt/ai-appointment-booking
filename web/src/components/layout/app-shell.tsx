@@ -16,6 +16,7 @@ import {
   BookIcon,
   BuildingIcon,
   CalendarIcon,
+  ChartIcon,
   ChatIcon,
   ClockIcon,
   CloseIcon,
@@ -60,6 +61,7 @@ const navigation: NavigationItem[] = [
 const businessNavigation: NavigationItem[] = [
   { href: "/business/calendar", icon: CalendarIcon, label: "Calendar" },
   { href: "/business/bookings", icon: ListIcon, label: "Bookings" },
+  { href: "/business/analytics", icon: ChartIcon, label: "Analytics" },
   { href: "/business/services", icon: TagIcon, label: "Services" },
   { href: "/business/staff", icon: UserIcon, label: "Staff" },
   { href: "/business/availability", icon: ClockIcon, label: "Availability" },
@@ -81,6 +83,7 @@ const setupNavigation: NavigationItem[] = [
 const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/calendar", "Calendar"],
   ["/business/bookings", "Bookings"],
+  ["/business/analytics", "Analytics"],
   ["/business/setup", "Set up your business"],
   ["/business/services", "Services"],
   ["/business/staff", "Staff"],

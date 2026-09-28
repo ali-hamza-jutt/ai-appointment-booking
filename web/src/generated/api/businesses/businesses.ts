@@ -29,12 +29,14 @@ import type {
   AddMessagingNumberRequest,
   AllowedOriginListResponse,
   AllowedOriginResponse,
+  AnalyticsResponse,
   ApiErrorResponse,
   BusinessListResponse,
   BusinessResponse,
   BusinessVerticalListResponse,
   CreateBusinessRequest,
   CreateLocationRequest,
+  GetAnalyticsParams,
   LocationListResponse,
   LocationResponse,
   MessagingNumberListResponse,
@@ -1247,6 +1249,120 @@ export function useListBusinessVerticals<TData = Awaited<ReturnType<typeof listB
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListBusinessVerticalsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetAnalyticsUrl = (businessId: string,
+    params?: GetAnalyticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/businesses/${businessId}/analytics?${stringifiedParams}` : `/businesses/${businessId}/analytics`
+}
+
+/**
+ * Bookings, revenue, cancellations, no-shows, busiest hours, provider
+ * utilisation and how the assistant is doing, between two local dates
+ * (inclusive, at most 92 days). Defaults to the last 30 days.
+ */
+export const getAnalytics = async (businessId: string,
+    params?: GetAnalyticsParams, options?: Parameters<typeof apiFetch>[1]): Promise<AnalyticsResponse> => {
+
+  return apiFetch<AnalyticsResponse>(getGetAnalyticsUrl(businessId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAnalyticsQueryKey = (businessId: string,
+    params?: GetAnalyticsParams,) => {
+    return [
+    `/businesses/${businessId}/analytics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getAnalytics>>, TError = ErrorType<ApiErrorResponse>>(businessId: string,
+    params?: GetAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAnalyticsQueryKey(businessId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalytics>>> = ({ signal }) => getAnalytics(businessId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getAnalytics>>>
+export type GetAnalyticsQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetAnalytics<TData = Awaited<ReturnType<typeof getAnalytics>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params: undefined |  GetAnalyticsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAnalytics<TData = Awaited<ReturnType<typeof getAnalytics>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params?: GetAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAnalytics>>,
+          TError,
+          Awaited<ReturnType<typeof getAnalytics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAnalytics<TData = Awaited<ReturnType<typeof getAnalytics>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params?: GetAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetAnalytics<TData = Awaited<ReturnType<typeof getAnalytics>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    params?: GetAnalyticsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAnalytics>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAnalyticsQueryOptions(businessId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

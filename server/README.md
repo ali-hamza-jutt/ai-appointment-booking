@@ -81,6 +81,7 @@ The API defaults to `http://localhost:4000`, Swagger UI is available at `/docs`,
 - `/api/businesses/{businessId}/chat-handoffs/{sessionId}` (and `/messages`): a handed-off chat in full, and staff replies as the business; `PUT /api/businesses/{businessId}/customers/{customerId}/notes` keeps private team notes.
 - `/api/public/{slug}/guest/code` and `/guest/verify`: guest booking by emailed code; `/api/public/{slug}/embed` and `/api/businesses/{businessId}/allowed-origins`: where the booking widget may be embedded.
 - `POST /api/channels/twilio/inbound`: incoming SMS and WhatsApp messages (Twilio-signed); `/api/businesses/{businessId}/messaging-numbers`: the numbers a business takes them on.
+- `GET /api/businesses/{businessId}/analytics?from=&to=`: booking and assistant analytics between two local dates (owners and managers).
 - `/api/businesses/{businessId}/notification-templates`: the wording of every booking email and text, editable per business; `/api/businesses/{businessId}/bookings/{bookingId}/notifications` lists what was sent for a booking. `/api/me/notification-settings` lets customers turn each business's emails or texts off.
 - `/api/businesses/{businessId}/services` and `/service-categories`: the service catalog. Services are `APPOINTMENT` (one customer) or `CLASS` (up to `capacity` seats), priced in integer minor units of the business currency, with optional deposit, buffers and location.
 - `/api/businesses/{businessId}/staff` and `/resources`: staff members (optionally linked to a team member's account) with the services they perform, per-person duration and price overrides, and the locations they work at; resources are rooms, chairs or equipment a service requires.
@@ -216,6 +217,16 @@ Customers who find nothing suitable can wait for a service between two dates, op
 - **Guests.** On a business's public page or widget, someone without an account enters their name, email and (optionally) phone, and gets a 6-digit code by email (10 minutes, 5 guesses, one per minute). Confirming it signs them in with a browser-session login, creating an account the first time; an existing account is signed in as it is, since the code proves the email. The phone number is saved on their customer record at that business. From there they use the same holds, confirmation and chat as any signed-in customer. A business with `allowGuestBooking` off refuses guest codes (403).
 - **Limits.** Everything under `/api/public` has its own per-IP limit (120 a minute); asking for a code uses the stricter limit of other code-sending endpoints.
 - **Widget.** `widget.js` (served by the web app) adds a button that opens `/embed/<slug>` in an iframe. The web app's proxy sets `Content-Security-Policy: frame-ancestors 'self' <allowed origins>` on that page from `GET /api/public/{slug}/embed`; every other page may only be framed by BookWise itself. The frame sends the host page nothing but a close request.
+
+## Analytics
+
+`GET /api/businesses/{businessId}/analytics` (`modules/analytics`) reports, per local day and for the range (at most 92 days, default the last 30):
+
+- **Bookings.** New bookings (by the day they were first confirmed or requested), visits, completions, cancellations, no-shows and revenue (price of completed visits). A booking only counts once it was confirmed or requested, so released holds and unpaid deposits never show up as bookings or cancellations. Cancellation rate = cancelled / all booked visits; no-show rate = no-shows / visits that were due.
+- **Busiest hours** by local starting hour, and **provider utilisation**: booked minutes out of working hours after time off and closures.
+- **Assistant.** For chats where the customer wrote something: how many booked, customer messages it took, handoffs, and where the rest stopped (before choosing a service, after choosing one, or with a time held).
+
+The numbers come from SQL over `bookings`, `booking_events`, `chat_sessions` and `chat_messages`, grouped by the business's local date. A nightly job (02:15 UTC, on the maintenance queue) stores the last three finished days of every business as `daily_metrics` rows, so late completions and cancellations are caught; requests read stored days and work out the rest (today, or days not stored yet) on the spot.
 
 ## SMS and WhatsApp
 
