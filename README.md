@@ -25,6 +25,7 @@ BookWise AI is a full-stack appointment-booking prototype built for the Full Sta
 - Booking by SMS and WhatsApp: customers text a business's Twilio number and the same assistant answers, with times as numbered options and YES to confirm; staff replies from the inbox reach them as texts.
 - Analytics for owners and managers: new bookings, visits, revenue, cancellation and no-show rates, busiest hours, provider utilisation, and how the assistant converts chats, how many messages that takes, how often it hands over and where chats stop.
 - A platform admin area: every business with its owner, recent bookings and model spend, suspending abusive businesses, signing in as a user to support them (audited, 15 minutes), and retrying failed background work.
+- Plans for businesses (Free, Starter, Pro) through Stripe Billing, limiting providers, assistant chats and text messages a month.
 - Staff calendar sync with Google Calendar and Microsoft 365: busy times in a connected calendar block bookings like time off, and confirmed bookings appear on the staff member's calendar and follow every move or cancellation, kept current by push notifications and a 15-minute sweep.
 - Customer memory: the usual service, provider and time of day, saved when the customer asks or learned from repeat visits, a one-tap "Book again" for returning customers, and a rolling summary that keeps long chats in context. Customers can review and remove what each business remembers from their profile.
 - Multi-turn booking conversations with persisted context and history.

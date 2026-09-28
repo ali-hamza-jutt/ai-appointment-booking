@@ -154,12 +154,12 @@ describe("SMS and WhatsApp", () => {
     expect(await prisma.booking.count({ where: { businessId: setup.business.id, status: "CONFIRMED" } })).toBe(0);
 
     await service.relayStaffReply(
-      { channel: "SMS", customerAddress: "+447700900666", businessAddress: "+15550001111" },
+      { businessId: setup.business.id, channel: "SMS", customerAddress: "+447700900666", businessAddress: "+15550001111" },
       "Sana",
       "Glow Salon",
       "We've fixed that for you.",
     );
-    await service.relayStaffReply({ channel: "WEB", customerAddress: null, businessAddress: null }, "Sana", "Glow Salon", "Hi");
+    await service.relayStaffReply({ businessId: setup.business.id, channel: "WEB", customerAddress: null, businessAddress: null }, "Sana", "Glow Salon", "Hi");
 
     expect(sent.at(-1)).toEqual({ to: "+447700900666", from: "+15550001111", text: "Sana from Glow Salon: We've fixed that for you." });
     expect(sent.filter((message) => message.text.startsWith("Sana"))).toHaveLength(1);

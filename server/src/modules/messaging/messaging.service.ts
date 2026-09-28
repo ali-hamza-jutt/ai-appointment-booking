@@ -6,6 +6,7 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
   MESSAGING_CONSTANTS,
+  SUBSCRIPTION_CONSTANTS,
   VALIDATION_PATTERNS,
 } from "../../constants/app.constants.js";
 import { smsSender, type SmsSender } from "../../infrastructure/messaging/sms-sender.js";
@@ -20,6 +21,7 @@ import { chatService } from "../chat/chat.service.js";
 import { chatDal } from "../chat/dal/chat.dal.js";
 import { customerProfileDal } from "../customers/dal/customer-profile.dal.js";
 import { publicBookingDal } from "../public-booking/dal/public-booking.dal.js";
+import { entitlements } from "../subscriptions/entitlements.js";
 import { interpretReply, renderReply, type TextChannel } from "./channel-renderer.js";
 import { messagingDal } from "./dal/messaging.dal.js";
 import type {
@@ -123,7 +125,19 @@ export class MessagingService {
 
     if (customerId) await publicBookingDal.setCustomerPhoneIfMissing(business.id, customerId, phone);
 
-    const session = await chatService.createSession(userId, { businessSlug: business.slug }, job.channel);
+    let session: Awaited<ReturnType<typeof chatService.createSession>>;
+
+    try {
+      session = await chatService.createSession(userId, { businessSlug: business.slug }, job.channel);
+    } catch (error) {
+      // Out of assistant chats for the month: answering would cost a message too, so stay quiet.
+      if (error instanceof AppError && error.code === ERROR_CODES.PLAN_LIMIT_REACHED) {
+        logger.warn({ businessId: business.id }, "Ignored an incoming message: the plan's chats are used up");
+        return;
+      }
+
+      throw error;
+    }
 
     await chatDal.setChannel(business.id, session.id, job.channel, { customerAddress: job.from, businessAddress: job.to });
 
@@ -153,12 +167,12 @@ export class MessagingService {
       reply = renderReply(TEXT_REFUSALS[error.code] ?? error.message, [], job.channel);
     }
 
-    await this.sender.send({ to: job.from, from: job.to, text: reply });
+    await this.sendText(business.id, { to: job.from, from: job.to, text: reply });
   }
 
   /** Sends a staff member's inbox reply to a customer chatting by SMS or WhatsApp. */
   public async relayStaffReply(
-    session: { channel: string; customerAddress: string | null; businessAddress: string | null },
+    session: { businessId: string; channel: string; customerAddress: string | null; businessAddress: string | null },
     staffName: string,
     businessName: string,
     text: string,
@@ -167,11 +181,21 @@ export class MessagingService {
       return;
     }
 
-    await this.sender.send({
+    await this.sendText(session.businessId, {
       to: session.customerAddress,
       from: session.businessAddress,
       text: renderReply(`${staffName} from ${businessName}: ${text}`, [], session.channel as TextChannel),
     });
+  }
+
+  /** Sends one SMS or WhatsApp message if the plan's monthly allowance has room for it. */
+  private async sendText(businessId: string, message: { to: string; from: string; text: string }): Promise<void> {
+    if (!(await entitlements.consume(businessId, SUBSCRIPTION_CONSTANTS.METRICS.TEXT_MESSAGES))) {
+      logger.warn({ businessId }, "Text message not sent: the plan's messages are used up");
+      return;
+    }
+
+    await this.sender.send(message);
   }
 
   /** The account behind a number, made the first time it writes in. */

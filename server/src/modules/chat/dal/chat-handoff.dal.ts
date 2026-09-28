@@ -13,6 +13,7 @@ const messageSelect = {
 
 const handoffSelect = {
   id: true,
+  businessId: true,
   userId: true,
   channel: true,
   customerAddress: true,

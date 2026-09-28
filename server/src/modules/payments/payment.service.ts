@@ -14,6 +14,7 @@ import { resolveBookingPolicy } from "../bookings/booking-policy.js";
 import { bookingService } from "../bookings/booking.service.js";
 import type { AppointmentResponse, BookingRecord } from "../bookings/dto/booking.dto.js";
 import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
+import { subscriptionService } from "../subscriptions/subscription.service.js";
 import { paymentDal } from "./dal/payment.dal.js";
 import type {
   BookingPaymentListResponse,
@@ -148,7 +149,9 @@ export class PaymentService {
     if (!(await paymentDal.claimWebhookEvent(event.id, event.type))) return;
 
     try {
-      await this.applyStripeEvent(event);
+      // BookWise's own subscriptions share the webhook with customers' payments.
+      if (subscriptionService.handles(event)) await subscriptionService.applyStripeEvent(event);
+      else await this.applyStripeEvent(event);
     } catch (error) {
       await paymentDal.releaseWebhookEvent(event.id);
       throw error;

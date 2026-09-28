@@ -64,6 +64,23 @@ export interface CheckoutRequest {
   metadata: Record<string, string>;
 }
 
+export interface SubscriptionCheckoutRequest {
+  priceId: string;
+  /** Reuses the business's Stripe customer when it has one. */
+  customerId: string | null;
+  customerEmail: string | null;
+  successUrl: string;
+  cancelUrl: string;
+  /** businessId and plan, copied onto the subscription so its webhooks find the business. */
+  metadata: { businessId: string; plan: string };
+}
+
+/** The Stripe Billing calls BookWise makes to charge businesses. */
+export interface BillingGateway {
+  createSubscriptionCheckout(request: SubscriptionCheckoutRequest): Promise<{ id: string; url: string | null }>;
+  createBillingPortalSession(customerId: string, returnUrl: string): Promise<string>;
+}
+
 /** The Stripe calls BookWise makes; the webhook tells us the outcomes. */
 export interface PaymentGateway {
   createAccount(input: { email: string | null; businessName: string }): Promise<StripeAccount>;
@@ -99,7 +116,7 @@ function toAccount(raw: RawAccount): StripeAccount {
  * created on the platform, paid out to the business's Express account, with
  * the business as merchant of record (on_behalf_of).
  */
-export class StripeClient implements PaymentGateway {
+export class StripeClient implements PaymentGateway, BillingGateway {
   public constructor(private readonly secretKey: string) {}
 
   public async createAccount(input: { email: string | null; businessName: string }): Promise<StripeAccount> {
@@ -168,6 +185,31 @@ export class StripeClient implements PaymentGateway {
     });
 
     return { id: session.id, url: session.url, expiresAt: new Date(session.expires_at * 1_000) };
+  }
+
+  /** A Checkout session that starts a BookWise subscription for a business (on the platform account). */
+  public async createSubscriptionCheckout(request: SubscriptionCheckoutRequest): Promise<{ id: string; url: string | null }> {
+    return this.request<{ id: string; url: string | null }>("POST", "/checkout/sessions", {
+      form: {
+        mode: "subscription",
+        line_items: [{ price: request.priceId, quantity: 1 }],
+        ...(request.customerId ? { customer: request.customerId } : request.customerEmail ? { customer_email: request.customerEmail } : {}),
+        client_reference_id: request.metadata.businessId,
+        success_url: request.successUrl,
+        cancel_url: request.cancelUrl,
+        metadata: request.metadata,
+        subscription_data: { metadata: request.metadata },
+      },
+    });
+  }
+
+  /** A link to Stripe's billing portal, where the owner changes plan, card or cancels. */
+  public async createBillingPortalSession(customerId: string, returnUrl: string): Promise<string> {
+    const session = await this.request<{ url: string }>("POST", "/billing_portal/sessions", {
+      form: { customer: customerId, return_url: returnUrl },
+    });
+
+    return session.url;
   }
 
   public async expireCheckoutSession(sessionId: string): Promise<void> {

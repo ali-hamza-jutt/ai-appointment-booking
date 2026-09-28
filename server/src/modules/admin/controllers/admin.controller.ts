@@ -16,6 +16,7 @@ import {
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
 import { getAuthenticatedUser } from "../../../utils/request.js";
+import type { GrantPlanRequest } from "../../subscriptions/dto/subscription.dto.js";
 import { adminService } from "../admin.service.js";
 import type {
   AdminAuditLogResponse,
@@ -62,6 +63,18 @@ export class AdminController extends Controller {
   @Response<ApiErrorResponse>(404, "Business was not found")
   public unsuspendBusiness(@Request() request: ExpressRequest, @Path() businessId: string): Promise<AdminBusinessDetail> {
     return adminService.unsuspend(getAuthenticatedUser(request).id, businessId);
+  }
+
+  /** Puts the business on a plan for free, or back on Free. Not for businesses paying through Stripe. */
+  @Post("businesses/{businessId}/plan")
+  @Response<ApiErrorResponse>(404, "Business was not found")
+  @Response<ApiErrorResponse>(409, "The business pays through Stripe")
+  public grantBusinessPlan(
+    @Request() request: ExpressRequest,
+    @Path() businessId: string,
+    @Body() body: GrantPlanRequest,
+  ): Promise<AdminBusinessDetail> {
+    return adminService.grantPlan(getAuthenticatedUser(request).id, businessId, body.plan);
   }
 
   /** People, newest first, searchable by email or name. */

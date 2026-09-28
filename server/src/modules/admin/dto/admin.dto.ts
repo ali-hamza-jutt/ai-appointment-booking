@@ -27,6 +27,8 @@ export interface AdminLlmUsageDay {
 }
 
 export interface AdminBusinessDetail extends AdminBusinessSummary {
+  /** The business's BookWise plan, and whether it pays through Stripe or was granted. */
+  plan: { id: "FREE" | "STARTER" | "PRO"; source: "free" | "stripe" | "complimentary"; status: string | null };
   team: Array<{ userId: string; fullName: string; email: string; role: "OWNER" | "MANAGER" | "STAFF" }>;
   /** The last 30 days, one entry per day with usage. */
   llmUsage: AdminLlmUsageDay[];

@@ -7,6 +7,7 @@
  */
 import type { AdminBusinessDetailLlmUsageByModelItem } from './adminBusinessDetailLlmUsageByModelItem';
 import type { AdminBusinessDetailOwner } from './adminBusinessDetailOwner';
+import type { AdminBusinessDetailPlan } from './adminBusinessDetailPlan';
 import type { AdminBusinessDetailSuspension } from './adminBusinessDetailSuspension';
 import type { AdminBusinessDetailTeamItem } from './adminBusinessDetailTeamItem';
 import type { AdminLlmUsageDay } from './adminLlmUsageDay';
@@ -25,6 +26,8 @@ export interface AdminBusinessDetail {
   bookingsLast30Days: number;
   /** Estimated model spend over the last 30 days. */
   llmCostLast30DaysUsd: number;
+  /** The business's BookWise plan, and whether it pays through Stripe or was granted. */
+  plan: AdminBusinessDetailPlan;
   team: AdminBusinessDetailTeamItem[];
   /** The last 30 days, one entry per day with usage. */
   llmUsage: AdminLlmUsageDay[];

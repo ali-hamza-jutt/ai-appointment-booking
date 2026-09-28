@@ -13,6 +13,7 @@ import { assertUuid } from "../../utils/identifiers.js";
 import { normalizeEmail, normalizeWhitespace } from "../../utils/text.js";
 import { throwRequestValidationError } from "../../utils/validation.js";
 import { businessService } from "../businesses/business.service.js";
+import { entitlements } from "../subscriptions/entitlements.js";
 import { staffDal } from "./dal/staff.dal.js";
 import type {
   CreateStaffRequest,
@@ -47,6 +48,8 @@ export class StaffService {
     businessId: string,
     request: CreateStaffRequest,
   ): Promise<StaffResponse> {
+    await entitlements.assertCanAddStaff(businessId);
+
     const profile = await this.prepareProfile(businessId, {
       displayName: request.displayName,
       email: request.email ?? null,
@@ -84,6 +87,8 @@ export class StaffService {
     const current = await staffDal.findStaff(businessId, staffId);
 
     if (!current) this.throwStaffNotFound();
+    // Switching a provider back on takes a seat again.
+    if (request.isActive === true && !current.isActive) await entitlements.assertCanAddStaff(businessId);
 
     const profile = await this.prepareProfile(businessId, {
       displayName: request.displayName ?? current.displayName,

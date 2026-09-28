@@ -1,6 +1,6 @@
 import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
-import { NOTIFICATION_CONSTANTS, REVIEW_CONSTANTS } from "../../constants/app.constants.js";
+import { NOTIFICATION_CONSTANTS, REVIEW_CONSTANTS, SUBSCRIPTION_CONSTANTS } from "../../constants/app.constants.js";
 import { mailer, type Mailer } from "../../infrastructure/messaging/mailer.js";
 import {
   smsSender,
@@ -13,6 +13,7 @@ import { isPlaceholderEmail } from "../../utils/placeholder-email.js";
 import { parseStoredBusinessSettings } from "../businesses/business-settings.js";
 import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
 import { reviewDal } from "../reviews/dal/review.dal.js";
+import { entitlements } from "../subscriptions/entitlements.js";
 import { notificationDal } from "./dal/notification.dal.js";
 import type {
   BookingNotificationContext,
@@ -216,6 +217,12 @@ export class NotificationService {
       });
 
       if (!claim.send) continue;
+
+      // Texts count against the plan's monthly allowance; email doesn't.
+      if (channel === "SMS" && !(await entitlements.consume(context.businessId, SUBSCRIPTION_CONSTANTS.METRICS.TEXT_MESSAGES))) {
+        await notificationDal.markFailed(context.businessId, claim.id, "The plan's text messages for this month are used up");
+        continue;
+      }
 
       try {
         const providerMessageId = await this.send(channel, recipient, context, options, templates);

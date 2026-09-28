@@ -16,6 +16,7 @@ import {
   BookIcon,
   BuildingIcon,
   CalendarIcon,
+  CardIcon,
   ChartIcon,
   ChatIcon,
   ClockIcon,
@@ -77,6 +78,7 @@ const businessNavigation: NavigationItem[] = [
   { href: "/business/knowledge", icon: BookIcon, label: "Knowledge base" },
   { href: "/business/notifications", icon: MailIcon, label: "Notifications" },
   { href: "/business/payments", icon: TagIcon, label: "Payments" },
+  { href: "/business/billing", icon: CardIcon, label: "Plan and billing" },
   { href: "/business/handoffs", icon: ChatIcon, label: "Inbox" },
 ];
 
@@ -112,6 +114,7 @@ const pageTitles: ReadonlyArray<[string, string]> = [
   ["/business/knowledge", "Knowledge base"],
   ["/business/notifications", "Notifications"],
   ["/business/payments", "Payments"],
+  ["/business/billing", "Plan and billing"],
   ["/business/handoffs", "Inbox"],
 ];
 
