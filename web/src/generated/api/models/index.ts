@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './addAllowedOriginRequest';
+export * from './allowedOriginListResponse';
+export * from './allowedOriginResponse';
 export * from './apiErrorResponse';
 export * from './apiErrorResponseError';
 export * from './appointmentListResponse';
@@ -132,9 +135,12 @@ export * from './customerProfileResponse';
 export * from './customerResponse';
 export * from './customerVisitResponse';
 export * from './emailAddress';
+export * from './embedPolicyResponse';
 export * from './forgotPasswordRequest';
 export * from './getBusinessAvailabilityParams';
 export * from './getPublicAvailabilityParams';
+export * from './guestCodeRequest';
+export * from './guestVerifyRequest';
 export * from './healthResponse';
 export * from './healthResponseStatus';
 export * from './invitableMembershipRole';

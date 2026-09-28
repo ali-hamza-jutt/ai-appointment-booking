@@ -313,6 +313,35 @@ model AuthToken {
 }
 
 /// One-time SMS codes for linking a phone or signing in with it.
+/// A one-time code emailed to someone booking as a guest on a public page.
+model GuestCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  email      String    @db.VarChar(254)
+  businessId String    @map("business_id") @db.Uuid
+  codeHash   String    @map("code_hash") @db.Char(64)
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([email, createdAt], map: "guest_codes_email_created_at_idx")
+  @@map("guest_codes")
+}
+
+/// A website allowed to embed the business's booking widget.
+model AllowedOrigin {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  /// Scheme, host and port only, for example https://glowsalon.com.
+  origin     String   @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, origin], map: "allowed_origins_business_id_origin_key")
+  @@map("allowed_origins")
+}
+
 model PhoneVerification {
   id         String                   @id @default(uuid()) @db.Uuid
   phone      String                   @db.VarChar(16)
@@ -357,6 +386,8 @@ model Business {
   waitlistEntries     WaitlistEntry[]
   waitlistOffers      WaitlistOffer[]
   reviews             Review[]
+  guestCodes          GuestCode[]
+  allowedOrigins      AllowedOrigin[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
