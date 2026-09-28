@@ -447,6 +447,10 @@ export class ChatOrchestrationService {
       if (message.id === current.id || message.role === "SYSTEM") return [];
       if (message.role === "USER") return [{ role: "user", content: message.content }];
 
+      const staff = message.structuredData?.sentBy;
+
+      if (staff) return [{ role: "assistant", content: `[Staff member ${staff.name}]: ${message.content}` }];
+
       const offered = (message.structuredData?.parts ?? [])
         .flatMap((part) => (part.type === "slot_picker" ? part.slots : []))
         .slice(0, AGENT_CONSTANTS.MAX_SLOTS_SHOWN)

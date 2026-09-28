@@ -3,6 +3,7 @@ import {
   ERROR_CODES,
   ERROR_MESSAGES,
   VALIDATION_MESSAGES,
+  VALIDATION_PATTERNS,
 } from "../../constants/app.constants.js";
 import { AppError } from "../../middleware/app-error.js";
 import { isUniqueConstraintError } from "../../utils/database.js";
@@ -20,6 +21,8 @@ import type {
   CustomerResponse,
   ListCustomersOptions,
 } from "./dto/customer.dto.js";
+
+const CUSTOMER_NOTES_MAX_LENGTH = 2_000;
 
 export class CustomerService {
   public async createCustomer(
@@ -122,6 +125,19 @@ export class CustomerService {
           }
         : {}),
     };
+  }
+
+  /** Replaces the team's private notes about a customer. */
+  public async updateNotes(businessId: string, customerId: string, notes: string | null): Promise<void> {
+    const trimmed = notes?.trim() || null;
+
+    if (trimmed && trimmed.length > CUSTOMER_NOTES_MAX_LENGTH) {
+      throwRequestValidationError("notes", "Notes can be at most 2000 characters");
+    }
+
+    const found = VALIDATION_PATTERNS.UUID.test(customerId) && (await customerDal.updateNotes(businessId, customerId, trimmed));
+
+    if (!found) throw new AppError(404, ERROR_CODES.CUSTOMER_NOT_FOUND, ERROR_MESSAGES.CUSTOMER_NOT_FOUND);
   }
 
   public toResponse(customer: CustomerRecord): CustomerResponse {

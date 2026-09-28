@@ -43,6 +43,8 @@ export function createChatStreamRouter(
       streamTurn(orchestration, request, response, next),
   );
   router.get("/api/chat/sessions/:sessionId/events", sessionEvents);
+  router.get("/api/businesses/:businessId/events", businessEvents);
+  // The older name, kept for clients that still use it.
   router.get("/api/businesses/:businessId/chat-events", businessEvents);
 
   return router;
@@ -197,7 +199,7 @@ async function sessionEvents(
   }
 }
 
-/** Changes to any chat at a business, for the staff dashboard. */
+/** Changes to any chat or booking at a business, for the staff dashboard. */
 async function businessEvents(
   request: Request,
   response: Response,

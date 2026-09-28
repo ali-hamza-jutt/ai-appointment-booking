@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/icons";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { BusinessRequired } from "@/features/business-settings/components/business-required";
+import { useBusinessEvents } from "@/features/business-settings/hooks/use-business-events";
 import { canManageBusiness } from "@/features/business-settings/utils/business-permissions";
 import { BookingDetailModal } from "@/features/bookings/components/booking-detail-modal";
 import { BookingLinkCard } from "@/features/bookings/components/booking-link-card";
@@ -99,6 +100,8 @@ function BookingsContent({ business }: { business: BusinessResponse }) {
   const servicesQuery = useListServices(business.id);
   const staffQuery = useListStaff(business.id);
   const actions = useBookingActions(business.id, business.slug);
+  // Bookings made or changed elsewhere show up without a reload.
+  useBusinessEvents(business.id);
   const bookings = bookingsQuery.data?.items ?? [];
   const activeServices = (servicesQuery.data?.items ?? []).filter((service) => service.isActive);
   const now = new Date();

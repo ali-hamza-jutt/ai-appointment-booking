@@ -186,6 +186,13 @@ export interface ChatMessageMetadata {
   /** True while a held slot is waiting for the customer to confirm. */
   confirmationRequired?: boolean;
   appointmentId?: string;
+  /** Written by a member of the business's team, not the assistant. */
+  sentBy?: ChatMessageAuthor;
+}
+
+export interface ChatMessageAuthor {
+  /** The staff member's first name. */
+  name: string;
 }
 
 export interface ChatHandoff {

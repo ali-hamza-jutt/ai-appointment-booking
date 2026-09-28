@@ -8,7 +8,13 @@
 import type { ChatHandoffMessageRole } from './chatHandoffMessageRole';
 
 export interface ChatHandoffMessage {
+  id: string;
   role: ChatHandoffMessageRole;
   content: string;
+  /**
+     * The staff member who wrote an ASSISTANT message; null when the assistant did.
+     * @nullable
+     */
+  sentBy: string | null;
   createdAt: string;
 }

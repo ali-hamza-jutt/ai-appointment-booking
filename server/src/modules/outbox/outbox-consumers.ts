@@ -10,6 +10,7 @@ import {
 } from "../../constants/app.constants.js";
 import { availabilityCache } from "../availability/availability-cache.js";
 import { calendarSyncService } from "../calendar/calendar-sync.service.js";
+import { publishBookingEvent } from "../chat/chat-events.js";
 import { customerProfileService } from "../customers/customer-profile.service.js";
 import { knowledgeService } from "../knowledge/knowledge.service.js";
 import { notificationService } from "../notifications/notification.service.js";
@@ -52,6 +53,24 @@ export const knowledgeIndexConsumer: OutboxConsumer = {
     }
 
     await knowledgeService.indexSource(businessId, sourceId, contentHash);
+  },
+};
+
+/** Refreshes the business dashboard's calendar, bookings list and inbox as bookings change. */
+export const bookingRealtimeConsumer: OutboxConsumer = {
+  name: "booking-realtime",
+  handles: (type) => type.startsWith(BOOKING_EVENT_PREFIX),
+  async handle(message) {
+    const { bookingId, status } = message.payload;
+
+    if (!message.businessId || typeof bookingId !== "string") return;
+
+    await publishBookingEvent({
+      type: "booking",
+      businessId: message.businessId,
+      bookingId,
+      status: typeof status === "string" ? status : "",
+    });
   },
 };
 
@@ -121,6 +140,7 @@ export const reviewAlertsConsumer: OutboxConsumer = {
 export const outboxConsumers: readonly OutboxConsumer[] = [
   availabilityCacheConsumer,
   bookingMetricsConsumer,
+  bookingRealtimeConsumer,
   knowledgeIndexConsumer,
   customerPreferencesConsumer,
   bookingNotificationsConsumer,

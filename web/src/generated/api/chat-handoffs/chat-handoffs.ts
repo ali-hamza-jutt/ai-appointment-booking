@@ -26,11 +26,14 @@ import type {
 
 import type {
   ApiErrorResponse,
-  ChatHandoffListResponse
+  ChatHandoffListResponse,
+  ChatHandoffMessage,
+  ChatHandoffThreadResponse,
+  ReplyToHandoffRequest
 } from '../models';
 
 import { apiFetch } from '../../../lib/api/api-fetch';
-import type { ErrorType } from '../../../lib/api/api-fetch';
+import type { ErrorType , BodyType } from '../../../lib/api/api-fetch';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -149,7 +152,183 @@ export function useListHandoffs<TData = Awaited<ReturnType<typeof listHandoffs>>
 
 
 
-export const getResolveHandoffUrl = (businessId: string,
+export const getGetHandoffThreadUrl = (businessId: string,
+    sessionId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/chat-handoffs/${sessionId}`
+}
+
+/**
+ * A handed-off chat with its latest 100 messages, oldest first.
+ */
+export const getHandoffThread = async (businessId: string,
+    sessionId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ChatHandoffThreadResponse> => {
+
+  return apiFetch<ChatHandoffThreadResponse>(getGetHandoffThreadUrl(businessId,sessionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHandoffThreadQueryKey = (businessId: string,
+    sessionId: string,) => {
+    return [
+    `/businesses/${businessId}/chat-handoffs/${sessionId}`
+    ] as const;
+    }
+
+
+export const getGetHandoffThreadQueryOptions = <TData = Awaited<ReturnType<typeof getHandoffThread>>, TError = ErrorType<ApiErrorResponse>>(businessId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHandoffThreadQueryKey(businessId,sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHandoffThread>>> = ({ signal }) => getHandoffThread(businessId,sessionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined && sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetHandoffThreadQueryResult = NonNullable<Awaited<ReturnType<typeof getHandoffThread>>>
+export type GetHandoffThreadQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useGetHandoffThread<TData = Awaited<ReturnType<typeof getHandoffThread>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHandoffThread>>,
+          TError,
+          Awaited<ReturnType<typeof getHandoffThread>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHandoffThread<TData = Awaited<ReturnType<typeof getHandoffThread>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHandoffThread>>,
+          TError,
+          Awaited<ReturnType<typeof getHandoffThread>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHandoffThread<TData = Awaited<ReturnType<typeof getHandoffThread>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetHandoffThread<TData = Awaited<ReturnType<typeof getHandoffThread>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHandoffThread>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetHandoffThreadQueryOptions(businessId,sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getReplyToHandoffUrl = (businessId: string,
+    sessionId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/chat-handoffs/${sessionId}/messages`
+}
+
+/**
+ * Replies in the customer's chat as the business, under the staff member's
+ * first name. Only while the handoff is open.
+ */
+export const replyToHandoff = async (businessId: string,
+    sessionId: string,
+    replyToHandoffRequest: ReplyToHandoffRequest, options?: Parameters<typeof apiFetch>[1]): Promise<ChatHandoffMessage> => {
+
+  return apiFetch<ChatHandoffMessage>(getReplyToHandoffUrl(businessId,sessionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(replyToHandoffRequest)
+  }
+);}
+
+
+
+
+
+export const getReplyToHandoffMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replyToHandoff>>, TError,{businessId: string;sessionId: string;data: BodyType<ReplyToHandoffRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replyToHandoff>>, TError,{businessId: string;sessionId: string;data: BodyType<ReplyToHandoffRequest>}, TContext> => {
+
+const mutationKey = ['replyToHandoff'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replyToHandoff>>, {businessId: string;sessionId: string;data: BodyType<ReplyToHandoffRequest>}> = (props) => {
+          const {businessId,sessionId,data} = props ?? {};
+
+          return  replyToHandoff(businessId,sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplyToHandoffMutationResult = NonNullable<Awaited<ReturnType<typeof replyToHandoff>>>
+    export type ReplyToHandoffMutationBody = BodyType<ReplyToHandoffRequest>
+    export type ReplyToHandoffMutationError = ErrorType<ApiErrorResponse>
+
+    export const useReplyToHandoff = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replyToHandoff>>, TError,{businessId: string;sessionId: string;data: BodyType<ReplyToHandoffRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof replyToHandoff>>,
+        TError,
+        {businessId: string;sessionId: string;data: BodyType<ReplyToHandoffRequest>},
+        TContext
+      > => {
+      return useMutation(getReplyToHandoffMutationOptions(options), queryClient);
+    }
+    export const getResolveHandoffUrl = (businessId: string,
     sessionId: string,) => {
 
 

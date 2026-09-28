@@ -1,16 +1,25 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/feedback";
+import { TextAreaField } from "@/components/ui/form-controls";
 import { Modal } from "@/components/ui/modal";
 import { BOOKING_STATUS_PRESENTATION } from "@/features/bookings/constants/booking-status.constants";
 import { PREFERENCE_UI_CONSTANTS } from "@/features/customers/constants/preference-ui.constants";
-import { useGetCustomerProfile } from "@/generated/api/customers/customers";
+import {
+  getGetCustomerProfileQueryKey,
+  useGetCustomerProfile,
+  useUpdateCustomerNotes,
+} from "@/generated/api/customers/customers";
 import type { CustomerResponse } from "@/generated/api/models";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { formatDateTime } from "@/lib/utils/date-time";
 
-/** A customer's visits and what the booking assistant remembers about them. */
+/** A customer's visits, the team's notes and what the booking assistant remembers about them. */
 export function CustomerProfileModal({
   businessId,
   customer,
@@ -42,6 +51,8 @@ export function CustomerProfileModal({
               <Stat label="Completed visits" value={profile.completedVisits} />
               <Stat label="No-shows" value={profile.noShows} />
             </dl>
+
+            <CustomerNotes businessId={businessId} customerId={customer.id} notes={profile.notes} />
 
             <section>
               <h4 className="text-sm font-semibold text-ink">Remembered preferences</h4>
@@ -97,6 +108,48 @@ export function CustomerProfileModal({
         ) : null}
       </div>
     </Modal>
+  );
+}
+
+/** Private notes for the team; customers and the assistant never see them. */
+function CustomerNotes({ businessId, customerId, notes }: { businessId: string; customerId: string; notes: string | null }) {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState(notes ?? "");
+  const saveMutation = useUpdateCustomerNotes({
+    mutation: {
+      onSuccess: (profile) => {
+        queryClient.setQueryData(getGetCustomerProfileQueryKey(businessId, customerId), profile);
+        setDraft(profile.notes ?? "");
+      },
+    },
+  });
+  const isChanged = draft.trim() !== (notes ?? "");
+
+  return (
+    <section className="space-y-2">
+      <TextAreaField
+        hint="Only your team sees these. The customer and the assistant never do."
+        id={`customer-notes-${customerId}`}
+        label="Team notes"
+        maxLength={2_000}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder="Allergies, preferences, anything worth knowing next time"
+        rows={3}
+        value={draft}
+      />
+      {saveMutation.error ? (
+        <Alert tone="danger">{getApiErrorMessage(saveMutation.error, "The notes could not be saved.")}</Alert>
+      ) : null}
+      <Button
+        disabled={!isChanged}
+        isLoading={saveMutation.isPending}
+        onClick={() => saveMutation.mutate({ businessId, customerId, data: { notes: draft.trim() || null } })}
+        size="sm"
+        variant="secondary"
+      >
+        Save notes
+      </Button>
+    </section>
   );
 }
 

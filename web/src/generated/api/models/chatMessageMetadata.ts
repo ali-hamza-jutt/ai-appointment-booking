@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatMessageAuthor } from './chatMessageAuthor';
 import type { ChatMessageMetadataIntent } from './chatMessageMetadataIntent';
 import type { ChatMessagePart } from './chatMessagePart';
 
@@ -16,4 +17,6 @@ export interface ChatMessageMetadata {
   /** True while a held slot is waiting for the customer to confirm. */
   confirmationRequired?: boolean;
   appointmentId?: string;
+  /** Written by a member of the business's team, not the assistant. */
+  sentBy?: ChatMessageAuthor;
 }

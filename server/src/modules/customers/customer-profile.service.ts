@@ -196,6 +196,7 @@ export class CustomerProfileService {
 
     return {
       customer: customerService.toResponse(customer),
+      notes: customer.notes,
       preferences: await this.withLabels(businessId, records),
       completedVisits: counts.completed,
       noShows: counts.noShows,

@@ -3,8 +3,17 @@ import { prisma } from "../../../infrastructure/database/prisma.js";
 
 const RECENT_MESSAGES = 6;
 
+const messageSelect = {
+  id: true,
+  role: true,
+  content: true,
+  structuredData: true,
+  createdAt: true,
+} satisfies Prisma.ChatMessageSelect;
+
 const handoffSelect = {
   id: true,
+  userId: true,
   handoffReason: true,
   handoffRequestedAt: true,
   handoffResolvedAt: true,
@@ -12,7 +21,7 @@ const handoffSelect = {
   messages: {
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: RECENT_MESSAGES,
-    select: { role: true, content: true, createdAt: true },
+    select: messageSelect,
   },
 } satisfies Prisma.ChatSessionSelect;
 
@@ -26,6 +35,17 @@ export class ChatHandoffDal {
     });
   }
 
+  /** One of the business's chats that was handed to staff, open or resolved, with its latest messages. */
+  public findHandedOff(businessId: string, sessionId: string, messageCount: number) {
+    return prisma.chatSession.findFirst({
+      where: { id: sessionId, businessId, handoffRequestedAt: { not: null } },
+      select: {
+        ...handoffSelect,
+        messages: { ...handoffSelect.messages, take: messageCount },
+      },
+    });
+  }
+
   /** Marks one of this business's handoffs resolved; false if there is none. */
   public async resolve(businessId: string, sessionId: string, resolvedAt: Date): Promise<boolean> {
     const result = await prisma.chatSession.updateMany({
@@ -34,6 +54,12 @@ export class ChatHandoffDal {
     });
 
     return result.count === 1;
+  }
+
+  public async findUserName(userId: string): Promise<string | null> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+
+    return user?.fullName ?? null;
   }
 }
 

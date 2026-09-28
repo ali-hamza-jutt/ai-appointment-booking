@@ -4,6 +4,7 @@ import {
   Get,
   Path,
   Post,
+  Put,
   Query,
   Response,
   Route,
@@ -20,6 +21,7 @@ import type {
   CreateCustomerRequest,
   CustomerListResponse,
   CustomerResponse,
+  UpdateCustomerNotesRequest,
 } from "../dto/customer.dto.js";
 
 @Route("businesses/{businessId}/customers")
@@ -59,6 +61,21 @@ export class CustomerController extends Controller {
     @Path() businessId: string,
     @Path() customerId: string,
   ): Promise<CustomerProfileResponse> {
+    return customerProfileService.getCustomerProfile(businessId, customerId);
+  }
+
+  /** Replaces the team's private notes about a customer. Customers and the assistant never see them. */
+  @Put("{customerId}/notes")
+  @Security("jwt", ["business:operate"])
+  @SuccessResponse("200", "Notes saved")
+  @Response<ApiErrorResponse>(404, "Customer was not found")
+  @Response<ApiErrorResponse>(422, "Notes are too long")
+  public async updateCustomerNotes(
+    @Path() businessId: string,
+    @Path() customerId: string,
+    @Body() body: UpdateCustomerNotesRequest,
+  ): Promise<CustomerProfileResponse> {
+    await customerService.updateNotes(businessId, customerId, body.notes);
     return customerProfileService.getCustomerProfile(businessId, customerId);
   }
 

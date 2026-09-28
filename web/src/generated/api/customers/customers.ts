@@ -31,7 +31,8 @@ import type {
   CustomerProfileResponse,
   CustomerResponse,
   ListCustomersParams,
-  MyPreferencesResponse
+  MyPreferencesResponse,
+  UpdateCustomerNotesRequest
 } from '../models';
 
 import { apiFetch } from '../../../lib/api/api-fetch';
@@ -506,3 +507,73 @@ export function useGetCustomerProfile<TData = Awaited<ReturnType<typeof getCusto
 
 
 
+export const getUpdateCustomerNotesUrl = (businessId: string,
+    customerId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/customers/${customerId}/notes`
+}
+
+/**
+ * Replaces the team's private notes about a customer. Customers and the assistant never see them.
+ */
+export const updateCustomerNotes = async (businessId: string,
+    customerId: string,
+    updateCustomerNotesRequest: UpdateCustomerNotesRequest, options?: Parameters<typeof apiFetch>[1]): Promise<CustomerProfileResponse> => {
+
+  return apiFetch<CustomerProfileResponse>(getUpdateCustomerNotesUrl(businessId,customerId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateCustomerNotesRequest)
+  }
+);}
+
+
+
+
+
+export const getUpdateCustomerNotesMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCustomerNotes>>, TError,{businessId: string;customerId: string;data: BodyType<UpdateCustomerNotesRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCustomerNotes>>, TError,{businessId: string;customerId: string;data: BodyType<UpdateCustomerNotesRequest>}, TContext> => {
+
+const mutationKey = ['updateCustomerNotes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCustomerNotes>>, {businessId: string;customerId: string;data: BodyType<UpdateCustomerNotesRequest>}> = (props) => {
+          const {businessId,customerId,data} = props ?? {};
+
+          return  updateCustomerNotes(businessId,customerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCustomerNotesMutationResult = NonNullable<Awaited<ReturnType<typeof updateCustomerNotes>>>
+    export type UpdateCustomerNotesMutationBody = BodyType<UpdateCustomerNotesRequest>
+    export type UpdateCustomerNotesMutationError = ErrorType<ApiErrorResponse>
+
+    export const useUpdateCustomerNotes = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCustomerNotes>>, TError,{businessId: string;customerId: string;data: BodyType<UpdateCustomerNotesRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCustomerNotes>>,
+        TError,
+        {businessId: string;customerId: string;data: BodyType<UpdateCustomerNotesRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateCustomerNotesMutationOptions(options), queryClient);
+    }
