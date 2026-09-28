@@ -3,6 +3,7 @@ import { Worker, type Job } from "bullmq";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import {
+  ANALYTICS_CONSTANTS,
   CALENDAR_CONSTANTS,
   JOB_CONSTANTS,
   MESSAGING_CONSTANTS,
@@ -23,6 +24,7 @@ import {
   createRedisConnection,
   getRedis,
 } from "./infrastructure/redis/redis.js";
+import { analyticsService } from "./modules/analytics/analytics.service.js";
 import { bookingMaintenanceService } from "./modules/bookings/booking-maintenance.service.js";
 import { calendarSyncQueue } from "./modules/calendar/calendar-sync.queue.js";
 import { calendarSyncService } from "./modules/calendar/calendar-sync.service.js";
@@ -94,6 +96,13 @@ async function observeJob<Result>(queue: string, job: Job, work: () => Promise<R
 }
 
 async function runMaintenanceJob(job: Job): Promise<number> {
+  if (job.name === ANALYTICS_CONSTANTS.NIGHTLY_JOB) {
+    const businesses = await observeJob(QUEUES.MAINTENANCE, job, () => analyticsService.storeRecentDays());
+
+    logger.info({ job: job.name, businesses }, "Daily metrics stored");
+    return businesses;
+  }
+
   if (!isMaintenanceJob(job.name)) {
     throw new Error(`Unknown maintenance job ${job.name}`);
   }
@@ -208,6 +217,11 @@ async function startWorker(): Promise<void> {
       await maintenanceQueue.upsertJobScheduler(name, { every }, { name });
     }
 
+    await maintenanceQueue.upsertJobScheduler(
+      ANALYTICS_CONSTANTS.NIGHTLY_JOB,
+      { pattern: ANALYTICS_CONSTANTS.NIGHTLY_PATTERN },
+      { name: ANALYTICS_CONSTANTS.NIGHTLY_JOB },
+    );
     await calendarQueue.upsertJobScheduler(
       CALENDAR_CONSTANTS.SWEEP_JOB,
       { every: CALENDAR_CONSTANTS.SWEEP_EVERY_MS },

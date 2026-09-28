@@ -354,6 +354,22 @@ model MessagingNumber {
   @@map("messaging_numbers")
 }
 
+/// One number about one local day at a business, computed nightly for the analytics page.
+model DailyMetric {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  /// The business's local date.
+  date       DateTime @db.Date
+  /// For example visits, revenue_minor, hour_09 or staff_open_minutes:<staff id>.
+  metric     String   @db.VarChar(80)
+  value      Float
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, date, metric], map: "daily_metrics_business_id_date_metric_key")
+  @@map("daily_metrics")
+}
+
 /// A website allowed to embed the business's booking widget.
 model AllowedOrigin {
   id         String   @id @default(uuid()) @db.Uuid
@@ -414,6 +430,7 @@ model Business {
   guestCodes          GuestCode[]
   allowedOrigins      AllowedOrigin[]
   messagingNumbers    MessagingNumber[]
+  dailyMetrics        DailyMetric[]
   payments            Payment[]
   closures         BusinessClosure[]
   knowledgeSources KnowledgeSource[]
