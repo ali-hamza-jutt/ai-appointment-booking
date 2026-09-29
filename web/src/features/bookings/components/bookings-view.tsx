@@ -40,6 +40,7 @@ import type {
   BusinessSummaryResponse,
 } from "@/generated/api/models";
 import { useListStaff } from "@/generated/api/staff/staff";
+import { isDateParam, useSearchParamState } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import {
   addDaysToDate,
@@ -92,8 +93,8 @@ function BookingsLoader({ summary }: { summary: BusinessSummaryResponse }) {
 function BookingsContent({ business }: { business: BusinessResponse }) {
   const queryClient = useQueryClient();
   const timeZone = business.timeZone;
-  const [date, setDate] = useState(() => getCurrentLocalDate(timeZone));
-  const [status, setStatus] = useState<BookingStatus | "ALL">("ALL");
+  const [date, setDate] = useSearchParamState("date", getCurrentLocalDate(timeZone), isDateParam);
+  const [status, setStatus] = useSearchParamState<BookingStatus | "ALL">("status", "ALL", STATUS_FILTERS);
   const [selected, setSelected] = useState<BookingResponse | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const bookingsQuery = useDayBookings(business.id, date, timeZone, status);
@@ -128,7 +129,7 @@ function BookingsContent({ business }: { business: BusinessResponse }) {
         <div className="flex items-center gap-1">
           <Button
             aria-label="Previous day"
-            onClick={() => setDate((current) => addDaysToDate(current, -1))}
+            onClick={() => setDate(addDaysToDate(date, -1))}
             size="sm"
             variant="secondary"
           >
@@ -139,7 +140,7 @@ function BookingsContent({ business }: { business: BusinessResponse }) {
           </Button>
           <Button
             aria-label="Next day"
-            onClick={() => setDate((current) => addDaysToDate(current, 1))}
+            onClick={() => setDate(addDaysToDate(date, 1))}
             size="sm"
             variant="secondary"
           >

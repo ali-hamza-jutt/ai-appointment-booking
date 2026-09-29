@@ -28,7 +28,7 @@ import {
   useCreateCustomer,
 } from "@/generated/api/customers/customers";
 import type { BusinessSummaryResponse, CustomerResponse } from "@/generated/api/models";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useSearchParamQuery } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage, getApiFieldError } from "@/lib/api/api-error";
 import { formatDate } from "@/lib/utils/date-time";
 
@@ -42,13 +42,12 @@ export function CustomersView() {
 
 function CustomersContent({ business }: { business: BusinessSummaryResponse }) {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [profileCustomer, setProfileCustomer] = useState<CustomerResponse | null>(null);
-  const debouncedSearch = useDebouncedValue(
-    search.trim(),
+  const { search, setSearch, query: debouncedSearch } = useSearchParamQuery(
+    "q",
     CUSTOMER_UI_CONSTANTS.SEARCH_DEBOUNCE_MS,
   );
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [profileCustomer, setProfileCustomer] = useState<CustomerResponse | null>(null);
   const customersQuery = useCustomers(business.id, debouncedSearch);
   const customers = customersQuery.data?.pages.flatMap((page) => page.items) ?? [];
 

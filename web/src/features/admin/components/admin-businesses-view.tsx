@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,7 +10,7 @@ import { BuildingIcon } from "@/components/ui/icons";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { useListAdminBusinesses } from "@/generated/api/platform-admin/platform-admin";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useSearchParamQuery } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { formatDate } from "@/lib/utils/date-time";
 
@@ -21,8 +20,7 @@ export function formatUsd(value: number): string {
 
 /** Every tenant, newest first, searchable by name or booking link. */
 export function AdminBusinessesView() {
-  const [search, setSearch] = useState("");
-  const debounced = useDebouncedValue(search.trim(), 300);
+  const { search, setSearch, query: debounced } = useSearchParamQuery("q", 300);
   const businessesQuery = useListAdminBusinesses(debounced ? { search: debounced } : {});
   const businesses = businessesQuery.data?.items ?? [];
 

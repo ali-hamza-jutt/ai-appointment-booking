@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -18,11 +17,14 @@ import { useConversationSessions } from "@/features/conversations/hooks/use-conv
 import type { ConversationFilter } from "@/features/conversations/types/conversation-ui";
 import { toConversationSessionViewModel } from "@/features/conversations/utils/conversation-format";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
+const FILTER_VALUES = CONVERSATION_UI_CONSTANTS.FILTERS.map((filter) => filter.value);
+
 export function ConversationsList() {
-  const [activeFilter, setActiveFilter] = useState<ConversationFilter>("ALL");
+  const [activeFilter, setActiveFilter] = useSearchParamState<ConversationFilter>("status", "ALL", FILTER_VALUES);
   const timeZone = useBrowserTimeZone();
   const sessionsQuery = useConversationSessions(activeFilter);
   const sessions = Array.from(

@@ -44,6 +44,18 @@ test("a new customer signs up, books through chat, confirms and cancels", async 
     await dialog.getByRole("button", { name: "Cancel appointment" }).click();
     await expect(page.getByText("Appointment cancelled.")).toBeVisible();
   });
+
+  await test.step("the status filter survives a reload", async () => {
+    await page.goto("/appointments");
+
+    const cancelledTab = page.getByRole("tab", { name: "Cancelled" });
+
+    await cancelledTab.click();
+    await expect(page).toHaveURL(/[?&]status=CANCELLED\b/);
+    await page.reload();
+    await expect(page.getByRole("tab", { name: "Cancelled" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText(`${business.name} · Sana`).first()).toBeVisible();
+  });
 });
 
 test("the assistant declines requests that aren't bookings", async ({ page }) => {

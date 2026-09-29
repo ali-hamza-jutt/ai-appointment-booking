@@ -19,6 +19,7 @@ import {
   useListBusinessReviews,
   useModerateReview,
 } from "@/generated/api/reviews/reviews";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { formatDate } from "@/lib/utils/date-time";
 
@@ -30,6 +31,8 @@ const FILTERS: ReadonlyArray<{ label: string; value: Filter }> = [
   { label: "Hidden", value: "HIDDEN" },
   { label: "All", value: "ALL" },
 ];
+
+const FILTER_VALUES = FILTERS.map((option) => option.value);
 
 const STATUS_PRESENTATION: Record<ReviewStatus, { label: string; tone: BadgeTone }> = {
   PENDING: { label: "Not published", tone: "warning" },
@@ -46,7 +49,7 @@ export function BusinessReviewsView() {
 }
 
 function BusinessReviewsContent({ business }: { business: BusinessSummaryResponse }) {
-  const [filter, setFilter] = useState<Filter>("PENDING");
+  const [filter, setFilter] = useSearchParamState<Filter>("status", "PENDING", FILTER_VALUES);
   const reviewsQuery = useListBusinessReviews(business.id, filter === "ALL" ? undefined : { status: filter });
   const reviews = reviewsQuery.data?.items ?? [];
   const summary = reviewsQuery.data?.summary;
