@@ -20,7 +20,7 @@ export function uniqueEmail(prefix: string): string {
 }
 
 /** A salon open every day 09:00–17:00 UTC with one bookable haircut. */
-export async function createBookableBusiness(): Promise<{ slug: string; name: string }> {
+export async function createBookableBusiness(): Promise<{ id: string; slug: string; name: string; ownerToken: string }> {
   const { accessToken: token } = await call<{ accessToken: string }>("/auth/signup", {
     method: "POST",
     body: { fullName: "Olivia Owner", email: uniqueEmail("owner"), password: "Password123" },
@@ -57,5 +57,10 @@ export async function createBookableBusiness(): Promise<{ slug: string; name: st
     },
   });
 
-  return { slug: business.slug, name };
+  return { id: business.id, slug: business.slug, name, ownerToken: token };
+}
+
+/** Lets a website embed the business's booking widget. */
+export async function allowWidgetOn(business: { id: string; ownerToken: string }, origin: string): Promise<void> {
+  await call(`/businesses/${business.id}/allowed-origins`, { method: "POST", token: business.ownerToken, body: { origin } });
 }
