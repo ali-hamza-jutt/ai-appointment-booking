@@ -1,10 +1,8 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   useRef,
-  useState,
   useEffect,
   useMemo,
   useTransition,
@@ -33,49 +31,21 @@ import { useAuth } from "@/features/auth/auth-context";
 import { ChatMessageParts } from "@/features/booking/components/chat-message-parts";
 import { LiveReply } from "@/features/booking/components/live-reply";
 import { StructuredBookingForm } from "@/features/booking/components/structured-booking-form";
+import { useBookingChat } from "@/features/booking/hooks/use-booking-chat";
 import { BOOKING_UI_CONSTANTS } from "@/features/bookings/constants/booking-status.constants";
 import { CONVERSATION_UI_CONSTANTS } from "@/features/conversations/constants/conversation-ui.constants";
-import { useChatMessagePolling } from "@/features/conversations/hooks/use-chat-message-polling";
 import { useConversationMessages } from "@/features/conversations/hooks/use-conversation-messages";
+import { useGetSession } from "@/generated/api/chat/chat";
 import type {
-  BookingDraftViewModel,
-  ChatMessageDeliveryStatus,
-  ChatMessageViewModel,
-  LiveReplyViewModel,
-  PendingChatTurn,
-  StructuredBookingFormValues,
-} from "@/features/booking/types/booking-ui";
-import {
-  getBrowserTimeZone,
-  getMissingDraftFields,
-  mergeLivePart,
-  toBookingDraft,
-  toConfirmedBookingDraft,
-} from "@/features/booking/utils/booking-format";
-import { streamChatTurn } from "@/features/booking/utils/chat-stream";
-import { getListAppointmentsQueryKey } from "@/generated/api/appointments/appointments";
-import {
-  getListMessagesQueryKey,
-  getListSessionsQueryKey,
-  useGetSession,
-  useConfirmBooking,
-  useCreateMessage,
-  useCreateSession,
-} from "@/generated/api/chat/chat";
-import type {
-  ChatAction,
-  ChatBookingDraft,
   ChatMessageResponse,
   ChatSessionResponse,
-  ChatTurnResponse,
-  ProcessChatMessageRequest,
 } from "@/generated/api/models";
 import {
   useGetPublicBusiness,
   useListPublicServices,
 } from "@/generated/api/public-booking/public-booking";
 import { useBrowserTimeZone } from "@/hooks/use-browser-time-zone";
-import { getApiErrorMessage, isApiError } from "@/lib/api/api-error";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 
 const MAX_SERVICE_SUGGESTIONS = 3;
@@ -85,14 +55,6 @@ const scheduleSuggestions = [
   "Next Tuesday at 2 PM",
   "Friday at 4 PM",
 ];
-
-function createWelcomeMessage(firstName: string): ChatMessageViewModel {
-  return {
-    id: "welcome",
-    role: "assistant",
-    text: `Hi ${firstName}! Tell me what you would like to schedule, and I’ll help turn it into an appointment.`,
-  };
-}
 
 interface BookingWorkspaceProps {
   businessSlug?: string;
@@ -202,13 +164,7 @@ function BookingExperience({
 }: BookingExperienceProps) {
   const router = useRouter();
   const [isStartingNew, startNewTransition] = useTransition();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
-  const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
-  const persistedMessages = initialMessages
-    .filter(isBookingMessage)
-    .map(toBookingMessageViewModel);
-  const initialMissingFields = getMissingDraftFields(initialSession?.draft);
   const businessQuery = useGetPublicBusiness(businessSlug);
   const publicServicesQuery = useListPublicServices(businessSlug);
   const businessName = businessQuery.data?.name ?? "this business";
@@ -226,54 +182,48 @@ function BookingExperience({
         : [],
     [serviceSuggestions],
   );
-  const createSessionMutation = useCreateSession();
-  const createMessageMutation = useCreateMessage();
-  const confirmBookingMutation = useConfirmBooking();
-  const [sessionId, setSessionId] = useState<string | null>(
-    initialSession?.id ?? null,
-  );
-  const [messages, setMessages] = useState<ChatMessageViewModel[]>(() =>
-    persistedMessages.length > 0
-      ? persistedMessages
-      : [createWelcomeMessage(firstName)],
-  );
-  const [composer, setComposer] = useState("");
-  const [draft, setDraft] = useState<BookingDraftViewModel | null>(() =>
-    toBookingDraft(initialSession?.draft, initialTimeZone),
-  );
-  const [sessionDraft, setSessionDraft] = useState<ChatBookingDraft | null>(
-    initialSession?.draft ?? null,
-  );
-  const [timeZone, setTimeZone] = useState(initialTimeZone);
-  const [missingFields, setMissingFields] = useState<string[]>(
-    initialMissingFields,
-  );
-  const [isReadyToConfirm, setIsReadyToConfirm] = useState(
-    initialSession?.status === "ACTIVE" && Boolean(initialSession.draft.hold),
-  );
-  const [isProcessingTurn, setIsProcessingTurn] = useState(false);
-  const [liveReply, setLiveReply] = useState<LiveReplyViewModel | null>(null);
-  const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [confirmationError, setConfirmationError] = useState<string | null>(null);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isStructuredFormOpen, setIsStructuredFormOpen] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(
-    initialSession?.status === "CLOSED",
-  );
-  const [isAwaitingApproval, setIsAwaitingApproval] = useState(false);
-  const messageScrollRef = useRef<HTMLDivElement | null>(null);
-  const messageRequestLockRef = useRef(false);
-  const confirmationRequestLockRef = useRef(false);
-  const messagePollingQuery = useChatMessagePolling(sessionId ?? "", {
-    enabled: Boolean(sessionId) && !isConfirmed,
-    ...(initialMessageCursor ? { initialCursor: initialMessageCursor } : {}),
+  const {
+    state: {
+      composer,
+      confirmationError,
+      dialog,
+      draft,
+      isReadyToConfirm,
+      isSending,
+      liveReply,
+      missingFields,
+      outcome,
+      pendingTurn,
+      requestError,
+      sessionDraft,
+      timeZone,
+    },
+    canConfirm,
+    closeConfirmation,
+    closeStructuredBookingForm,
+    confirmBooking,
+    handlePartAction,
+    hasFailedTurn,
+    isBooked,
+    isComposerDisabled,
+    isConfirming,
+    openConfirmation,
+    openStructuredBookingForm,
+    retryPendingTurn,
+    sendMessage,
+    setComposer,
+    submitStructuredBookingDetails,
+    visibleMessages,
+  } = useBookingChat({
+    businessSlug,
+    firstName: user?.fullName.trim().split(/s+/)[0] ?? "there",
+    initialMessageCursor,
+    messages: initialMessages,
+    onSessionCreated,
+    session: initialSession,
+    timeZone: initialTimeZone,
   });
-  const visibleMessages = useMemo(
-    () =>
-      mergeBookingMessages(messages, messagePollingQuery.data?.items ?? []),
-    [messagePollingQuery.data?.items, messages],
-  );
+  const messageScrollRef = useRef<HTMLDivElement | null>(null);
   const latestAssistantMessageId = [...visibleMessages]
     .reverse()
     .find((message) => message.role === "assistant")?.id;
@@ -281,17 +231,6 @@ function BookingExperience({
     () => getContextualSuggestions(missingFields, initialSuggestions, serviceSuggestions),
     [initialSuggestions, missingFields, serviceSuggestions],
   );
-
-  const isSending = isProcessingTurn;
-  const isConfirming = confirmBookingMutation.isPending;
-  const hasFailedTurn = Boolean(pendingTurn) && !isSending;
-  const isComposerDisabled = isSending || hasFailedTurn || isConfirmed;
-  const canConfirm =
-    Boolean(sessionId) &&
-    Boolean(draft) &&
-    isReadyToConfirm &&
-    !isSending &&
-    !isConfirmed;
 
   useEffect(() => {
     const messageScroller = messageScrollRef.current;
@@ -304,306 +243,9 @@ function BookingExperience({
     });
   }, [isSending, visibleMessages]);
 
-  function updateOptimisticMessage(
-    turn: PendingChatTurn,
-    deliveryStatus: ChatMessageDeliveryStatus,
-  ) {
-    setMessages((current) => {
-      const existingMessage = current.find(
-        (message) => message.clientMessageId === turn.clientMessageId,
-      );
-
-      if (existingMessage) {
-        return current.map((message) =>
-          message.clientMessageId === turn.clientMessageId
-            ? { ...message, deliveryStatus }
-            : message,
-        );
-      }
-
-      return [
-        ...current,
-        {
-          clientMessageId: turn.clientMessageId,
-          deliveryStatus,
-          id: `pending-${turn.clientMessageId}`,
-          role: "user",
-          text: turn.text,
-        },
-      ];
-    });
-  }
-
-  /**
-   * Streams the reply when the API supports it. If the stream can't open or
-   * drops, the JSON endpoint returns the same turn: the message id makes the
-   * request idempotent, so nothing is processed twice.
-   */
-  async function sendTurn(
-    activeSessionId: string,
-    data: ProcessChatMessageRequest,
-  ): Promise<ChatTurnResponse> {
-    setLiveReply({ status: null, text: "", parts: [] });
-
-    try {
-      return await streamChatTurn(activeSessionId, data, {
-        onStatus: (status) => setLiveReply((current) => ({ status, text: "", parts: current?.parts ?? [] })),
-        onToken: (text) =>
-          setLiveReply((current) => ({
-            status: current?.status ?? null,
-            text: `${current?.text ?? ""}${text}`,
-            parts: current?.parts ?? [],
-          })),
-        onPart: (part) =>
-          setLiveReply((current) => ({
-            status: current?.status ?? null,
-            text: current?.text ?? "",
-            parts: mergeLivePart(current?.parts ?? [], part),
-          })),
-      });
-    } catch (error) {
-      if (isApiError(error)) throw error;
-
-      return createMessageMutation.mutateAsync({ data, sessionId: activeSessionId });
-    } finally {
-      setLiveReply(null);
-    }
-  }
-
-  async function processTurn(turn: PendingChatTurn): Promise<boolean> {
-    if (messageRequestLockRef.current || isConfirmed) return false;
-
-    messageRequestLockRef.current = true;
-    setIsProcessingTurn(true);
-    setPendingTurn(turn);
-    setRequestError(null);
-    setIsReadyToConfirm(false);
-    updateOptimisticMessage(turn, "sending");
-
-    try {
-      let activeSessionId = sessionId;
-      let newlyCreatedSessionId: string | null = null;
-
-      if (!activeSessionId) {
-        const session = await createSessionMutation.mutateAsync({
-          data: { businessSlug, title: turn.text.slice(0, 120) },
-        });
-        activeSessionId = session.id;
-        newlyCreatedSessionId = session.id;
-        setSessionId(session.id);
-        onSessionCreated?.(session.id);
-      }
-
-      const browserTimeZone = getBrowserTimeZone();
-      setTimeZone(browserTimeZone);
-
-      const response = await sendTurn(activeSessionId, {
-        clientMessageId: turn.clientMessageId,
-        content: turn.text,
-        timeZone: browserTimeZone,
-        ...(turn.bookingDetails
-          ? { bookingDetails: turn.bookingDetails }
-          : {}),
-        ...(turn.action ? { action: turn.action } : {}),
-      });
-
-      setMessages((current) => {
-        const deliveredMessages = current.map((message) =>
-          message.clientMessageId === turn.clientMessageId
-            ? {
-                ...message,
-                deliveryStatus: "sent" as const,
-                text: response.userMessage.content,
-              }
-            : message,
-        );
-
-        if (
-          deliveredMessages.some(
-            (message) => message.id === response.assistantMessage.id,
-          )
-        ) {
-          return deliveredMessages;
-        }
-
-        return [
-          ...deliveredMessages,
-          toBookingMessageViewModel({ ...response.assistantMessage, role: "ASSISTANT" }),
-        ];
-      });
-      setSessionDraft(response.session.draft);
-      setDraft(toBookingDraft(response.session.draft, browserTimeZone));
-      setMissingFields(getMissingDraftFields(response.session.draft));
-      setIsReadyToConfirm(Boolean(response.session.draft.hold));
-      setConfirmationError(null);
-      setPendingTurn(null);
-      void Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: getListSessionsQueryKey(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: getListMessagesQueryKey(activeSessionId),
-        }),
-      ]);
-
-      if (newlyCreatedSessionId) {
-        window.history.replaceState(
-          window.history.state,
-          "",
-          `/book?sessionId=${encodeURIComponent(newlyCreatedSessionId)}`,
-        );
-      }
-      return true;
-    } catch (error) {
-      updateOptimisticMessage(turn, "failed");
-      setRequestError(
-        getApiErrorMessage(
-          error,
-          "We could not process your message. Please try again or use the booking form.",
-        ),
-      );
-      return false;
-    } finally {
-      messageRequestLockRef.current = false;
-      setIsProcessingTurn(false);
-    }
-  }
-
-  function sendMessage(text: string) {
-    const trimmedMessage = text.trim();
-    if (!trimmedMessage || isComposerDisabled || messageRequestLockRef.current) {
-      return;
-    }
-
-    const turn: PendingChatTurn = {
-      clientMessageId: crypto.randomUUID(),
-      text: trimmedMessage,
-    };
-    setComposer("");
-    void processTurn(turn);
-  }
-
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     sendMessage(composer);
-  }
-
-  function retryPendingTurn() {
-    if (pendingTurn && !isSending) void processTurn(pendingTurn);
-  }
-
-  /** A tap on a card or button in an assistant reply. */
-  function handlePartAction(action: ChatAction, label: string) {
-    if (action.type === "confirm_booking") {
-      openConfirmation();
-      return;
-    }
-
-    if (isComposerDisabled || messageRequestLockRef.current) return;
-
-    void processTurn({ action, clientMessageId: crypto.randomUUID(), text: label });
-  }
-
-  async function submitStructuredBookingDetails(
-    values: StructuredBookingFormValues,
-  ): Promise<boolean> {
-    if (isSending || isConfirmed || messageRequestLockRef.current) {
-      return false;
-    }
-
-    const turn: PendingChatTurn = pendingTurn
-      ? { ...pendingTurn, bookingDetails: values }
-      : {
-        bookingDetails: values,
-        clientMessageId: crypto.randomUUID(),
-        text: "I completed the structured booking form.",
-      };
-
-    return processTurn(turn);
-  }
-
-  function openStructuredBookingForm() {
-    if (isSending || isConfirmed) return;
-
-    setRequestError(null);
-    setIsStructuredFormOpen(true);
-  }
-
-  function openConfirmation() {
-    if (!canConfirm || isConfirming) return;
-
-    setConfirmationError(null);
-    setIsConfirmOpen(true);
-  }
-
-  function closeConfirmation() {
-    if (isConfirming) return;
-
-    setConfirmationError(null);
-    setIsConfirmOpen(false);
-  }
-
-  function confirmBooking() {
-    if (
-      !sessionId ||
-      !canConfirm ||
-      isConfirming ||
-      confirmationRequestLockRef.current
-    ) {
-      return;
-    }
-
-    confirmationRequestLockRef.current = true;
-    setConfirmationError(null);
-    confirmBookingMutation.mutate(
-      { sessionId },
-      {
-        onError: (error) => {
-          setConfirmationError(
-            getApiErrorMessage(
-              error,
-              "The appointment could not be confirmed. Please try again.",
-            ),
-          );
-        },
-        onSettled: () => {
-          confirmationRequestLockRef.current = false;
-        },
-        onSuccess: (response) => {
-          setMessages((current) =>
-            current.some((message) => message.id === response.assistantMessage.id)
-              ? current
-              : [
-                  ...current,
-                  toBookingMessageViewModel({ ...response.assistantMessage, role: "ASSISTANT" }),
-                ],
-          );
-          setDraft(toConfirmedBookingDraft(response.appointment));
-          setSessionDraft(response.session.draft);
-          setIsReadyToConfirm(false);
-          setIsAwaitingApproval(response.appointment.status === "PENDING");
-          setIsConfirmed(true);
-          setIsConfirmOpen(false);
-          setIsStructuredFormOpen(false);
-
-          // A deposit is taken on Stripe's page; the booking is confirmed when it goes through.
-          const checkoutUrl = response.appointment.payment?.checkoutUrl;
-
-          if (checkoutUrl) window.location.assign(checkoutUrl);
-          void Promise.all([
-            queryClient.invalidateQueries({
-              queryKey: getListAppointmentsQueryKey(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: getListSessionsQueryKey(),
-            }),
-            queryClient.invalidateQueries({
-              queryKey: getListMessagesQueryKey(sessionId),
-            }),
-          ]);
-        },
-      },
-    );
   }
 
   function startAnotherBooking() {
@@ -727,7 +369,7 @@ function BookingExperience({
               </Alert>
             ) : null}
 
-            {visibleMessages.length === 1 && !isConfirmed && initialSuggestions.length > 0 ? (
+            {visibleMessages.length === 1 && !isBooked && initialSuggestions.length > 0 ? (
               <BookingSuggestions
                 disabled={isComposerDisabled}
                 label="Try an example"
@@ -738,7 +380,7 @@ function BookingExperience({
 
             {visibleMessages.length > 1 &&
             contextualSuggestions.length > 0 &&
-            !isConfirmed &&
+            !isBooked &&
             !requestError ? (
               <BookingSuggestions
                 disabled={isComposerDisabled}
@@ -766,7 +408,7 @@ function BookingExperience({
                   }
                 }}
                 placeholder={
-                  isConfirmed
+                  isBooked
                     ? "This appointment has been booked"
                     : hasFailedTurn
                       ? "Retry or start over before sending another message"
@@ -804,15 +446,15 @@ function BookingExperience({
               <p className="mt-0.5 text-xs text-muted">Review before you confirm.</p>
             </div>
             {draft ? (
-              <Badge tone={isConfirmed ? "success" : "warning"}>
-                {isConfirmed ? "Booked" : "Draft"}
+              <Badge tone={isBooked ? "success" : "warning"}>
+                {isBooked ? "Booked" : "Draft"}
               </Badge>
             ) : null}
           </div>
 
-          {isConfirmed ? (
+          {isBooked ? (
             <Alert className="mb-4" tone="success">
-              {isAwaitingApproval
+              {outcome === "awaiting_approval"
                 ? `Your request was sent to ${businessName} for approval.`
                 : "Your appointment has been booked successfully."}
             </Alert>
@@ -821,7 +463,7 @@ function BookingExperience({
           {draft ? (
             <div className="rounded-xl border border-border bg-surface shadow-card">
               <div className="space-y-5 p-5">
-                {missingFields.length > 0 && !isConfirmed ? (
+                {missingFields.length > 0 && !isBooked ? (
                   <Alert tone="info">
                     Still needed: {missingFields.map(formatMissingField).join(", ")}.
                   </Alert>
@@ -836,7 +478,7 @@ function BookingExperience({
                   <DraftRow icon={<TagIcon className="size-[18px]" />} label="Price" value={draft.price} />
                 ) : null}
                 <DraftRow icon={<GlobeIcon className="size-[18px]" />} label="Timezone" value={draft.timezone} />
-                {draft.heldUntil && !isConfirmed ? (
+                {draft.heldUntil && !isBooked ? (
                   <Alert tone="warning">This time is held for you until {draft.heldUntil}.</Alert>
                 ) : null}
                 <div className="border-t border-border pt-4">
@@ -845,7 +487,7 @@ function BookingExperience({
                 </div>
               </div>
               <div className="flex flex-col gap-2 border-t border-border p-4 sm:flex-row xl:flex-col">
-                {isConfirmed ? (
+                {isBooked ? (
                   <Button
                     fullWidth
                     isLoading={isStartingNew}
@@ -904,7 +546,7 @@ function BookingExperience({
 
       <Modal
         description="Check the final details. You can still go back and edit them."
-        isOpen={isConfirmOpen}
+        isOpen={dialog === "confirm"}
         onClose={closeConfirmation}
         title="Confirm appointment"
       >
@@ -930,13 +572,13 @@ function BookingExperience({
         </div>
       </Modal>
 
-      {isStructuredFormOpen ? (
+      {dialog === "form" ? (
         <StructuredBookingForm
           draft={sessionDraft}
           businessSlug={businessSlug}
           initialValues={pendingTurn?.bookingDetails}
           isSubmitting={isSending}
-          onClose={() => !isSending && setIsStructuredFormOpen(false)}
+          onClose={closeStructuredBookingForm}
           onSubmit={submitStructuredBookingDetails}
           submissionError={requestError}
           timeZone={timeZone}
@@ -960,59 +602,6 @@ function DraftRow({ icon, label, value }: { icon: ReactNode; label: string; valu
 
 function formatMissingField(field: string): string {
   return field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-}
-
-function isBookingMessage(
-  message: ChatMessageResponse,
-): message is ChatMessageResponse & { role: "ASSISTANT" | "USER" } {
-  return message.role === "ASSISTANT" || message.role === "USER";
-}
-
-function toBookingMessageViewModel(
-  message: ChatMessageResponse & { role: "ASSISTANT" | "USER" },
-): ChatMessageViewModel {
-  return {
-    ...(message.clientMessageId
-      ? { clientMessageId: message.clientMessageId }
-      : {}),
-    ...(message.role === "USER" ? { deliveryStatus: "sent" as const } : {}),
-    id: message.id,
-    ...(message.role === "ASSISTANT" && message.structuredData?.parts?.length
-      ? { parts: message.structuredData.parts }
-      : {}),
-    role: message.role === "USER" ? "user" : "assistant",
-    ...(message.structuredData?.sentBy ? { sentBy: message.structuredData.sentBy.name } : {}),
-    text: message.content,
-  };
-}
-
-function mergeBookingMessages(
-  current: ChatMessageViewModel[],
-  polledMessages: ChatMessageResponse[],
-): ChatMessageViewModel[] {
-  if (polledMessages.length === 0) return current;
-
-  const mergedMessages = [...current];
-
-  for (const polledMessage of polledMessages) {
-    if (!isBookingMessage(polledMessage)) continue;
-
-    const message = toBookingMessageViewModel(polledMessage);
-    const existingIndex = mergedMessages.findIndex(
-      (existingMessage) =>
-        existingMessage.id === message.id ||
-        (message.clientMessageId !== undefined &&
-          existingMessage.clientMessageId === message.clientMessageId),
-    );
-
-    if (existingIndex >= 0) {
-      mergedMessages[existingIndex] = message;
-    } else {
-      mergedMessages.push(message);
-    }
-  }
-
-  return mergedMessages;
 }
 
 function getContextualSuggestions(
