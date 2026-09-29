@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/feedback";
-import { CheckboxField, TextField } from "@/components/ui/form-controls";
+import { CheckboxField, SelectField, TextField } from "@/components/ui/form-controls";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   POLICY_FIELDS,
@@ -15,7 +15,7 @@ import {
   getGetBusinessQueryKey,
   useUpdateBusinessSettings,
 } from "@/generated/api/businesses/businesses";
-import type { BusinessResponse } from "@/generated/api/models";
+import type { BusinessResponse, NoShowFee } from "@/generated/api/models";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
 interface BookingPoliciesFormProps {
@@ -42,6 +42,7 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
     business.settings.autoConfirmBookings,
   );
   const [autoMarkNoShows, setAutoMarkNoShows] = useState(business.settings.autoMarkNoShows);
+  const [noShowFee, setNoShowFee] = useState<NoShowFee>(business.settings.noShowFee);
   const [fieldErrors, setFieldErrors] = useState<Partial<PolicyValues>>({});
   const [saved, setSaved] = useState(false);
 
@@ -68,7 +69,7 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
     updateMutation.mutate(
       {
         businessId: business.id,
-        data: { ...numbers, allowGuestBooking, autoConfirmBookings, autoMarkNoShows },
+        data: { ...numbers, allowGuestBooking, autoConfirmBookings, autoMarkNoShows, noShowFee },
       },
       {
         onSuccess: (response) => {
@@ -147,6 +148,18 @@ export function BookingPoliciesForm({ business, canEdit }: BookingPoliciesFormPr
               label="Mark no-shows automatically"
               onChange={(event) => setAutoMarkNoShows(event.target.checked)}
             />
+            <SelectField
+              disabled={!canEdit}
+              hint="Applies to deposits and prepayments taken online when a booking is marked as a no-show."
+              id="policy-no-show-fee"
+              label="No-show fee"
+              onChange={(event) => setNoShowFee(event.target.value as NoShowFee)}
+              value={noShowFee}
+            >
+              <option value="payment">Keep what they paid</option>
+              <option value="deposit">Keep only the deposit, refund the rest</option>
+              <option value="none">No fee: refund everything</option>
+            </SelectField>
           </div>
         </div>
       </SectionCard>

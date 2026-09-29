@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isValidStripeSignature, stripeSignatureHeader } from "../../src/integrations/stripe/stripe-signature.js";
 import { encodeStripeForm, StripeClient } from "../../src/integrations/stripe/stripe.client.js";
-import { amountDue, cancellationRefund, platformFee } from "../../src/modules/payments/payment-rules.js";
+import { amountDue, cancellationRefund, noShowRefund, platformFee } from "../../src/modules/payments/payment-rules.js";
 
 const start = new Date("2026-10-10T10:00:00Z");
 const base = {
@@ -49,6 +49,22 @@ describe("cancellationRefund", () => {
       cancellationRefund({ ...base, alreadyRefundedMinor: 4_500, cancelledBy: "STAFF", cancelledAt: start }),
     ).toBe(500);
     expect(cancellationRefund({ ...base, alreadyRefundedMinor: 4_500, cancelledAt: new Date("2026-10-09T12:00:00Z") })).toBe(0);
+  });
+});
+
+describe("noShowRefund", () => {
+  const prepaid = { paidMinor: 5_000, alreadyRefundedMinor: 0, kind: "FULL" as const, depositMinor: 1_000 };
+
+  it("keeps everything by default, only the deposit, or nothing, as the business chose", () => {
+    expect(noShowRefund({ ...prepaid, fee: "payment" })).toBe(0);
+    expect(noShowRefund({ ...prepaid, fee: "deposit" })).toBe(4_000);
+    expect(noShowRefund({ ...prepaid, fee: "none" })).toBe(5_000);
+  });
+
+  it("keeps a paid deposit whole, and never refunds twice", () => {
+    expect(noShowRefund({ ...prepaid, kind: "DEPOSIT", paidMinor: 1_000, fee: "deposit" })).toBe(0);
+    expect(noShowRefund({ ...prepaid, depositMinor: null, fee: "deposit" })).toBe(5_000);
+    expect(noShowRefund({ ...prepaid, alreadyRefundedMinor: 4_500, fee: "none" })).toBe(500);
   });
 });
 

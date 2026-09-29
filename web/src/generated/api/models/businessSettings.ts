@@ -5,6 +5,7 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import type { NoShowFee } from './noShowFee';
 
 export interface BusinessSettings {
   /** Furthest day ahead a customer can book. */
@@ -33,4 +34,9 @@ export interface BusinessSettings {
      */
   quietHoursStart: string;
   quietHoursEnd: string;
+  /**
+     * What a customer who doesn't show up forfeits of what they paid online:
+     * all of it, only the deposit, or nothing (a full refund).
+     */
+  noShowFee: NoShowFee;
 }

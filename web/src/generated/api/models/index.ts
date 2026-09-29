@@ -231,6 +231,7 @@ export * from './myNotificationSettingsResponse';
 export * from './myPreferencesResponse';
 export * from './myReviewResponse';
 export * from './newCustomerInput';
+export * from './noShowFee';
 export * from './notificationChannel';
 export * from './notificationKind';
 export * from './notificationSettingsBusiness';

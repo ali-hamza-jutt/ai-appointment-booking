@@ -13,6 +13,7 @@ import { throwRequestValidationError } from "../../utils/validation.js";
 import { resolveBookingPolicy } from "../bookings/booking-policy.js";
 import { bookingService } from "../bookings/booking.service.js";
 import type { AppointmentResponse, BookingRecord } from "../bookings/dto/booking.dto.js";
+import { parseStoredBusinessSettings } from "../businesses/business-settings.js";
 import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
 import { subscriptionService } from "../subscriptions/subscription.service.js";
 import { paymentDal } from "./dal/payment.dal.js";
@@ -25,7 +26,7 @@ import type {
   StripeEvent,
 } from "./dto/payment.dto.js";
 import { createPaymentGateway } from "./payment-gateway.js";
-import { cancellationRefund, platformFee } from "./payment-rules.js";
+import { cancellationRefund, noShowRefund, platformFee } from "./payment-rules.js";
 
 const MINUTE = 60_000;
 const PAID: readonly PaymentStatus[] = ["SUCCEEDED", "PARTIALLY_REFUNDED"];
@@ -174,6 +175,8 @@ export class PaymentService {
         await paymentDal.setStatus(payment, "CANCELLED", ["PENDING"]);
       } else if (PAID.includes(payment.status) && message.type === PAYMENT_CONSTANTS.EVENTS.CANCELLED) {
         await this.refundCancelled(booking, payment);
+      } else if (PAID.includes(payment.status) && message.type === PAYMENT_CONSTANTS.EVENTS.NO_SHOW) {
+        await this.refundNoShow(booking, payment);
       } else if (PAID.includes(payment.status) && message.type === PAYMENT_CONSTANTS.EVENTS.EXPIRED) {
         // Paid, but the time was lost first: give it all back.
         await this.refund(payment, payment.amountMinor - payment.refundedMinor, "expired");
@@ -300,6 +303,22 @@ export class PaymentService {
     });
 
     if (amount > 0) await this.refund(payment, amount, "cancelled");
+  }
+
+  /** Gives back what the business's no-show fee doesn't keep (by default, it keeps everything). */
+  private async refundNoShow(booking: BookingRecord, payment: BookingPaymentRecord): Promise<void> {
+    const service = booking.serviceId
+      ? await paymentDal.findServicePayment(prisma, booking.businessId, booking.serviceId)
+      : null;
+    const amount = noShowRefund({
+      paidMinor: payment.amountMinor,
+      alreadyRefundedMinor: payment.refundedMinor,
+      kind: payment.kind,
+      depositMinor: service?.depositMinor ?? null,
+      fee: parseStoredBusinessSettings(booking.business.settings).noShowFee,
+    });
+
+    if (amount > 0) await this.refund(payment, amount, "no-show");
   }
 
   /**

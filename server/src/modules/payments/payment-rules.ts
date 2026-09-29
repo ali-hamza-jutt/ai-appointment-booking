@@ -45,6 +45,31 @@ export function cancellationRefund(input: CancellationRefundInput): number {
   return Math.max(0, input.paidMinor - kept - input.alreadyRefundedMinor);
 }
 
+export interface NoShowRefundInput {
+  paidMinor: number;
+  alreadyRefundedMinor: number;
+  kind: PaymentKind;
+  /** The service's deposit; the most a "deposit" fee keeps of a full prepayment. */
+  depositMinor: number | null;
+  fee: "payment" | "deposit" | "none";
+}
+
+/**
+ * How much to give back when a paid booking ends as a no-show, by the
+ * business's no-show fee: keep everything, keep only the deposit, or keep
+ * nothing.
+ */
+export function noShowRefund(input: NoShowRefundInput): number {
+  const remaining = Math.max(0, input.paidMinor - input.alreadyRefundedMinor);
+
+  if (input.fee === "none") return remaining;
+  if (input.fee === "payment") return 0;
+
+  const kept = input.kind === "DEPOSIT" ? input.paidMinor : Math.min(input.depositMinor ?? 0, input.paidMinor);
+
+  return Math.max(0, input.paidMinor - kept - input.alreadyRefundedMinor);
+}
+
 /** BookWise's cut of a payment, rounded down to whole minor units. */
 export function platformFee(amountMinor: number, percent: number): number {
   return Math.floor((amountMinor * percent) / 100);

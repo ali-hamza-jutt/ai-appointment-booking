@@ -52,7 +52,14 @@ export interface BusinessSettings {
    */
   quietHoursStart: string;
   quietHoursEnd: string;
+  /**
+   * What a customer who doesn't show up forfeits of what they paid online:
+   * all of it, only the deposit, or nothing (a full refund).
+   */
+  noShowFee: NoShowFee;
 }
+
+export type NoShowFee = "payment" | "deposit" | "none";
 
 export interface UpdateBusinessSettingsRequest {
   /** @isInt @minimum 1 @maximum 365 */
@@ -76,6 +83,7 @@ export interface UpdateBusinessSettingsRequest {
   autoMarkNoShows?: boolean;
   quietHoursStart?: LocalTime;
   quietHoursEnd?: LocalTime;
+  noShowFee?: NoShowFee;
 }
 
 export interface CreateBusinessLocationInput {
