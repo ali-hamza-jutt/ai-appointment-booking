@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LocalTime } from './localTime';
+import type { NoShowFee } from './noShowFee';
 
 export interface UpdateBusinessSettingsRequest {
   /**
@@ -50,4 +51,5 @@ export interface UpdateBusinessSettingsRequest {
   autoMarkNoShows?: boolean;
   quietHoursStart?: LocalTime;
   quietHoursEnd?: LocalTime;
+  noShowFee?: NoShowFee;
 }

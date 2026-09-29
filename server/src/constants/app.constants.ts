@@ -433,6 +433,8 @@ export const PAYMENT_CONSTANTS = {
   EVENTS: {
     CANCELLED: "booking.cancelled",
     EXPIRED: "booking.expired",
+    /** Refunds what the business's no-show fee doesn't keep. */
+    NO_SHOW: "booking.no_show",
   },
   BOOKING_LOG_LIMIT: 20,
 } as const;

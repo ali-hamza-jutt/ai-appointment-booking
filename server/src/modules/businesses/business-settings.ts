@@ -41,6 +41,7 @@ export const businessSettingsSchema = z.object({
   autoMarkNoShows: bookingPolicyFields.autoMarkNoShows.default(false),
   quietHoursStart: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_START),
   quietHoursEnd: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_END),
+  noShowFee: z.enum(["payment", "deposit", "none"]).default("payment"),
 });
 
 export const DEFAULT_BUSINESS_SETTINGS = businessSettingsSchema.parse({});

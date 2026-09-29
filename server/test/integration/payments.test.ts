@@ -252,6 +252,50 @@ describe("payments", () => {
     expect(await payment(confirmed.id)).toMatchObject({ status: "REFUNDED", refundedMinor: 1_000 });
   });
 
+  it("keeps a no-show's deposit by default, and refunds it when the business charges no fee", async () => {
+    const markNoShow = async (bookingId: string) => {
+      // Marking a no-show waits for the visit to start, so the test moves the booking there directly.
+      await prisma.booking.updateMany({ where: { businessId: setup.business.id, id: bookingId }, data: { status: "NO_SHOW" } });
+      await prisma.outboxEvent.create({
+        data: {
+          id: randomUUID(),
+          businessId: setup.business.id,
+          type: "booking.no_show",
+          aggregateType: "booking",
+          aggregateId: bookingId,
+          payload: { bookingId, businessId: setup.business.id, status: "NO_SHOW", previousStatus: "CONFIRMED" },
+        },
+      });
+      await payments.handleBookingEvent(await outboxMessage(bookingId, "booking.no_show"));
+    };
+    const kept = await bookAwaitingPayment("10:00");
+
+    await payFor(kept.id);
+    await markNoShow(kept.id);
+    expect(stripe.refunds).toEqual([]);
+
+    await request(app)
+      .patch(`/api/businesses/${setup.business.id}/settings`)
+      .set(...authHeader(setup.owner))
+      .send({ noShowFee: "none" })
+      .expect(200);
+    await request(app)
+      .patch(`/api/businesses/${setup.business.id}/settings`)
+      .set(...authHeader(setup.owner))
+      .send({ noShowFee: "sometimes" })
+      .expect(422);
+
+    const refunded = await bookAwaitingPayment("11:00");
+
+    await payments.handleStripeEvent(paidEvent((await payment(refunded.id)).checkoutSessionId, "pi_2"));
+    await markNoShow(refunded.id);
+
+    expect(stripe.refunds).toEqual([
+      { paymentIntentId: "pi_2", amountMinor: 1_000, idempotencyKey: expect.stringMatching(/-no-show$/) },
+    ]);
+    expect(await payment(refunded.id)).toMatchObject({ status: "REFUNDED", refundedMinor: 1_000 });
+  });
+
   it("lets staff refund part of a payment, and records refunds made in Stripe", async () => {
     const confirmed = await bookAwaitingPayment();
 
