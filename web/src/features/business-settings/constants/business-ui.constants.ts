@@ -80,7 +80,8 @@ export interface PolicyFieldDefinition {
     | "cancellationWindowHours"
     | "rescheduleLimit"
     | "holdMinutes"
-    | "noShowGraceMinutes";
+    | "noShowGraceMinutes"
+    | "chatRetentionDays";
   label: string;
   hint: string;
   min: number;
@@ -136,5 +137,12 @@ export const POLICY_FIELDS: ReadonlyArray<PolicyFieldDefinition> = [
     hint: "Minutes after start before an unattended booking is a no-show.",
     min: 0,
     max: 240,
+  },
+  {
+    key: "chatRetentionDays",
+    label: "Keep chats for (days)",
+    hint: "Chats untouched this long are deleted each night. 0 keeps them.",
+    min: 0,
+    max: 3_650,
   },
 ];

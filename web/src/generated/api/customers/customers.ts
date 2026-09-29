@@ -27,6 +27,7 @@ import type {
 import type {
   ApiErrorResponse,
   CreateCustomerRequest,
+  CustomerDataExport,
   CustomerListResponse,
   CustomerProfileResponse,
   CustomerResponse,
@@ -576,4 +577,181 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateCustomerNotesMutationOptions(options), queryClient);
+    }
+    export const getExportCustomerDataUrl = (businessId: string,
+    customerId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/customers/${customerId}/data-export`
+}
+
+/**
+ * Everything the business holds about a customer, for a data access (GDPR) request.
+ */
+export const exportCustomerData = async (businessId: string,
+    customerId: string, options?: Parameters<typeof apiFetch>[1]): Promise<CustomerDataExport> => {
+
+  return apiFetch<CustomerDataExport>(getExportCustomerDataUrl(businessId,customerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportCustomerDataQueryKey = (businessId: string,
+    customerId: string,) => {
+    return [
+    `/businesses/${businessId}/customers/${customerId}/data-export`
+    ] as const;
+    }
+
+
+export const getExportCustomerDataQueryOptions = <TData = Awaited<ReturnType<typeof exportCustomerData>>, TError = ErrorType<ApiErrorResponse>>(businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportCustomerDataQueryKey(businessId,customerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportCustomerData>>> = ({ signal }) => exportCustomerData(businessId,customerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: businessId !== null && businessId !== undefined && customerId !== null && customerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ExportCustomerDataQueryResult = NonNullable<Awaited<ReturnType<typeof exportCustomerData>>>
+export type ExportCustomerDataQueryError = ErrorType<ApiErrorResponse>
+
+
+export function useExportCustomerData<TData = Awaited<ReturnType<typeof exportCustomerData>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportCustomerData>>,
+          TError,
+          Awaited<ReturnType<typeof exportCustomerData>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportCustomerData<TData = Awaited<ReturnType<typeof exportCustomerData>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof exportCustomerData>>,
+          TError,
+          Awaited<ReturnType<typeof exportCustomerData>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useExportCustomerData<TData = Awaited<ReturnType<typeof exportCustomerData>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useExportCustomerData<TData = Awaited<ReturnType<typeof exportCustomerData>>, TError = ErrorType<ApiErrorResponse>>(
+ businessId: string,
+    customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof exportCustomerData>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getExportCustomerDataQueryOptions(businessId,customerId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getEraseCustomerUrl = (businessId: string,
+    customerId: string,) => {
+
+
+
+
+  return `/businesses/${businessId}/customers/${customerId}/erase`
+}
+
+/**
+ * Erases a customer's personal details (GDPR erasure): their name and
+ * contact details, notes, chats, reviews, waitlist entries, preferences
+ * and message log. Their bookings stay as anonymous records. Refused while
+ * they have appointments ahead.
+ */
+export const eraseCustomer = async (businessId: string,
+    customerId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getEraseCustomerUrl(businessId,customerId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getEraseCustomerMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eraseCustomer>>, TError,{businessId: string;customerId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof eraseCustomer>>, TError,{businessId: string;customerId: string}, TContext> => {
+
+const mutationKey = ['eraseCustomer'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof eraseCustomer>>, {businessId: string;customerId: string}> = (props) => {
+          const {businessId,customerId} = props ?? {};
+
+          return  eraseCustomer(businessId,customerId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EraseCustomerMutationResult = NonNullable<Awaited<ReturnType<typeof eraseCustomer>>>
+
+    export type EraseCustomerMutationError = ErrorType<ApiErrorResponse>
+
+    export const useEraseCustomer = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof eraseCustomer>>, TError,{businessId: string;customerId: string}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof eraseCustomer>>,
+        TError,
+        {businessId: string;customerId: string},
+        TContext
+      > => {
+      return useMutation(getEraseCustomerMutationOptions(options), queryClient);
     }

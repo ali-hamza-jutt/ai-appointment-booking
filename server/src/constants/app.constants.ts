@@ -512,6 +512,15 @@ export const SUBSCRIPTION_CONSTANTS = {
   SUBSCRIPTION_EVENTS: ["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"],
 } as const;
 
+export const PRIVACY_CONSTANTS = {
+  PURGE_CHATS_JOB: "purge-old-chats",
+  /** 02:45 UTC every day. */
+  PURGE_CHATS_PATTERN: "45 2 * * *",
+  ERASED_CUSTOMER_NAME: "Deleted customer",
+  /** Messages per chat included in a data export. */
+  EXPORT_MESSAGES_PER_CHAT: 1_000,
+} as const;
+
 export const ADMIN_CONSTANTS = {
   /** An admin's session as another user ends after this long. */
   IMPERSONATION_TTL_SECONDS: 15 * 60,
@@ -629,6 +638,9 @@ export const ERROR_CODES = {
   MESSAGING_NUMBER_TAKEN: "MESSAGING_NUMBER_TAKEN",
   BUSINESS_SUSPENDED: "BUSINESS_SUSPENDED",
   PLAN_LIMIT_REACHED: "PLAN_LIMIT_REACHED",
+  UPCOMING_BOOKINGS_EXIST: "UPCOMING_BOOKINGS_EXIST",
+  SOLE_OWNER: "SOLE_OWNER",
+  ACCOUNT_DELETION_NOT_CONFIRMED: "ACCOUNT_DELETION_NOT_CONFIRMED",
   BILLING_NOT_CONFIGURED: "BILLING_NOT_CONFIGURED",
   BILLING_MANAGED_IN_PORTAL: "BILLING_MANAGED_IN_PORTAL",
   NO_BILLING_ACCOUNT: "NO_BILLING_ACCOUNT",
@@ -726,6 +738,9 @@ export const ERROR_MESSAGES = {
   MESSAGING_NUMBER_TAKEN: "This number is already connected to a business",
   BUSINESS_SUSPENDED: "This business is suspended. Its team can view it but not make changes",
   PLAN_LIMIT_REACHED: "This business has reached its plan's limit",
+  UPCOMING_BOOKINGS_EXIST: "Cancel the upcoming appointments first",
+  SOLE_OWNER: "You're the only owner of a business; make someone else an owner or delete the business first",
+  ACCOUNT_DELETION_NOT_CONFIRMED: "Type your email address to confirm",
   BILLING_NOT_CONFIGURED: "Plans and billing are not set up on this server",
   BILLING_MANAGED_IN_PORTAL: "This business already has a subscription; change it in the billing portal",
   NO_BILLING_ACCOUNT: "This business has no billing account yet; choose a plan first",

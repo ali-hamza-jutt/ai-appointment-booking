@@ -52,4 +52,9 @@ export interface UpdateBusinessSettingsRequest {
   quietHoursStart?: LocalTime;
   quietHoursEnd?: LocalTime;
   noShowFee?: NoShowFee;
+  /**
+     * @minimum 0
+     * @maximum 3650
+     */
+  chatRetentionDays?: number;
 }

@@ -57,6 +57,8 @@ export interface BusinessSettings {
    * all of it, only the deposit, or nothing (a full refund).
    */
   noShowFee: NoShowFee;
+  /** Chats untouched for this many days are deleted nightly; 0 keeps them. */
+  chatRetentionDays: number;
 }
 
 export type NoShowFee = "payment" | "deposit" | "none";
@@ -84,6 +86,8 @@ export interface UpdateBusinessSettingsRequest {
   quietHoursStart?: LocalTime;
   quietHoursEnd?: LocalTime;
   noShowFee?: NoShowFee;
+  /** @isInt @minimum 0 @maximum 3650 */
+  chatRetentionDays?: number;
 }
 
 export interface CreateBusinessLocationInput {

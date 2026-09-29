@@ -39,4 +39,6 @@ export interface BusinessSettings {
      * all of it, only the deposit, or nothing (a full refund).
      */
   noShowFee: NoShowFee;
+  /** Chats untouched for this many days are deleted nightly; 0 keeps them. */
+  chatRetentionDays: number;
 }
