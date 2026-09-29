@@ -480,6 +480,11 @@ export const MESSAGING_CONSTANTS = {
   /** Accounts made for people who only text: this address never receives mail. */
   PLACEHOLDER_EMAIL_DOMAIN: "phone.bookwise.invalid",
   YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
+  /** A text reply that cancels the booking a reminder was about. */
+  CANCEL_WORDS: ["c", "cancel"],
+  REMINDER_REPLY_JOB: "handle-reminder-reply",
+  /** How recent a reminder must be for "C" to cancel its booking. */
+  REMINDER_REPLY_DAYS: 7,
 } as const;
 
 export const AI_GUARDRAIL_CONSTANTS = {

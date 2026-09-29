@@ -88,6 +88,11 @@ const environmentSchema = z.object({
    * endpoint (checkout and refunds) and one for the Connect endpoint (account updates).
    */
   STRIPE_WEBHOOK_SECRET: optionalNonEmptyString,
+  /** Web Push keys (npx web-push generate-vapid-keys); with both set, browser notifications are on. */
+  VAPID_PUBLIC_KEY: optionalNonEmptyString,
+  VAPID_PRIVATE_KEY: optionalNonEmptyString,
+  /** Who push services can contact about this sender: a mailto: or https: URL. */
+  VAPID_SUBJECT: z.string().default("mailto:support@bookwise.app"),
   /** Stripe Billing prices (price_…) for the Starter and Pro plans. With both set, plan limits apply. */
   STRIPE_PRICE_STARTER: optionalNonEmptyString,
   STRIPE_PRICE_PRO: optionalNonEmptyString,

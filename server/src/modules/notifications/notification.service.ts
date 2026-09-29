@@ -2,6 +2,7 @@ import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { NOTIFICATION_CONSTANTS, REVIEW_CONSTANTS, SUBSCRIPTION_CONSTANTS } from "../../constants/app.constants.js";
 import { mailer, type Mailer } from "../../infrastructure/messaging/mailer.js";
+import { pushSender, type PushSender } from "../../infrastructure/messaging/push-sender.js";
 import {
   smsSender,
   SmsProviderError,
@@ -15,6 +16,7 @@ import type { OutboxMessage } from "../outbox/dto/outbox.dto.js";
 import { reviewDal } from "../reviews/dal/review.dal.js";
 import { entitlements } from "../subscriptions/entitlements.js";
 import { notificationDal } from "./dal/notification.dal.js";
+import { pushSubscriptionDal } from "./dal/push-subscription.dal.js";
 import type {
   BookingNotificationContext,
   BookingNotificationContextRecord,
@@ -34,6 +36,17 @@ import { planReminders } from "./reminder-plan.js";
 import { QueueReminderScheduler, type ReminderScheduler } from "./reminder-scheduler.js";
 
 const { EVENTS } = NOTIFICATION_CONSTANTS;
+
+/** Email, SMS, then the customer's browsers. */
+const DELIVERY_CHANNELS: NotificationChannel[] = [...NOTIFICATION_CHANNELS, "PUSH"];
+
+/** Every browser the customer had has since unsubscribed. */
+class NoBrowsersError extends Error {
+  public constructor() {
+    super("No browser accepted the notification; the customer turned them off");
+    this.name = "NoBrowsersError";
+  }
+}
 
 /** The address part of "Name <address>", or the whole value. */
 function senderAddress(from: string): string {
@@ -61,6 +74,7 @@ export class NotificationService {
     private readonly scheduler: ReminderScheduler,
     private readonly email: Mailer = mailer,
     private readonly sms: SmsSender = smsSender,
+    private readonly push: PushSender = pushSender,
   ) {}
 
   /** Reacts to a committed booking change. Safe to repeat for the same event. */
@@ -200,10 +214,10 @@ export class NotificationService {
     const templates = await notificationDal.listTemplates(context.businessId);
     let retryable: unknown;
 
-    for (const channel of NOTIFICATION_CHANNELS) {
-      const recipient = channel === "EMAIL" ? context.customer.email : context.customer.phone;
+    for (const channel of DELIVERY_CHANNELS) {
+      const recipient = await this.recipientFor(channel, context);
 
-      if (!recipient || (channel === "SMS" && !this.sms.isAvailable)) continue;
+      if (!recipient) continue;
 
       const claim = await notificationDal.claim({
         businessId: context.businessId,
@@ -241,12 +255,23 @@ export class NotificationService {
           "Notification failed",
         );
 
-        // An SMS the provider refused outright (a bad number) won't succeed on a retry.
-        if (!(error instanceof SmsProviderError && !error.retryable)) retryable ??= error;
+        // An SMS the provider refused outright (a bad number), or browsers that all unsubscribed, won't succeed on a retry.
+        if (!(error instanceof SmsProviderError && !error.retryable) && !(error instanceof NoBrowsersError)) retryable ??= error;
       }
     }
 
     if (retryable) throw retryable;
+  }
+
+  /** Where a channel reaches this customer, or null when it can't. */
+  private async recipientFor(channel: NotificationChannel, context: BookingNotificationContext): Promise<string | null> {
+    if (channel === "EMAIL") return context.customer.email;
+    if (channel === "SMS") return this.sms.isAvailable ? context.customer.phone : null;
+    if (!this.push.isAvailable || !context.customer.userId) return null;
+
+    const browsers = await pushSubscriptionDal.countForUser(context.customer.userId);
+
+    return browsers > 0 ? `${browsers} browser${browsers === 1 ? "" : "s"}` : null;
   }
 
   private async send(
@@ -256,10 +281,17 @@ export class NotificationService {
     options: DeliveryOptions,
     templates: NotificationTemplateRecord[],
   ): Promise<string | null> {
-    const custom = templates.find((template) => template.channel === channel && template.kind === options.kind);
-    const template = custom ?? DEFAULT_TEMPLATES[channel][options.kind];
+    // Browser notifications are short, so they use the SMS wording.
+    const templateChannel = channel === "PUSH" ? "SMS" : channel;
+    const custom = templates.find((template) => template.channel === templateChannel && template.kind === options.kind);
+    const template = custom ?? DEFAULT_TEMPLATES[templateChannel][options.kind];
     const values = this.templateValues(context);
     const body = renderTemplate(template.body, values);
+
+    if (channel === "PUSH") {
+      await this.sendPush(context, truncate(body, NOTIFICATION_CONSTANTS.MAX_SMS_BODY_LENGTH));
+      return null;
+    }
 
     if (channel === "SMS") {
       const receipt = await this.sms.send({
@@ -279,6 +311,20 @@ export class NotificationService {
     });
 
     return null;
+  }
+
+  /** Shows the message on every browser the customer turned notifications on in; forgets browsers that left. */
+  private async sendPush(context: BookingNotificationContext, body: string): Promise<void> {
+    let delivered = 0;
+
+    for (const browser of await pushSubscriptionDal.listForUser(context.customer.userId as string)) {
+      const result = await this.push.send(browser, { title: context.business.name, body, url: this.manageLink(context) });
+
+      if (result === "gone") await pushSubscriptionDal.removeById(browser.id);
+      else delivered += 1;
+    }
+
+    if (delivered === 0) throw new NoBrowsersError();
   }
 
   private calendarInvite(
@@ -368,6 +414,7 @@ export class NotificationService {
       },
       customer: {
         id: customer.id,
+        userId: customer.user?.id ?? null,
         name: customer.name,
         // People who only text have a stand-in address that must never be emailed.
         email: [customer.email, customer.user?.email].find((email) => email && !isPlaceholderEmail(email)) ?? null,

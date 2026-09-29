@@ -1,10 +1,11 @@
 import type {
-  NotificationChannel,
   NotificationKind,
+  TemplateChannel,
   NotificationTemplateVariable,
 } from "./dto/notification.dto.js";
 
-export const NOTIFICATION_CHANNELS: NotificationChannel[] = ["EMAIL", "SMS"];
+/** Channels with their own wording; browser notifications reuse the SMS text. */
+export const NOTIFICATION_CHANNELS: TemplateChannel[] = ["EMAIL", "SMS"];
 
 export const NOTIFICATION_KINDS: NotificationKind[] = [
   "BOOKING_CONFIRMED",
@@ -41,7 +42,7 @@ interface DefaultTemplate {
 const EMAIL_SIGN_OFF = "\n\nView, move or cancel: {{link}}\n\n{{businessName}}";
 
 /** The wording used until a business writes its own. */
-export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationKind, DefaultTemplate>> = {
+export const DEFAULT_TEMPLATES: Record<TemplateChannel, Record<NotificationKind, DefaultTemplate>> = {
   EMAIL: {
     BOOKING_CONFIRMED: {
       subject: "Booked: {{serviceName}} on {{date}} at {{time}}",
@@ -91,7 +92,7 @@ export const DEFAULT_TEMPLATES: Record<NotificationChannel, Record<NotificationK
     },
     BOOKING_REMINDER: {
       subject: null,
-      body: "Reminder from {{businessName}}: {{serviceName}} with {{staffName}} on {{date}} at {{time}}. Manage it: {{link}}",
+      body: "Reminder from {{businessName}}: {{serviceName}} with {{staffName}} on {{date}} at {{time}}. Manage it: {{link}} Reply C to cancel.",
     },
     WAITLIST_OFFER: {
       subject: null,

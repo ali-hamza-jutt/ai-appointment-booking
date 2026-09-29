@@ -14,4 +14,6 @@ export interface MyBusinessNotificationSettings {
   business: NotificationSettingsBusiness;
   email: boolean;
   sms: boolean;
+  /** Browser notifications, on browsers where the user turned them on. */
+  push: boolean;
 }

@@ -5,7 +5,8 @@ import { logger } from "../../../config/logger.js";
 import { MESSAGING_CONSTANTS } from "../../../constants/app.constants.js";
 import { isValidTwilioSignature } from "../../../infrastructure/messaging/twilio-signature.js";
 import { messagingDal } from "../dal/messaging.dal.js";
-import type { InboundMessageJobData, MessagingChannel } from "../dto/messaging.dto.js";
+import type { InboundMessageJobData, MessagingChannel, ReminderReplyJobData } from "../dto/messaging.dto.js";
+import { isCancelReply } from "../messaging.service.js";
 import { messagingQueue } from "../messaging.queue.js";
 
 /** An empty TwiML answer: the reply is sent separately once the worker has it. */
@@ -28,6 +29,7 @@ function formFields(body: unknown): Record<string, string> {
  */
 export function createTwilioInboundRouter(
   enqueue: (job: InboundMessageJobData) => Promise<void> = (job) => messagingQueue.enqueue(job),
+  enqueueReminderReply: (job: ReminderReplyJobData) => Promise<void> = (job) => messagingQueue.enqueueReminderReply(job),
 ): Router {
   const router = Router();
 
@@ -63,6 +65,9 @@ export function createTwilioInboundRouter(
           messageSid,
           profileName: fields.ProfileName ?? null,
         });
+      } else if (to && from && messageSid && isCancelReply(fields.Body ?? "")) {
+        // Reminders go out from the platform's number; "C" there cancels the reminded booking.
+        await enqueueReminderReply({ from, to, messageSid });
       } else {
         logger.warn({ to }, "Ignored a message to a number no business has connected");
       }

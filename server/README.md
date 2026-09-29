@@ -188,13 +188,15 @@ The agent starts each turn knowing who it is talking to (`modules/customers/cust
 
 ## Notifications and reminders
 
-Customers hear about their bookings by email and, when a mobile number is known, by text (`modules/notifications`). Everything is sent by the worker, never inside a booking transaction.
+Customers hear about their bookings by email, by text when a mobile number is known, and as browser notifications on browsers where they turned them on (`modules/notifications`). Everything is sent by the worker, never inside a booking transaction.
 
 - **What is sent.** An outbox consumer turns `booking.confirmed`, `booking.pending_approval`, `booking.rescheduled` and `booking.cancelled` into a message. Confirmation, move and cancellation emails carry an iCalendar invite (`utils/ics.ts`) with a stable UID and a rising `SEQUENCE`, so calendar apps update or remove the same event. A cancelled hold that was never confirmed sends nothing, and an event overtaken by a later change (a confirmation for a booking already moved) is skipped.
 - **Reminders.** A confirmed or moved booking schedules one delayed job per `reminderOffsetsMinutes` (24 and 2 hours by default) on the `notifications` queue. A reminder due inside the business's quiet hours (`quietHoursStart` to `quietHoursEnd`, 21:00 to 08:00 by default, in the customer's time zone) goes out when quiet hours begin instead. Job ids include the booking's start, and each job re-reads the booking before sending, so a moved, cancelled or finished booking gets no stale reminder. Reminders already due when the booking is made are skipped.
 - **Exactly once per message.** Each message is written to `notifications` before it is sent, keyed by event (or reminder) and channel. A repeated event or job sends only what never went out. A temporary failure (SMTP down, Twilio 5xx) fails the job so the queue retries it, while a number Twilio refuses is marked `FAILED` without retrying.
 - **Templates.** Businesses can replace the built-in wording of any message with plain text and `{{placeholders}}` (`customerName`, `serviceName`, `staffName`, `date`, `time`, `timeZone`, `location`, `link` and `businessName`); unknown placeholders are rejected when saved.
 - **Opt-outs and phone numbers.** A customer can turn a business's emails or texts off; a skipped message is logged as `SKIPPED`. Texts go to the account's verified phone or the customer record's number when it is in international (E.164) form.
+- **Browser notifications.** With `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` set (`npx web-push generate-vapid-keys`), customers can turn on notifications per browser from their profile. The web registers `public/sw.js`, subscribes with the public key and saves the subscription (`/api/me/push`). Every message then also goes to each saved browser as a Web Push notification, using the SMS wording under the business's name and opening the booking when clicked. Browsers that unsubscribed (404/410 from the push service) are forgotten. Customers can switch a business's browser notifications off like email and texts.
+- **Reply C to cancel.** Reminder texts end with "Reply C to cancel." A reply of C (or "cancel") cancels the booking of the latest reminder sent to that number in the last 7 days, as the customer would, so the business's cancellation window still applies, and texts back the outcome. It works on a business's own SMS number and on the number reminders come from (`TWILIO_FROM`), whose incoming-message webhook should also point at `/api/channels/twilio/inbound`.
 - **Delivery reports.** Twilio posts status callbacks to `/api/webhooks/twilio/sms-status`. Requests are checked against Twilio's signature over `{API_PUBLIC_URL}/api/webhooks/twilio/sms-status`; a message moves to `DELIVERED` or `FAILED` and never back.
 
 ## Payments and deposits
@@ -386,7 +388,7 @@ Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_
 - The health endpoint reports process availability and does not perform a database readiness query.
 - Payments are taken through Stripe Checkout only (no saved cards or in-page payment form), and disputes are handled in the business's Stripe dashboard.
 - Calendar sync re-reads the next 90 days of a calendar on each sync rather than using incremental sync tokens, and events BookWise writes stay in a staff member's calendar after they disconnect it.
-- Email delivery is recorded as `SENT` when the SMTP server accepts it; bounces are not tracked. Web push notifications are not implemented yet.
+- Email delivery is recorded as `SENT` when the SMTP server accepts it; bounces are not tracked.
 - Each Mistral call is retried once on timeouts, network failures, invalid responses, HTTP 408 and 5xx responses. Client retries remain safe through message idempotency.
 
 ## Sample data

@@ -5,11 +5,11 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
-import type { NotificationChannel } from './notificationChannel';
 import type { NotificationKind } from './notificationKind';
+import type { TemplateChannel } from './templateChannel';
 
 export interface NotificationTemplateResponse {
-  channel: NotificationChannel;
+  channel: TemplateChannel;
   kind: NotificationKind;
   /**
      * Email only.
