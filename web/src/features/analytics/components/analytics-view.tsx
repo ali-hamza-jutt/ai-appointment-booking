@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { Alert, Skeleton } from "@/components/ui/feedback";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/section-card";
@@ -10,6 +8,7 @@ import { BusinessRequired } from "@/features/business-settings/components/busine
 import { canManageBusiness } from "@/features/business-settings/utils/business-permissions";
 import { useGetAnalytics, useGetBusiness } from "@/generated/api/businesses/businesses";
 import type { AnalyticsResponse, BusinessSummaryResponse } from "@/generated/api/models";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { cn } from "@/lib/utils/cn";
 import { addDaysToDate, formatLocalDateLabel, getCurrentLocalDate } from "@/lib/utils/date-time";
@@ -22,6 +21,8 @@ const RANGES = [
   { label: "Last 30 days", value: "30" },
   { label: "Last 90 days", value: "90" },
 ] as const;
+
+const RANGE_VALUES = RANGES.map((option) => option.value);
 
 function percent(value: number | null): string {
   return value === null ? "–" : `${Math.round(value * 100)}%`;
@@ -48,7 +49,7 @@ export function AnalyticsView() {
 }
 
 function AnalyticsContent({ business }: { business: BusinessSummaryResponse }) {
-  const [range, setRange] = useState<RangeDays>("30");
+  const [range, setRange] = useSearchParamState<RangeDays>("range", "30", RANGE_VALUES);
   const businessQuery = useGetBusiness(business.id);
   const timeZone = businessQuery.data?.timeZone;
   // The range ends today in the business's own time zone.

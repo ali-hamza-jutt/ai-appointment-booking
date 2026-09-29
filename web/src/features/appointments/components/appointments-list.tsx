@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -18,10 +17,13 @@ import { useAppointments } from "@/features/appointments/hooks/use-appointments"
 import type { AppointmentFilter } from "@/features/appointments/types/appointment-ui";
 import { toAppointmentViewModel } from "@/features/appointments/utils/appointment-format";
 import { MyWaitlist } from "@/features/waitlist/components/my-waitlist";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 
+const FILTER_VALUES = APPOINTMENT_UI_CONSTANTS.FILTERS.map((filter) => filter.value);
+
 export function AppointmentsList() {
-  const [activeFilter, setActiveFilter] = useState<AppointmentFilter>("ALL");
+  const [activeFilter, setActiveFilter] = useSearchParamState<AppointmentFilter>("status", "ALL", FILTER_VALUES);
   const appointmentsQuery = useAppointments(activeFilter);
   const appointments = Array.from(
     new Map(

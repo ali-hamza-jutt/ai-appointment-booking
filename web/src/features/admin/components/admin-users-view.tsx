@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/feedback";
@@ -10,14 +8,13 @@ import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@/components/ui/table";
 import { useImpersonation } from "@/features/admin/hooks/use-impersonation";
 import { useListAdminUsers } from "@/generated/api/platform-admin/platform-admin";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useSearchParamQuery } from "@/hooks/use-search-param-state";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import { formatDate } from "@/lib/utils/date-time";
 
 /** Everyone with an account, to find and support a customer or business owner. */
 export function AdminUsersView() {
-  const [search, setSearch] = useState("");
-  const debounced = useDebouncedValue(search.trim(), 300);
+  const { search, setSearch, query: debounced } = useSearchParamQuery("q", 300);
   const usersQuery = useListAdminUsers(debounced ? { search: debounced } : {});
   const impersonation = useImpersonation();
   const users = usersQuery.data?.items ?? [];
