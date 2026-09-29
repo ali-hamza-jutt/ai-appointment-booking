@@ -386,6 +386,7 @@ psql "<development-database-url>" -f server/prisma/sample-inserts.sql
 | Layer | Command | Covers |
 | --- | --- | --- |
 | Unit, integration, contract | `cd server && npm test` | Slot generation, state machine, policies, time zones, DALs and constraints on real PostgreSQL, the outbox and Redis, API scopes and tenant isolation. Recorded agent evals run here too. |
+| Web unit | `cd web && npm test` | The booking chat's state: sending, streaming, failed and retried messages, and confirming. |
 | Agent evals | `cd server && npm run eval` / `npm run eval:live` / `npm run eval:record` | Scripted conversations with a frozen clock: booking success, wrong-slot rate and out-of-scope refusals. `eval` replays recorded model replies; `eval:live` calls Mistral and grades against targets; `eval:record` refreshes the recordings. |
 | End to end | `cd e2e && npm test` | Sign up, book through chat, confirm and cancel; book through the public page's step-by-step form; and open and close the widget on another website. All in a real browser against the real API and web app, with a fake Mistral server. Set `E2E_CHROMIUM_PATH` to use a preinstalled Chromium. |
 
