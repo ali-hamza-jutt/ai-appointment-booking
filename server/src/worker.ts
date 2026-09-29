@@ -8,6 +8,7 @@ import {
   JOB_CONSTANTS,
   MESSAGING_CONSTANTS,
   NOTIFICATION_CONSTANTS,
+  PRIVACY_CONSTANTS,
 } from "./constants/app.constants.js";
 import {
   connectDatabase,
@@ -44,6 +45,7 @@ import { OutboxConsumerRunner } from "./modules/outbox/outbox-consumer.runner.js
 import { outboxConsumers } from "./modules/outbox/outbox-consumers.js";
 import { readOutboxMeta } from "./modules/outbox/outbox-meta.js";
 import { OutboxRelayService } from "./modules/outbox/outbox-relay.service.js";
+import { privacyService } from "./modules/privacy/privacy.service.js";
 import { ProcessedEventStore } from "./modules/outbox/processed-event.store.js";
 import { QueueOutboxPublisher } from "./modules/outbox/queue-outbox.publisher.js";
 
@@ -96,6 +98,13 @@ async function observeJob<Result>(queue: string, job: Job, work: () => Promise<R
 }
 
 async function runMaintenanceJob(job: Job): Promise<number> {
+  if (job.name === PRIVACY_CONSTANTS.PURGE_CHATS_JOB) {
+    const deleted = await observeJob(QUEUES.MAINTENANCE, job, () => privacyService.purgeOldChats());
+
+    if (deleted > 0) logger.info({ job: job.name, deleted }, "Old chats deleted");
+    return deleted;
+  }
+
   if (job.name === ANALYTICS_CONSTANTS.NIGHTLY_JOB) {
     const businesses = await observeJob(QUEUES.MAINTENANCE, job, () => analyticsService.storeRecentDays());
 
@@ -224,6 +233,11 @@ async function startWorker(): Promise<void> {
       ANALYTICS_CONSTANTS.NIGHTLY_JOB,
       { pattern: ANALYTICS_CONSTANTS.NIGHTLY_PATTERN },
       { name: ANALYTICS_CONSTANTS.NIGHTLY_JOB },
+    );
+    await maintenanceQueue.upsertJobScheduler(
+      PRIVACY_CONSTANTS.PURGE_CHATS_JOB,
+      { pattern: PRIVACY_CONSTANTS.PURGE_CHATS_PATTERN },
+      { name: PRIVACY_CONSTANTS.PURGE_CHATS_JOB },
     );
     await calendarQueue.upsertJobScheduler(
       CALENDAR_CONSTANTS.SWEEP_JOB,

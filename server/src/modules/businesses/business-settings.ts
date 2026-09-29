@@ -42,6 +42,7 @@ export const businessSettingsSchema = z.object({
   quietHoursStart: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_START),
   quietHoursEnd: localTime.default(NOTIFICATION_CONSTANTS.DEFAULT_QUIET_HOURS_END),
   noShowFee: z.enum(["payment", "deposit", "none"]).default("payment"),
+  chatRetentionDays: z.number().int().min(0).max(3_650).default(0),
 });
 
 export const DEFAULT_BUSINESS_SETTINGS = businessSettingsSchema.parse({});

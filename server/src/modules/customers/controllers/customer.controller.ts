@@ -14,6 +14,8 @@ import {
 } from "@tsoa/runtime";
 
 import type { ApiErrorResponse } from "../../../models/api-error.js";
+import type { CustomerDataExport } from "../../privacy/dto/privacy.dto.js";
+import { privacyService } from "../../privacy/privacy.service.js";
 import { customerProfileService } from "../customer-profile.service.js";
 import { customerService } from "../customer.service.js";
 import type { CustomerProfileResponse } from "../dto/customer-profile.dto.js";
@@ -77,6 +79,31 @@ export class CustomerController extends Controller {
   ): Promise<CustomerProfileResponse> {
     await customerService.updateNotes(businessId, customerId, body.notes);
     return customerProfileService.getCustomerProfile(businessId, customerId);
+  }
+
+  /** Everything the business holds about a customer, for a data access (GDPR) request. */
+  @Get("{customerId}/data-export")
+  @Security("jwt", ["business:manage"])
+  @SuccessResponse("200", "Customer data")
+  @Response<ApiErrorResponse>(404, "Customer was not found")
+  public exportCustomerData(@Path() businessId: string, @Path() customerId: string): Promise<CustomerDataExport> {
+    return privacyService.exportCustomer(businessId, customerId);
+  }
+
+  /**
+   * Erases a customer's personal details (GDPR erasure): their name and
+   * contact details, notes, chats, reviews, waitlist entries, preferences
+   * and message log. Their bookings stay as anonymous records. Refused while
+   * they have appointments ahead.
+   */
+  @Post("{customerId}/erase")
+  @Security("jwt", ["business:manage"])
+  @SuccessResponse("204", "Customer erased")
+  @Response<ApiErrorResponse>(404, "Customer was not found")
+  @Response<ApiErrorResponse>(409, "The customer has upcoming appointments")
+  public async eraseCustomer(@Path() businessId: string, @Path() customerId: string): Promise<void> {
+    await privacyService.eraseCustomer(businessId, customerId);
+    this.setStatus(204);
   }
 
   /** Adds a customer record, for example a walk-in or phone booking. */

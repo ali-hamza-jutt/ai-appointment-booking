@@ -9,6 +9,7 @@ import { Alert, Skeleton } from "@/components/ui/feedback";
 import { TextAreaField } from "@/components/ui/form-controls";
 import { Modal } from "@/components/ui/modal";
 import { BOOKING_STATUS_PRESENTATION } from "@/features/bookings/constants/booking-status.constants";
+import { CustomerPrivacy } from "@/features/customers/components/customer-privacy";
 import { PREFERENCE_UI_CONSTANTS } from "@/features/customers/constants/preference-ui.constants";
 import {
   getGetCustomerProfileQueryKey,
@@ -104,6 +105,7 @@ export function CustomerProfileModal({
                 </ul>
               )}
             </section>
+            <CustomerPrivacy businessId={businessId} customerId={customer.id} onErased={onClose} />
           </>
         ) : null}
       </div>

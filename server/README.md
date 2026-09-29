@@ -368,6 +368,14 @@ Integration and contract tests migrate and truncate the database in `TEST_DATABA
 
 Tests that touch the queue, idempotency or cache use Redis database 15 at `TEST_REDIS_URL` (default `redis://localhost:6379/15`) and flush it. GitHub Actions runs lint, typecheck and all tests on every pull request against PostgreSQL 16 (pgvector) and Redis 7 service containers.
 
+## Privacy and data retention
+
+`modules/privacy` handles GDPR requests and chat retention.
+
+- **A business's customer.** Owners and managers can download everything the business holds about a customer (`GET /api/businesses/{businessId}/customers/{customerId}/data-export`: details and team notes, bookings, chats with the assistant, reviews, waitlist entries, preferences and the message log) and erase it (`POST …/erase`). Erasing replaces the name with "Deleted customer", clears email, phone, notes and the account link, clears booking notes, and deletes the chats, reviews, waitlist entries, preferences and message log. The bookings stay as the business's anonymous records. It is refused while the customer has an appointment ahead.
+- **The person themselves.** `GET /api/me/data/export` returns their account and the same export for every business they booked with. `POST /api/me/data/delete-account` (with their email typed as confirmation) erases them at every business and deletes the account, taking its sessions, browsers and remaining chats with it. It is refused while they have an appointment ahead or are the only owner of a business.
+- **Retention.** A business can set `chatRetentionDays`; a nightly job (02:45 UTC) deletes its chats untouched for longer. 0, the default, keeps them.
+
 ## Security and reliability decisions
 
 - Argon2id password hashing and short-lived signed JWTs.
