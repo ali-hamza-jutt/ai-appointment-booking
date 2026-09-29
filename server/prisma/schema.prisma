@@ -219,6 +219,8 @@ enum CalendarConnectionStatus {
 enum NotificationChannel {
   EMAIL
   SMS
+  /// Browser notifications (Web Push); worded like SMS.
+  PUSH
 
   @@map("notification_channel")
 }
@@ -292,6 +294,7 @@ model User {
   waitlistEntries    WaitlistEntry[]
   reviews            Review[]
   adminAuditLogs     AdminAuditLog[]
+  pushSubscriptions  PushSubscription[]
   invitations        BusinessInvitation[]
   staff              Staff[]
 
@@ -334,6 +337,21 @@ model AuthToken {
 }
 
 /// One-time SMS codes for linking a phone or signing in with it.
+/// A browser a user allowed to show BookWise notifications (Web Push).
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  /// The push service URL for this browser; unique across users.
+  endpoint  String   @unique(map: "push_subscriptions_endpoint_key") @db.VarChar(1000)
+  p256dh    String   @db.VarChar(200)
+  auth      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "push_subscriptions_user_id_idx")
+  @@map("push_subscriptions")
+}
+
 /// A one-time code emailed to someone booking as a guest on a public page.
 model GuestCode {
   id         String    @id @default(uuid()) @db.Uuid

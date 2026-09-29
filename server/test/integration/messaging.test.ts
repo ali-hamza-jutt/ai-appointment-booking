@@ -11,10 +11,10 @@ import type { SmsMessage, SmsSender } from "../../src/infrastructure/messaging/s
 import { twilioSignature } from "../../src/infrastructure/messaging/twilio-signature.js";
 import { ChatOrchestrationService } from "../../src/modules/chat/chat-orchestration.service.js";
 import { createTwilioInboundRouter } from "../../src/modules/messaging/controllers/twilio-inbound.routes.js";
-import type { InboundMessageJobData } from "../../src/modules/messaging/dto/messaging.dto.js";
+import type { InboundMessageJobData, ReminderReplyJobData } from "../../src/modules/messaging/dto/messaging.dto.js";
 import { MessagingService } from "../../src/modules/messaging/messaging.service.js";
 import { authHeader, createTestUser } from "../helpers/auth.js";
-import { createBookableSetup, type BookableSetup } from "../helpers/booking.js";
+import { bookSlot, createBookableSetup, type BookableSetup } from "../helpers/booking.js";
 import { addTestMember, createTestBusiness } from "../helpers/business.js";
 import { disconnectTestDatabase, resetDatabase } from "../helpers/database.js";
 import { ScriptedProvider } from "../helpers/scripted-provider.js";
@@ -165,6 +165,65 @@ describe("SMS and WhatsApp", () => {
     expect(sent.filter((message) => message.text.startsWith("Sana"))).toHaveLength(1);
   });
 
+  it("cancels the reminded booking when the customer replies C, within the business's policy", async () => {
+    const phone = "+447700900777";
+    const customer = await createTestUser();
+    const remind = async (time: string) => {
+      const bookingId = await bookSlot(customer, setup, setup.at(time));
+      const customerId = (await prisma.customer.findFirstOrThrow({ where: { businessId: setup.business.id, userId: customer.id } })).id;
+
+      await prisma.notification.create({
+        data: {
+          businessId: setup.business.id,
+          bookingId,
+          customerId,
+          channel: "SMS",
+          kind: "BOOKING_REMINDER",
+          status: "SENT",
+          recipient: phone,
+          dedupeKey: `reminder:${bookingId}`,
+          sentAt: new Date(),
+        },
+      });
+
+      return bookingId;
+    };
+    const status = async (bookingId: string) =>
+      (await prisma.booking.findFirstOrThrow({ where: { businessId: setup.business.id, id: bookingId } })).status;
+
+    // Replying to the number reminders come from.
+    const first = await remind("10:00");
+
+    await service.handleReminderReply({ from: phone, to: "+15559990000", messageSid: "SM-c-1" });
+
+    expect(await status(first)).toBe("CANCELLED");
+    expect(sent.at(-1)).toMatchObject({ to: phone, from: "+15559990000", text: expect.stringMatching(/^Cancelled: your Haircut on .+. Book again any time.$/) });
+
+    // Nothing left to cancel.
+    await service.handleReminderReply({ from: phone, to: "+15559990000", messageSid: "SM-c-2" });
+    expect(sent.at(-1)?.text).toMatch(/^We couldn't find an upcoming appointment to cancel/);
+
+    // "C" to a business's own number cancels too, instead of starting a chat.
+    const second = await remind("11:00");
+
+    await service.handleInbound(inbound("C", { channel: "SMS", from: phone, to: "+15550001111", profileName: null }));
+    expect(await status(second)).toBe("CANCELLED");
+    expect(provider.requests).toHaveLength(0);
+
+    // Inside the cancellation window, the policy wins and they're told why.
+    await request(app)
+      .patch(`/api/businesses/${setup.business.id}/settings`)
+      .set(...authHeader(setup.owner))
+      .send({ cancellationWindowHours: 720 })
+      .expect(200);
+
+    const third = await remind("12:00");
+
+    await service.handleReminderReply({ from: phone, to: "+15559990000", messageSid: "SM-c-3" });
+    expect(await status(third)).toBe("CONFIRMED");
+    expect(sent.at(-1)?.text).toMatch(/^We couldn't cancel it: /);
+  });
+
   it("lets owners connect numbers and shows where Twilio should send messages", async () => {
     const base = `/api/businesses/${setup.business.id}/messaging-numbers`;
     const sms = await request(app).post(base).set(...authHeader(setup.owner)).send({ channel: "SMS", number: "+1 555 000 1111" }).expect(201);
@@ -201,12 +260,21 @@ describe("SMS and WhatsApp", () => {
 
   it("queues only messages Twilio signed, for numbers a business connected", async () => {
     const queued: InboundMessageJobData[] = [];
+    const replies: ReminderReplyJobData[] = [];
     const webhook = express()
       .use(express.urlencoded({ extended: false }))
-      .use(createTwilioInboundRouter((job) => {
-        queued.push(job);
-        return Promise.resolve();
-      }));
+      .use(
+        createTwilioInboundRouter(
+          (job) => {
+            queued.push(job);
+            return Promise.resolve();
+          },
+          (job) => {
+            replies.push(job);
+            return Promise.resolve();
+          },
+        ),
+      );
     const path = MESSAGING_CONSTANTS.INBOUND_PATH;
     const fields = { From: CUSTOMER, To: BUSINESS_NUMBER, Body: "Hello", MessageSid: "SM-hook-1", ProfileName: "Zara" };
 
@@ -225,6 +293,12 @@ describe("SMS and WhatsApp", () => {
       // Nobody has connected this number yet.
       await request(webhook).post(path).type("form").set("X-Twilio-Signature", sign(fields)).send(fields).expect(200);
       expect(queued).toHaveLength(0);
+
+      // Except that "C" there answers a reminder.
+      const cancel = { From: "+447700900555", To: "+15559990000", Body: "C", MessageSid: "SM-hook-c" };
+
+      await request(webhook).post(path).type("form").set("X-Twilio-Signature", sign(cancel)).send(cancel).expect(200);
+      expect(replies).toEqual([{ from: "+447700900555", to: "+15559990000", messageSid: "SM-hook-c" }]);
 
       await request(app)
         .post(`/api/businesses/${setup.business.id}/messaging-numbers`)

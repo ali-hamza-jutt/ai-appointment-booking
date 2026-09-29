@@ -18,6 +18,7 @@ export const NOTIFICATION_UI_CONSTANTS = {
   CHANNEL_LABELS: {
     EMAIL: "Email",
     SMS: "Text message",
+    PUSH: "Browser",
   } satisfies Record<NotificationChannel, string>,
   STATUS_PRESENTATION: {
     PENDING: { label: "Sending", tone: "neutral" },

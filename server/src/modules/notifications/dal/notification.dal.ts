@@ -5,12 +5,15 @@ import type {
   BookingNotificationResponse,
   ClaimNotificationData,
   NotificationChannel,
+  TemplateChannel,
   NotificationClaim,
   NotificationKind,
   NotificationStatus,
   NotificationTemplateRecord,
   UserNotificationSettingsRecord,
 } from "../dto/notification.dto.js";
+
+const TEMPLATE_CHANNELS = ["EMAIL", "SMS"] as const;
 
 /** Messages in these states may be (re)sent when their event is delivered again. */
 const SENDABLE: readonly NotificationStatus[] = ["PENDING", "FAILED"];
@@ -53,7 +56,7 @@ export class NotificationDal {
             name: true,
             email: true,
             phone: true,
-            user: { select: { email: true, phone: true, phoneVerifiedAt: true } },
+            user: { select: { id: true, email: true, phone: true, phoneVerifiedAt: true } },
             notificationPreferences: { select: { channel: true, optedIn: true } },
           },
         },
@@ -63,9 +66,9 @@ export class NotificationDal {
 
   public listTemplates(businessId: string): Promise<NotificationTemplateRecord[]> {
     return prisma.notificationTemplate.findMany({
-      where: { businessId },
+      where: { businessId, channel: { in: [...TEMPLATE_CHANNELS] } },
       select: { channel: true, kind: true, subject: true, body: true },
-    });
+    }) as Promise<NotificationTemplateRecord[]>;
   }
 
   public async upsertTemplate(
@@ -79,12 +82,12 @@ export class NotificationDal {
       create: { businessId, ...template },
       update: { subject: template.subject, body: template.body },
       select: { channel: true, kind: true, subject: true, body: true },
-    });
+    }) as Promise<NotificationTemplateRecord>;
   }
 
   public async deleteTemplate(
     businessId: string,
-    channel: NotificationChannel,
+    channel: TemplateChannel,
     kind: NotificationKind,
   ): Promise<void> {
     await prisma.notificationTemplate.deleteMany({ where: { businessId, channel, kind } });

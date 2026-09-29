@@ -28,7 +28,7 @@ import { analyticsService } from "./modules/analytics/analytics.service.js";
 import { bookingMaintenanceService } from "./modules/bookings/booking-maintenance.service.js";
 import { calendarSyncQueue } from "./modules/calendar/calendar-sync.queue.js";
 import { calendarSyncService } from "./modules/calendar/calendar-sync.service.js";
-import type { InboundMessageJobData } from "./modules/messaging/dto/messaging.dto.js";
+import type { InboundMessageJobData, ReminderReplyJobData } from "./modules/messaging/dto/messaging.dto.js";
 import { messagingQueue } from "./modules/messaging/messaging.queue.js";
 import { messagingService } from "./modules/messaging/messaging.service.js";
 import { calendarDal } from "./modules/calendar/dal/calendar.dal.js";
@@ -146,12 +146,15 @@ async function runCalendarJob(job: Job<CalendarSyncJobData>): Promise<void> {
 }
 
 /** Answers one incoming SMS or WhatsApp message. */
-function runChannelJob(job: Job<InboundMessageJobData>): Promise<void> {
-  if (job.name !== MESSAGING_CONSTANTS.INBOUND_JOB) {
-    return Promise.reject(new Error(`Unknown channel job ${job.name}`));
+function runChannelJob(job: Job<InboundMessageJobData | ReminderReplyJobData>): Promise<void> {
+  switch (job.name) {
+    case MESSAGING_CONSTANTS.INBOUND_JOB:
+      return observeJob(QUEUES.CHANNELS, job, () => messagingService.handleInbound(job.data as InboundMessageJobData));
+    case MESSAGING_CONSTANTS.REMINDER_REPLY_JOB:
+      return observeJob(QUEUES.CHANNELS, job, () => messagingService.handleReminderReply(job.data as ReminderReplyJobData));
+    default:
+      return Promise.reject(new Error(`Unknown channel job ${job.name}`));
   }
-
-  return observeJob(QUEUES.CHANNELS, job, () => messagingService.handleInbound(job.data));
 }
 
 /** Continues the trace and request id of the request that wrote the event. */
@@ -255,7 +258,7 @@ async function startWorker(): Promise<void> {
     );
     watch(
       // One at a time, so a customer's quick messages are answered in order.
-      new Worker<InboundMessageJobData>(QUEUES.CHANNELS, runChannelJob, {
+      new Worker<InboundMessageJobData | ReminderReplyJobData>(QUEUES.CHANNELS, runChannelJob, {
         connection: createRedisConnection(),
         prefix: QUEUE_PREFIX,
         concurrency: 1,

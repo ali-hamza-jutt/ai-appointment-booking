@@ -11,6 +11,7 @@ import {
   type SmsMessage,
   type SmsSender,
 } from "../../src/infrastructure/messaging/sms-sender.js";
+import type { PushPayload, PushSender } from "../../src/infrastructure/messaging/push-sender.js";
 import { twilioSignature } from "../../src/infrastructure/messaging/twilio-signature.js";
 import { createQueue } from "../../src/infrastructure/queue/queues.js";
 import type { PlannedReminder } from "../../src/modules/notifications/dto/notification.dto.js";
@@ -55,6 +56,8 @@ describe("booking notifications", () => {
   let failNextEmail: boolean;
   let rejectTexts: SmsProviderError | null;
   let scheduler: FakeScheduler;
+  let pushes: Array<{ endpoint: string } & PushPayload>;
+  let goneEndpoints: Set<string>;
   let service: NotificationService;
   let setup: BookableSetup;
   let customer: TestUser;
@@ -68,6 +71,16 @@ describe("booking notifications", () => {
 
       emails.push(message);
       return Promise.resolve();
+    },
+  };
+  const push: PushSender = {
+    isAvailable: true,
+    publicKey: "test-vapid-key",
+    send: (target, payload) => {
+      if (goneEndpoints.has(target.endpoint)) return Promise.resolve("gone");
+
+      pushes.push({ endpoint: target.endpoint, ...payload });
+      return Promise.resolve("sent");
     },
   };
   const sms: SmsSender = {
@@ -117,7 +130,9 @@ describe("booking notifications", () => {
     failNextEmail = false;
     rejectTexts = null;
     scheduler = new FakeScheduler();
-    service = new NotificationService(scheduler, mailer, sms);
+    pushes = [];
+    goneEndpoints = new Set();
+    service = new NotificationService(scheduler, mailer, sms, push);
     setup = await createBookableSetup({ daysAhead: 2 });
     customer = await createTestUser({ fullName: "Ayesha Khan", email: `ayesha.${Date.now()}@example.com` });
   });
@@ -224,7 +239,7 @@ describe("booking notifications", () => {
     const settings = await request(app).get("/api/me/notification-settings").set(...authHeader(customer)).expect(200);
 
     expect(settings.body.items).toEqual([
-      { business: expect.objectContaining({ id: setup.business.id }), email: true, sms: true },
+      { business: expect.objectContaining({ id: setup.business.id }), email: true, sms: true, push: true },
     ]);
 
     await request(app)
@@ -249,6 +264,60 @@ describe("booking notifications", () => {
       .set(...authHeader(customer))
       .send({ channel: "EMAIL", optedIn: false })
       .expect(404);
+  });
+
+  it("shows booking messages on the customer's browsers, and forgets browsers that left", async () => {
+    const bookingId = await bookSlot(customer, setup, setup.at("15:00"));
+    const subscribe = (endpoint: string) =>
+      request(app)
+        .post("/api/me/push/subscriptions")
+        .set(...authHeader(customer))
+        .send({ endpoint, keys: { p256dh: "BPublicKeyOfTheBrowser", auth: "secret" } });
+
+    await subscribe("http://push.example/insecure").expect(422);
+    await subscribe("https://push.example/laptop").expect(204);
+    await subscribe("https://push.example/phone").expect(204);
+    // Saving the same browser again doesn't add a second one.
+    await subscribe("https://push.example/phone").expect(204);
+    expect((await request(app).get("/api/me/push").set(...authHeader(customer)).expect(200)).body).toMatchObject({ browsers: 2 });
+
+    goneEndpoints.add("https://push.example/phone");
+    await deliver(bookingId, "booking.confirmed");
+
+    expect(pushes).toEqual([
+      {
+        endpoint: "https://push.example/laptop",
+        title: "Glow Salon",
+        body: expect.stringContaining("your Haircut is booked"),
+        url: expect.stringContaining(`/appointments/${bookingId}`),
+      },
+    ]);
+    expect(await notifications(bookingId)).toContainEqual(
+      expect.objectContaining({ channel: "PUSH", kind: "BOOKING_CONFIRMED", status: "SENT", recipient: "2 browsers" }),
+    );
+    // The browser that unsubscribed is forgotten.
+    expect((await request(app).get("/api/me/push").set(...authHeader(customer)).expect(200)).body.browsers).toBe(1);
+
+    // Turning browser notifications off for this business skips them.
+    await request(app)
+      .put(`/api/me/notification-settings/${setup.business.id}`)
+      .set(...authHeader(customer))
+      .send({ channel: "PUSH", optedIn: false })
+      .expect(204);
+    await request(app).patch(`/api/appointments/${bookingId}/cancel`).set(...authHeader(customer)).send({}).expect(200);
+    await deliver(bookingId, "booking.cancelled");
+
+    expect(pushes).toHaveLength(1);
+    expect(await notifications(bookingId)).toContainEqual(
+      expect.objectContaining({ channel: "PUSH", kind: "BOOKING_CANCELLED", status: "SKIPPED" }),
+    );
+
+    await request(app).post("/api/me/push/subscriptions/remove").set(...authHeader(customer)).send({ endpoint: "https://push.example/laptop" }).expect(204);
+    expect((await request(app).get("/api/me/push").set(...authHeader(customer)).expect(200)).body).toEqual({
+      enabled: false,
+      publicKey: null,
+      browsers: 0,
+    });
   });
 
   it("sends a cancellation that removes the calendar event and drops reminders", async () => {

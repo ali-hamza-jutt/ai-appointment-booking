@@ -70,6 +70,7 @@
     "pino-http": "^11.0.0",
     "rate-limit-redis": "^6.0.1",
     "swagger-ui-express": "^5.0.1",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -83,6 +84,7 @@
     "@types/pg": "^8.21.0",
     "@types/supertest": "^7.2.1",
     "@types/swagger-ui-express": "^4.1.8",
+    "@types/web-push": "^3.6.4",
     "cross-env": "^10.1.0",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",

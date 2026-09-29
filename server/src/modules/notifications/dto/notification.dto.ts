@@ -1,7 +1,11 @@
 import type { BookingStatus } from "../../bookings/dto/booking.dto.js";
 import type { BusinessSettings } from "../../businesses/dto/business.dto.js";
 
-export type NotificationChannel = "EMAIL" | "SMS";
+/** Channels a business writes its own wording for. */
+export type TemplateChannel = "EMAIL" | "SMS";
+
+/** Every way a message goes out; browser notifications reuse the SMS wording. */
+export type NotificationChannel = TemplateChannel | "PUSH";
 
 export type NotificationKind =
   | "BOOKING_CONFIRMED"
@@ -20,7 +24,7 @@ export interface NotificationTemplateVariable {
 }
 
 export interface NotificationTemplateResponse {
-  channel: NotificationChannel;
+  channel: TemplateChannel;
   kind: NotificationKind;
   /** Email only. */
   subject: string | null;
@@ -69,6 +73,8 @@ export interface MyBusinessNotificationSettings {
   business: NotificationSettingsBusiness;
   email: boolean;
   sms: boolean;
+  /** Browser notifications, on browsers where the user turned them on. */
+  push: boolean;
 }
 
 export interface MyNotificationSettingsResponse {
@@ -97,6 +103,8 @@ export interface BookingNotificationContext {
   business: { name: string; slug: string; settings: BusinessSettings };
   customer: {
     id: string;
+    /** The customer's account, whose browsers get push notifications. */
+    userId: string | null;
     name: string;
     email: string | null;
     /** E.164 when known, from a verified account phone or the customer record. */
@@ -128,13 +136,13 @@ export interface BookingNotificationContextRecord {
     name: string;
     email: string | null;
     phone: string | null;
-    user: { email: string; phone: string | null; phoneVerifiedAt: Date | null } | null;
+    user: { id: string; email: string; phone: string | null; phoneVerifiedAt: Date | null } | null;
     notificationPreferences: Array<{ channel: NotificationChannel; optedIn: boolean }>;
   };
 }
 
 export interface NotificationTemplateRecord {
-  channel: NotificationChannel;
+  channel: TemplateChannel;
   kind: NotificationKind;
   subject: string | null;
   body: string;
@@ -184,4 +192,29 @@ export interface UserNotificationSettingsRecord {
   customerId: string;
   business: NotificationSettingsBusiness;
   preferences: Array<{ channel: NotificationChannel; optedIn: boolean }>;
+}
+
+export interface PushSettingsResponse {
+  /** False when this server has no Web Push keys. */
+  enabled: boolean;
+  /** The VAPID key browsers subscribe with. */
+  publicKey: string | null;
+  /** Browsers of this account that get notifications. */
+  browsers: number;
+}
+
+export interface SavePushSubscriptionRequest {
+  /** The push service URL from the browser's PushSubscription. @maxLength 1000 */
+  endpoint: string;
+  keys: {
+    /** @maxLength 200 */
+    p256dh: string;
+    /** @maxLength 100 */
+    auth: string;
+  };
+}
+
+export interface RemovePushSubscriptionRequest {
+  /** @maxLength 1000 */
+  endpoint: string;
 }

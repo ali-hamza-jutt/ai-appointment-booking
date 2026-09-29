@@ -15,6 +15,7 @@ import type {
   NotificationKind,
   NotificationTemplateListResponse,
   NotificationTemplateResponse,
+  TemplateChannel,
   UpdateMyNotificationSettingRequest,
   UpdateNotificationTemplateRequest,
 } from "./dto/notification.dto.js";
@@ -26,7 +27,7 @@ import {
   TEMPLATE_VARIABLES,
 } from "./notification-templates.js";
 
-function isChannel(value: string): value is NotificationChannel {
+function isChannel(value: string): value is TemplateChannel {
   return (NOTIFICATION_CHANNELS as string[]).includes(value);
 }
 
@@ -112,6 +113,7 @@ export class NotificationSettingsService {
         business: customer.business,
         email: optedIn(customer.preferences, "EMAIL"),
         sms: optedIn(customer.preferences, "SMS"),
+        push: optedIn(customer.preferences, "PUSH"),
       })),
     };
   }
@@ -132,7 +134,7 @@ export class NotificationSettingsService {
     await notificationDal.setPreference(businessId, customerId, request.channel, request.optedIn);
   }
 
-  private parseTemplateKey(channel: string, kind: string): { channel: NotificationChannel; kind: NotificationKind } {
+  private parseTemplateKey(channel: string, kind: string): { channel: TemplateChannel; kind: NotificationKind } {
     const upperChannel = channel.toUpperCase();
     const upperKind = kind.toUpperCase();
 

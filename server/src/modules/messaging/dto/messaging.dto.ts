@@ -35,6 +35,13 @@ export interface InboundMessageJobData {
   profileName: string | null;
 }
 
+/** A text to a number no business connected, such as a "C" reply to a reminder. */
+export interface ReminderReplyJobData {
+  from: string;
+  to: string;
+  messageSid: string;
+}
+
 export interface MessagingNumberRecord {
   id: string;
   businessId: string;

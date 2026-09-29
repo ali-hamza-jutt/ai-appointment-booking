@@ -17,6 +17,7 @@ import { authDal } from "../auth/dal/auth.dal.js";
 import { normalizePhoneNumber } from "../auth/phone-auth.service.js";
 import { chatOrchestrationService, type ChatOrchestrationService } from "../chat/chat-orchestration.service.js";
 import { parseStoredParts } from "../chat/chat-parts.schema.js";
+import { bookingService } from "../bookings/booking.service.js";
 import { chatService } from "../chat/chat.service.js";
 import { chatDal } from "../chat/dal/chat.dal.js";
 import { customerProfileDal } from "../customers/dal/customer-profile.dal.js";
@@ -30,9 +31,16 @@ import type {
   MessagingNumberListResponse,
   MessagingNumberRecord,
   MessagingNumberResponse,
+  ReminderReplyJobData,
 } from "./dto/messaging.dto.js";
 
 const { WHATSAPP_PREFIX } = MESSAGING_CONSTANTS;
+const CANCEL_WORDS = new Set<string>(MESSAGING_CONSTANTS.CANCEL_WORDS);
+
+/** True for a reply of just "C" or "cancel". */
+export function isCancelReply(text: string): boolean {
+  return CANCEL_WORDS.has(text.trim().toLowerCase().replace(/[.!]+$/, ""));
+}
 
 /** Refusals worded for someone texting, where the web shows a form or button instead. */
 const TEXT_REFUSALS: Readonly<Record<string, string>> = {
@@ -120,6 +128,9 @@ export class MessagingService {
 
     if (!business) return;
 
+    // "C" answers a reminder: cancel that booking rather than start a chat about it.
+    if (job.channel === "SMS" && isCancelReply(job.body) && (await this.cancelFromReminder(job, now))) return;
+
     const userId = await this.resolveUser(phone, job.profileName, now);
     const customerId = await customerProfileDal.resolveCustomerIdForUser(business.id, userId);
 
@@ -168,6 +179,61 @@ export class MessagingService {
     }
 
     await this.sendText(business.id, { to: job.from, from: job.to, text: reply });
+  }
+
+  /** A "C" texted to a number no business connected (the one reminders come from). */
+  public async handleReminderReply(job: ReminderReplyJobData, now: Date = new Date()): Promise<void> {
+    if (await this.cancelFromReminder(job, now)) return;
+
+    await this.sender.send({
+      to: job.from,
+      from: job.to,
+      text: "We couldn't find an upcoming appointment to cancel from this number. Use the link in your reminder to manage it.",
+    });
+  }
+
+  /**
+   * Cancels the booking of the latest reminder texted to this number, as the
+   * customer would, so the cancellation policy applies, and texts back the
+   * outcome. False when no recent reminder points at a booking still ahead.
+   */
+  private async cancelFromReminder(job: { from: string; to: string }, now: Date): Promise<boolean> {
+    let phone: string;
+
+    try {
+      phone = normalizePhoneNumber(job.from);
+    } catch {
+      return false;
+    }
+
+    const reminded = await messagingDal.findRemindedBooking(phone, now, MESSAGING_CONSTANTS.REMINDER_REPLY_DAYS);
+
+    if (!reminded) return false;
+
+    let reply: string;
+
+    try {
+      const cancelled = await bookingService.cancelForCustomer(reminded.user_id, reminded.booking_id, "Cancelled by replying C to a reminder");
+      const when = new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: cancelled.timeZone,
+      }).format(new Date(cancelled.scheduledAt));
+
+      reply = `Cancelled: your ${cancelled.serviceName} on ${when}. Book again any time.`;
+    } catch (error) {
+      // Too late under the business's policy, for example: say so instead of retrying.
+      if (!(error instanceof AppError) || error.statusCode >= 500) throw error;
+
+      reply = `We couldn't cancel it: ${error.message}. Use the link in your reminder, or contact the business.`;
+    }
+
+    await this.sendText(reminded.business_id, { to: job.from, from: job.to, text: reply });
+
+    return true;
   }
 
   /** Sends a staff member's inbox reply to a customer chatting by SMS or WhatsApp. */

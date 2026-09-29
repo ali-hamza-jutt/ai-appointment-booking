@@ -43,6 +43,27 @@ export class MessagingDal {
     });
   }
 
+  /**
+   * The booking of the latest reminder texted to this number in the last
+   * few days, if it is still booked and ahead. Reminders go out from any
+   * business, so this looks across them.
+   */
+  public async findRemindedBooking(phone: string, now: Date, days: number) {
+    const rows = await prisma.$queryRaw<Array<{ business_id: string; booking_id: string; user_id: string }>>`
+      SELECT b.business_id::text AS business_id, b.id::text AS booking_id, b.user_id::text AS user_id
+      FROM notifications n
+      JOIN bookings b ON b.id = n.booking_id
+      WHERE n.kind = 'BOOKING_REMINDER' AND n.channel = 'SMS' AND n.recipient = ${phone}
+        AND n.status IN ('SENT', 'DELIVERED')
+        AND n.created_at > ${new Date(now.getTime() - days * 24 * 60 * 60 * 1_000)}
+        AND b.status = 'CONFIRMED' AND b.scheduled_at > ${now}
+      ORDER BY n.created_at DESC
+      LIMIT 1
+    `;
+
+    return rows[0] ?? null;
+  }
+
   /** The cards and buttons of the assistant's latest message in a chat, for reading a numbered reply. */
   public async lastAssistantParts(sessionId: string): Promise<unknown> {
     const message = await prisma.chatMessage.findFirst({

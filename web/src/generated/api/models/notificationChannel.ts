@@ -5,11 +5,11 @@
  * HTTP API for BookWise AI.
  * OpenAPI spec version: 0.1.0
  */
+import { TemplateChannel } from './templateChannel';
 
+/**
+ * Every way a message goes out; browser notifications reuse the SMS wording.
+ */
+export const NotificationChannel = {...TemplateChannel,  PUSH: 'PUSH',
+} as const
 export type NotificationChannel = typeof NotificationChannel[keyof typeof NotificationChannel];
-
-
-export const NotificationChannel = {
-  EMAIL: 'EMAIL',
-  SMS: 'SMS',
-} as const;

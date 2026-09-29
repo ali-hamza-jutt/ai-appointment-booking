@@ -30,6 +30,9 @@ import type {
   MyNotificationSettingsResponse,
   NotificationTemplateListResponse,
   NotificationTemplateResponse,
+  PushSettingsResponse,
+  RemovePushSubscriptionRequest,
+  SavePushSubscriptionRequest,
   UpdateMyNotificationSettingRequest,
   UpdateNotificationTemplateRequest
 } from '../models';
@@ -402,7 +405,238 @@ export function useListBookingNotifications<TData = Awaited<ReturnType<typeof li
 
 
 
-export const getListMySettingsUrl = () => {
+export const getGetPushSettingsUrl = () => {
+
+
+
+
+  return `/me/push`
+}
+
+/**
+ * Whether push is available, the key to subscribe with, and how many browsers are on.
+ */
+export const getPushSettings = async ( options?: Parameters<typeof apiFetch>[1]): Promise<PushSettingsResponse> => {
+
+  return apiFetch<PushSettingsResponse>(getGetPushSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPushSettingsQueryKey = () => {
+    return [
+    `/me/push`
+    ] as const;
+    }
+
+
+export const getGetPushSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getPushSettings>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPushSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPushSettings>>> = ({ signal }) => getPushSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetPushSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getPushSettings>>>
+export type GetPushSettingsQueryError = ErrorType<unknown>
+
+
+export function useGetPushSettings<TData = Awaited<ReturnType<typeof getPushSettings>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPushSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getPushSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPushSettings<TData = Awaited<ReturnType<typeof getPushSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getPushSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getPushSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetPushSettings<TData = Awaited<ReturnType<typeof getPushSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function useGetPushSettings<TData = Awaited<ReturnType<typeof getPushSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPushSettings>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetPushSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getSavePushSubscriptionUrl = () => {
+
+
+
+
+  return `/me/push/subscriptions`
+}
+
+/**
+ * Turns notifications on for this browser. Saving the same browser again replaces its keys.
+ */
+export const savePushSubscription = async (savePushSubscriptionRequest: SavePushSubscriptionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getSavePushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(savePushSubscriptionRequest)
+  }
+);}
+
+
+
+
+
+export const getSavePushSubscriptionMutationOptions = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,{data: BodyType<SavePushSubscriptionRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,{data: BodyType<SavePushSubscriptionRequest>}, TContext> => {
+
+const mutationKey = ['savePushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePushSubscription>>, {data: BodyType<SavePushSubscriptionRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  savePushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SavePushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof savePushSubscription>>>
+    export type SavePushSubscriptionMutationBody = BodyType<SavePushSubscriptionRequest>
+    export type SavePushSubscriptionMutationError = ErrorType<ApiErrorResponse>
+
+    export const useSavePushSubscription = <TError = ErrorType<ApiErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePushSubscription>>, TError,{data: BodyType<SavePushSubscriptionRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof savePushSubscription>>,
+        TError,
+        {data: BodyType<SavePushSubscriptionRequest>},
+        TContext
+      > => {
+      return useMutation(getSavePushSubscriptionMutationOptions(options), queryClient);
+    }
+    export const getRemovePushSubscriptionUrl = () => {
+
+
+
+
+  return `/me/push/subscriptions/remove`
+}
+
+/**
+ * Turns notifications off for this browser.
+ */
+export const removePushSubscription = async (removePushSubscriptionRequest: RemovePushSubscriptionRequest, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getRemovePushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(removePushSubscriptionRequest)
+  }
+);}
+
+
+
+
+
+export const getRemovePushSubscriptionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePushSubscription>>, TError,{data: BodyType<RemovePushSubscriptionRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removePushSubscription>>, TError,{data: BodyType<RemovePushSubscriptionRequest>}, TContext> => {
+
+const mutationKey = ['removePushSubscription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removePushSubscription>>, {data: BodyType<RemovePushSubscriptionRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  removePushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemovePushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof removePushSubscription>>>
+    export type RemovePushSubscriptionMutationBody = BodyType<RemovePushSubscriptionRequest>
+    export type RemovePushSubscriptionMutationError = ErrorType<unknown>
+
+    export const useRemovePushSubscription = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removePushSubscription>>, TError,{data: BodyType<RemovePushSubscriptionRequest>}, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removePushSubscription>>,
+        TError,
+        {data: BodyType<RemovePushSubscriptionRequest>},
+        TContext
+      > => {
+      return useMutation(getRemovePushSubscriptionMutationOptions(options), queryClient);
+    }
+    export const getListMySettingsUrl = () => {
 
 
 
