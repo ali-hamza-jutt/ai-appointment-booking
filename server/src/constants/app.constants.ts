@@ -275,6 +275,10 @@ export const CHAT_CONSTANTS = {
       "Tell me what you'd like and when — for example “a haircut on Friday afternoon” — and I'll find open times. You can also tap a service below or use the booking form.",
     ASSISTANT_UNAVAILABLE:
       "The booking assistant is unavailable right now, but you can still book: pick a service below or use the booking form.",
+    SLOW_DOWN:
+      "You're sending messages faster than I can keep up. Give me a moment, or pick a service below to book straight away.",
+    ASSISTANT_BUSY:
+      "The booking assistant has reached its limit for today, but you can still book: pick a service below or use the booking form.",
     EMPTY_REPLY: "Here's what I found.",
     BOOKING_SUCCESS_PREFIX: "Your appointment has been booked",
     BOOKING_PENDING_PREFIX: "Your request has been sent for approval",
@@ -476,6 +480,11 @@ export const MESSAGING_CONSTANTS = {
   /** Accounts made for people who only text: this address never receives mail. */
   PLACEHOLDER_EMAIL_DOMAIN: "phone.bookwise.invalid",
   YES_WORDS: ["yes", "y", "yeah", "yep", "ok", "okay", "confirm", "sure"],
+} as const;
+
+export const AI_GUARDRAIL_CONSTANTS = {
+  /** Assistant turns one customer can start per minute, on any channel (AI_MAX_TURNS_PER_MINUTE). */
+  DEFAULT_MAX_TURNS_PER_MINUTE: 8,
 } as const;
 
 export const SUBSCRIPTION_CONSTANTS = {
