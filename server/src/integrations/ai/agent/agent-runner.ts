@@ -51,6 +51,11 @@ export class AgentRunner {
     private readonly maxRounds: number = AGENT_CONSTANTS.MAX_TOOL_ROUNDS,
   ) {}
 
+  /** The model the runner talks to, for logs. */
+  public get model(): string {
+    return this.provider.model;
+  }
+
   public async run<Context, Part>(request: AgentRunRequest<Context, Part>): Promise<AgentRunResult<Part>> {
     const tools = new Map(request.tools.map((tool) => [tool.name, tool]));
     const definitions = request.tools.map((tool) => toToolDefinition(tool));

@@ -30,6 +30,7 @@ import {
 import { buildBookingAgentPrompt } from "./agent/booking-agent.prompt.js";
 import { bookingTools } from "./agent/booking-tools.js";
 import { ConversationMemory } from "./agent/conversation-memory.js";
+import { aiGuardrails } from "./agent/ai-guardrails.js";
 import { classifyLocalIntent } from "./agent/local-intent.js";
 import { describeToolCall } from "./agent/tool-status.js";
 import { publishChatEvent } from "./chat-events.js";
@@ -326,6 +327,19 @@ export class ChatOrchestrationService {
       return this.withServiceCards(context, CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_UNAVAILABLE);
     }
 
+    const refusal = await aiGuardrails.check(context.business.id, context.userId, context.now);
+
+    if (refusal) {
+      logger.warn({ businessId: context.business.id, refusal }, "Booking agent skipped by a guardrail");
+
+      return this.withServiceCards(
+        context,
+        refusal === "customer_rate"
+          ? CHAT_CONSTANTS.ASSISTANT_MESSAGES.SLOW_DOWN
+          : CHAT_CONSTANTS.ASSISTANT_MESSAGES.ASSISTANT_BUSY,
+      );
+    }
+
     const [memory, user, profile] = await Promise.all([
       this.memory.load({
         userId: context.userId,
@@ -339,6 +353,8 @@ export class ChatOrchestrationService {
     ]);
 
     listener?.status(REALTIME_CONSTANTS.STATUS.THINKING);
+
+    const startedAt = performance.now();
 
     try {
       const result = await this.runner.run({
@@ -366,9 +382,12 @@ export class ChatOrchestrationService {
           : {}),
       });
 
+      // Counts and names only: the conversation itself never goes to the logs.
       logger.info(
         {
           businessId: context.business.id,
+          model: this.runner.model,
+          durationMs: Math.round(performance.now() - startedAt),
           rounds: result.rounds,
           tools: result.toolCalls.map((call) => `${call.name}${call.ok ? "" : `!${call.error ?? ""}`}`),
           tokens: result.usage.totalTokens,

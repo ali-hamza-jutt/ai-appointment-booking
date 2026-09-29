@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   AI_CONSTANTS,
+  AI_GUARDRAIL_CONSTANTS,
   AUTH_CONSTANTS,
   JOB_CONSTANTS,
   KNOWLEDGE_CONSTANTS,
@@ -117,6 +118,10 @@ const environmentSchema = z.object({
     .min(0)
     .max(3_600)
     .default(JOB_CONSTANTS.DEFAULT_AVAILABILITY_CACHE_TTL_SECONDS),
+  /** Tokens the assistant may use per business per (UTC) day; 0 turns the cap off. */
+  LLM_DAILY_TOKEN_BUDGET: z.coerce.number().int().min(0).default(2_000_000),
+  /** Assistant turns one customer can start per minute, on any channel. */
+  AI_MAX_TURNS_PER_MINUTE: z.coerce.number().int().min(1).default(AI_GUARDRAIL_CONSTANTS.DEFAULT_MAX_TURNS_PER_MINUTE),
   AI_MAX_HISTORY_MESSAGES: z.coerce
     .number()
     .int()

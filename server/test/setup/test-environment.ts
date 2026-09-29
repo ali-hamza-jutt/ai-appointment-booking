@@ -9,6 +9,8 @@ export const TEST_ENVIRONMENT = {
   REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/15",
   // Tests read their own writes immediately; cache behaviour is tested directly.
   AVAILABILITY_CACHE_TTL_SECONDS: "0",
+  // Scripted conversations run faster than any person; the guardrail's own test lowers this.
+  AI_MAX_TURNS_PER_MINUTE: "1000",
   // A fixed key so calendar tokens can be sealed and opened in tests.
   TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   // Tests never reach Mistral (fakes stand in); live evals keep the real key.
